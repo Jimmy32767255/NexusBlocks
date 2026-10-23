@@ -47,6 +47,20 @@ Failed to initialize gtk backend!: BoolError { message: "Failed to initialize GT
 
 屏幕上的窗口只会出现在这些 socket 所属的那台机器、那个会话上；从别的电脑 ssh 过来时需要 `ssh -X` 做 X11 转发。
 
+## 保存与打开项目
+
+浏览器版用 `<a download>` 触发下载；**WebKitGTK（Tauri 在 Linux 上的 WebView）会忽略 `download` 属性，也不允许网页弹出系统文件选择器**，所以桌面版必须走原生对话框：
+
+| 动作 | 桌面版 | 浏览器版 |
+| --- | --- | --- |
+| 保存 | `project_save` 打开系统「另存为」，把 JSON 写到你选的位置 | 下载到浏览器默认目录 |
+| 打开 | `project_open` 打开系统文件选择器，读回文本后按同一套校验解析 | `<input type="file">` |
+
+- 取消对话框不会提示“已保存”，文档也不会被标记为已保存；
+- 项目文件名取自项目名（`/ \ : * ? " < > |` 换成 `-`），后缀固定 `.nexusblocks.json`；
+- 写入前会自动创建目标目录，失败按 `runtime.error.file*` 报错并弹提示；
+- 桌面与浏览器共用 `persist.ts` 的解析/序列化，文件格式完全一致，可以互相拷。
+
 ## 文件路径
 
 桌面版**不设工作区根目录**，积木里的路径按下面的规则解析：
