@@ -31,6 +31,8 @@ import { renderToolbar } from "./toolbar.ts";
 import { renderToolbox } from "./toolbox.ts";
 import { renderVariables } from "./variables.ts";
 
+import "./styles.css";
+
 const mount = document.querySelector<HTMLElement>("#app");
 if (!mount) throw new Error("Editor root element #app is missing");
 const host: HTMLElement = mount;
