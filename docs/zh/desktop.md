@@ -31,6 +31,22 @@ pnpm desktop:build    # 构建安装包（默认 deb）
 
 `pnpm desktop` 会先启动编辑器的 Vite 开发服务器，再打开原生窗口；编辑器代码改动仍然热更新。
 
+### 打不开窗口：`Failed to initialize GTK`
+
+Linux 上 Tauri 通过 GTK 建窗口，`DISPLAY` 和 `WAYLAND_DISPLAY` 都不可用时就会直接 panic：
+
+```
+Failed to initialize gtk backend!: BoolError { message: "Failed to initialize GTK" }
+```
+
+常见于 ssh 登录、从非图形会话启动的 tmux、或者 `scripts/dev-env.sh` 把 `XDG_RUNTIME_DIR` 指向仓库目录之后。`pnpm desktop` 现在经由 `scripts/desktop-display.mjs` 启动，会按顺序尝试：
+
+1. 沿用有效的 `WAYLAND_DISPLAY` / `DISPLAY`；
+2. 在 `$XDG_RUNTIME_DIR`、`/run/user/$UID` 里找一个活着的 `wayland-<n>` 或 `X<n>` socket，并顺手补上 `DBUS_SESSION_BUS_ADDRESS`；
+3. 都没有时退回 `xvfb-run` 虚拟显示（窗口不可见，仅用于跑通/截图）。
+
+屏幕上的窗口只会出现在这些 socket 所属的那台机器、那个会话上；从别的电脑 ssh 过来时需要 `ssh -X` 做 X11 转发。
+
 ## 文件路径
 
 桌面版**不设工作区根目录**，积木里的路径按下面的规则解析：

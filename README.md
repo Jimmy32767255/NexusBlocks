@@ -53,6 +53,8 @@ pnpm desktop:build  # 构建桌面安装包（deb）
 
 桌面版需要 Rust 1.77+；Linux 另需 `webkit2gtk-4.1`、`gtk+-3.0`、`libsoup-3.0` 开发包，Debian/Ubuntu 上为 `libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev`。
 
+`pnpm desktop` 通过 `scripts/desktop-display.mjs` 启动，会自动找回丢失的 `WAYLAND_DISPLAY` / `DISPLAY`（ssh、非图形会话里常见），没有可用的显示器时退回 `xvfb-run`；细节见[桌面外壳](docs/zh/desktop.md)。
+
 打开编辑器后，从左侧工具箱把「当程序启动时」拖到画布，再拖入「打印」，点顶部「运行」即可在控制台看到 `Hello, world!`。
 
 ## 文档
