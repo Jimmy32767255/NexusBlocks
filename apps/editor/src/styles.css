@@ -526,14 +526,14 @@ button {
 
 .block__head {
   position: relative;
-  width: var(--block-width);
+  width: max-content;
+  min-width: var(--block-width);
   min-height: 38px;
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
   gap: 6px;
   padding: 7px 10px;
-  overflow: hidden;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--block-color) 58%, #05080f);
   background: linear-gradient(
