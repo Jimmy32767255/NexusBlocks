@@ -12,6 +12,7 @@ export const CATEGORY_COLORS = {
   data: "#2aa6a6",
   functions: "#9b6bff",
   files: "#6a8caf",
+  modules: "#c47f42",
 } as const;
 
 const CONTROL = CATEGORY_COLORS.control;

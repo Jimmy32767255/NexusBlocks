@@ -20,6 +20,7 @@ const PATHS = {
   terminal: '<path d="M4 5h16v14H4z"/><path d="m8 10 3 2-3 2M13 14h3"/>',
   warning: '<path d="M12 4 3 20h18z"/><path d="M12 10v4M12 17h.01"/>',
   book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M6 3v18"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.4 6"/><path d="M20 4v7h-7"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;

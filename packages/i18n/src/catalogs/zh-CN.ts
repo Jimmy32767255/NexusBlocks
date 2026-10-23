@@ -19,6 +19,7 @@ export const zhCN: Catalog = {
   "toolbar.language": "语言",
   "toolbar.help": "快捷键",
   "toolbar.docs": "文档",
+  "toolbar.refreshImports": "重新载入导入",
 
   "language.en": "English",
   "language.zh-CN": "简体中文",
@@ -121,6 +122,12 @@ export const zhCN: Catalog = {
   "runtime.error.paramScope": "参数“{name}”只能在其函数内部使用",
   "runtime.error.unknownFunction": "找不到函数：{name}",
   "runtime.error.callDepth": "嵌套调用太深（上限 {limit}）",
+  "runtime.error.importNoFile": "导入需要文件路径。",
+  "runtime.error.importNoName": "导入需要函数名。",
+  "runtime.error.importMissingFunction": "在 {file} 中找不到函数 {name}。",
+  "runtime.error.importInvalid": "无法读取 {file}：{message}",
+  "runtime.error.importUnreadable": "无法读取导入文件 {file}。",
+  "runtime.error.importDepth": "导入链过深（超过 {limit}），位于 {file}。",
   "runtime.error.badType": "需要 {to} 类型，但得到的是 {from} 类型",
   "runtime.error.expressionAsStatement": "“{type}”会返回一个值，不能单独执行",
   "runtime.error.statementAsValue": "“{type}”不返回值",
@@ -139,6 +146,7 @@ export const zhCN: Catalog = {
   "common.cancel": "取消",
   "common.confirm": "确定",
   "common.close": "关闭",
+  "toast.importsRefreshed": "导入已刷新",
   "common.delete": "删除",
   "common.add": "添加",
   "common.none": "无",
@@ -179,6 +187,7 @@ export const zhCN: Catalog = {
   "category.data": "列表与字典",
   "category.functions": "函数",
   "category.files": "文件",
+  "category.modules": "模块",
 
   "block.control.start.label": "当程序启动时",
   "block.control.start.description": "程序的入口。按下“运行”后，这块积木下面的内容会执行一次。",
@@ -310,5 +319,15 @@ export const zhCN: Catalog = {
   "block.file.delete.port.path": "路径",
   "block.file.list.label": "列出文件",
   "block.file.list.description": "列出文件夹里的文件名（留空时为主目录）。",
+
+  "block.import.all.label": "导入[文件]",
+  "block.import.all.description": "从另一个程序文件导入全部函数。该文件必须是保存过的 Nexus Blocks 项目。",
+  "block.import.named.label": "从[文件]导入[函数]",
+  "block.import.named.description": "从另一个程序文件导入一个函数。",
+  "block.import.alias.label": "从[文件]导入[函数]作为[名称]",
+  "block.import.alias.description": "导入函数并使用本地名称；调用积木和校验都会使用该名称。",
+  "block.import.field.file": "文件",
+  "block.import.field.name": "函数",
+  "block.import.field.alias": "作为",
 
 };

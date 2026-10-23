@@ -23,6 +23,7 @@ export interface ToolbarOptions {
   onLocaleChange: (locale: string) => void;
   onHelp: () => void;
   onDocs: () => void;
+  onRefreshImports: () => void;
   onRename: (name: string) => void;
 }
 
@@ -115,6 +116,7 @@ export function renderToolbar(options: ToolbarOptions): HTMLElement {
       language,
       iconButton("help", t("toolbar.help"), options.onHelp),
       iconButton("book", t("toolbar.docs"), options.onDocs),
+      iconButton("refresh", t("toolbar.refreshImports"), options.onRefreshImports),
     ]),
   ]);
 }

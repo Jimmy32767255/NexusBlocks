@@ -115,6 +115,8 @@ export interface RunOptions {
   stepLimit?: number;
   /** Replace the default local host (tests, desktop shell). */
   host?: HostBridge;
+  /** Skip import resolution (the caller already merged imported functions). */
+  skipImports?: boolean;
   /** Enables the workspace file capabilities of the default local host. */
   storage?: KeyValueStorage;
   /** How many interpreted blocks between event-loop yields. */

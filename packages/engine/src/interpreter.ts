@@ -3,6 +3,7 @@ import {
   collectFunctions,
   defaultValue,
   FUNCTION_DEFINE_TYPE,
+  isImportType,
   toDisplayText,
   type BlockNode,
   type FunctionDecl,
@@ -73,7 +74,9 @@ export class Interpreter implements ExecutionContext {
   }
 
   async runScripts(scripts: BlockNode[]): Promise<void> {
-    await this.run(scripts.filter((node) => node.type !== FUNCTION_DEFINE_TYPE));
+    await this.run(
+      scripts.filter((node) => node.type !== FUNCTION_DEFINE_TYPE && !isImportType(node.type)),
+    );
   }
 
   async run(blocks: BlockNode[]): Promise<void> {

@@ -4,5 +4,6 @@ export * from "./values.ts";
 export * from "./create.ts";
 export * from "./traverse.ts";
 export * from "./functions.ts";
+export * from "./imports.ts";
 export * from "./serialize.ts";
 export * from "./validate.ts";

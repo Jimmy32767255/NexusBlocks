@@ -34,6 +34,8 @@
 
 ## v0.5 — 桌面壳与系统能力
 
+- [x] 跨文件导入：`导入[文件]` / `从[文件]导入[函数]` / `从[文件]导入[函数]作为[名称]`
+
 - ✅ Tauri 2 + Rust 壳，加载 `apps/editor/dist`
 - ✅ `HostBridge` 的 Rust 实现：`fs.read/write/exists/delete/list`，直接访问本机文件系统（绝对路径 / `~/…` / 主目录相对路径）
 - ⬜ 更多能力：`net.fetch`、`proc.spawn`、`clipboard`

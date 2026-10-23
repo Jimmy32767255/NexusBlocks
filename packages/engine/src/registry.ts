@@ -5,6 +5,7 @@ import { controlBlocks } from "./blocks/control.ts";
 import { createFunctionCallBlock, functionBlocks } from "./blocks/functions.ts";
 import { dictBlocks } from "./blocks/dicts.ts";
 import { fileBlocks } from "./blocks/files.ts";
+import { moduleBlocks } from "./blocks/modules.ts";
 import { listBlocks } from "./blocks/lists.ts";
 import { ioBlocks } from "./blocks/io.ts";
 import { logicBlocks } from "./blocks/logic.ts";
@@ -23,6 +24,7 @@ export const CATEGORY_ORDER: readonly string[] = [
   "functions",
   "data",
   "files",
+  "modules",
 ];
 
 export class BlockRegistry {
@@ -101,6 +103,7 @@ export const coreBlocks: readonly BlockDefinition[] = [
   ...listBlocks,
   ...dictBlocks,
   ...fileBlocks,
+  ...moduleBlocks,
   ...functionBlocks,
 ];
 

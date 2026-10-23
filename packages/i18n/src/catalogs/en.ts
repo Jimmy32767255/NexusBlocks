@@ -22,6 +22,7 @@ export const en: Catalog = {
   "toolbar.language": "Language",
   "toolbar.help": "Shortcuts",
   "toolbar.docs": "Docs",
+  "toolbar.refreshImports": "Refresh imports",
 
   "language.en": "English",
   "language.zh-CN": "简体中文",
@@ -124,6 +125,12 @@ export const en: Catalog = {
   "runtime.error.paramScope": "Parameter “{name}” is not available outside its function",
   "runtime.error.unknownFunction": "Function not found: {name}",
   "runtime.error.callDepth": "Too many nested calls (limit {limit})",
+  "runtime.error.importNoFile": "Import needs a file path.",
+  "runtime.error.importNoName": "Import needs a function name.",
+  "runtime.error.importMissingFunction": "Function {name} not found in {file}.",
+  "runtime.error.importInvalid": "Cannot read {file}: {message}",
+  "runtime.error.importUnreadable": "Cannot read import file {file}.",
+  "runtime.error.importDepth": "Import chain deeper than {limit} at {file}.",
   "runtime.error.badType": "Cannot use a {from} value where {to} is expected",
   "runtime.error.expressionAsStatement": "“{type}” returns a value and cannot run on its own",
   "runtime.error.statementAsValue": "“{type}” does not return a value",
@@ -142,6 +149,7 @@ export const en: Catalog = {
   "common.cancel": "Cancel",
   "common.confirm": "Confirm",
   "common.close": "Close",
+  "toast.importsRefreshed": "Imports refreshed",
   "common.delete": "Delete",
   "common.add": "Add",
   "common.none": "None",
@@ -182,6 +190,7 @@ export const en: Catalog = {
   "category.data": "Lists & dictionaries",
   "category.functions": "Functions",
   "category.files": "Files",
+  "category.modules": "Modules",
 
   "block.control.start.label": "when program starts",
   "block.control.start.description": "Entry point. Everything under this block runs once when you press Run.",
@@ -313,5 +322,15 @@ export const en: Catalog = {
   "block.file.delete.port.path": "path",
   "block.file.list.label": "list files",
   "block.file.list.description": "Return the file names in a folder (the home directory when left empty).",
+
+  "block.import.all.label": "import [file]",
+  "block.import.all.description": "Load every function from another program file. The file must be a saved Nexus Blocks project.",
+  "block.import.named.label": "from [file] import [name]",
+  "block.import.named.description": "Load one function from another program file.",
+  "block.import.alias.label": "from [file] import [name] as [alias]",
+  "block.import.alias.description": "Load one function under a local name; call blocks and validation use that name.",
+  "block.import.field.file": "file",
+  "block.import.field.name": "function",
+  "block.import.field.alias": "as",
 
 };

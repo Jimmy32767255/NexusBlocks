@@ -2,6 +2,7 @@ import { validateProject, type Project } from "@nexus/ir";
 import { CapabilityUnavailableError, createLocalHost } from "./host.ts";
 import { Interpreter } from "./interpreter.ts";
 import { BreakSignal, RuntimeFailure, StopSignal } from "./errors.ts";
+import { resolveImports } from "./modules.ts";
 import { createProjectRegistry } from "./registry.ts";
 import type { RunOptions, RunResult, RuntimeEvent } from "./types.ts";
 
@@ -13,6 +14,32 @@ import type { RunOptions, RunResult, RuntimeEvent } from "./types.ts";
 export async function runProject(project: Project, options: RunOptions = {}): Promise<RunResult> {
   const started = performance.now();
   const emit = options.onEvent ?? (() => {});
+  const host = options.host ?? createLocalHost(emit, options.storage);
+
+  if (!options.skipImports) {
+    const resolved = await resolveImports(project, { host });
+    project = resolved.project;
+    if (resolved.errors.length > 0) {
+      for (const error of resolved.errors) {
+        emit({
+          kind: "error",
+          blockId: error.blockId,
+          messageKey: error.messageKey,
+          params: error.params,
+          time: Date.now(),
+        });
+      }
+      const first = resolved.errors[0]!;
+      emit({ kind: "status", status: "error", durationMs: performance.now() - started });
+      return {
+        status: "error",
+        durationMs: performance.now() - started,
+        steps: 0,
+        error: { messageKey: first.messageKey, params: first.params, blockId: first.blockId },
+      };
+    }
+  }
+
   const registry = options.registry ?? createProjectRegistry(project);
 
   const diagnostics = validateProject(project, registry);
@@ -52,7 +79,6 @@ export async function runProject(project: Project, options: RunOptions = {}): Pr
     else options.signal.addEventListener("abort", () => controller.abort(), { once: true });
   }
 
-  const host = options.host ?? createLocalHost(emit, options.storage);
   const interpreter = new Interpreter(project, registry, {
     host,
     emit,

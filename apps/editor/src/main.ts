@@ -1,8 +1,11 @@
 import {
+  createLocalHost,
   createProjectRegistry,
   createStarterDocument,
+  resolveImports,
   runProject,
   type BlockRegistry,
+  type ImportError,
   type RuntimeEvent,
 } from "@nexus/engine";
 import {
@@ -46,6 +49,10 @@ setUiLocale(currentLocale());
 
 const store = new Store(loadAutosave() ?? createStarterDocument(currentLocale()));
 let registry: BlockRegistry = createProjectRegistry(store.state.document.project);
+let importErrors: ImportError[] = [];
+let importToken = 0;
+let importTimer: number | null = null;
+const editorHost = desktopHost ?? createLocalHost(handleEvent, window.localStorage);
 
 let controller: AbortController | null = null;
 let surface: HTMLElement | null = null;
@@ -63,7 +70,10 @@ const STATUS_KEYS: Record<RunStatus, string> = {
 store.subscribe(() => {
   scheduleRender();
   scheduleAutosave();
+  scheduleImportRefresh();
 });
+
+void refreshImports(false);
 
 /* ------------------------------------------------------------------ render */
 
@@ -83,8 +93,6 @@ function renderNow(): void {
   const state = store.state;
   const document = state.document;
   const running = state.status === "running";
-  // Function call blocks are derived from the definitions on the canvas.
-  registry = createProjectRegistry(document.project);
 
   const toolbox = renderToolbox({
     registry,
@@ -104,7 +112,8 @@ function renderNow(): void {
   const canvasHost = el("div", { class: "canvas-host" }, [canvas.root]);
 
   const diagnostics = validateQuietly();
-  const errorCount = diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
+  const errorCount =
+    diagnostics.filter((diagnostic) => diagnostic.severity === "error").length + importErrors.length;
   const problems = el(
     "button",
     {
@@ -177,6 +186,7 @@ function renderNow(): void {
     onLocaleChange: (locale) => changeLocale(locale),
     onHelp: () => void showHelp(),
     onDocs: () => void showDocs(),
+    onRefreshImports: () => void refreshImports(true),
     onRename: (name) => renameProject(name),
   });
 
@@ -187,6 +197,42 @@ function renderNow(): void {
 }
 
 /* -------------------------------------------------------------------- data */
+
+function scheduleImportRefresh(): void {
+  if (importTimer !== null) window.clearTimeout(importTimer);
+  importTimer = window.setTimeout(() => {
+    importTimer = null;
+    void refreshImports(false);
+  }, 250);
+}
+
+async function refreshImports(announce: boolean): Promise<void> {
+  const token = ++importToken;
+  try {
+    const resolved = await resolveImports(store.state.document.project, { host: editorHost });
+    if (token !== importToken) return;
+    importErrors = resolved.errors;
+    registry = createProjectRegistry(resolved.project);
+    if (announce) {
+      toast(
+        importErrors.length > 0
+          ? t(importErrors[0]!.messageKey, importErrors[0]!.params)
+          : t("toast.importsRefreshed"),
+        importErrors.length > 0 ? "error" : "info",
+      );
+    }
+    scheduleRender();
+  } catch (error) {
+    if (token !== importToken) return;
+    importErrors = [
+      {
+        messageKey: "runtime.error.importUnreadable",
+        params: { file: "?", message: error instanceof Error ? error.message : String(error) },
+      },
+    ];
+    scheduleRender();
+  }
+}
 
 function validateQuietly(): Diagnostic[] {
   try {
@@ -283,7 +329,6 @@ async function run(): Promise<void> {
   store.setStatus("running");
   try {
     await runProject(store.state.document.project, {
-      registry,
       signal: controller.signal,
       onEvent: handleEvent,
       // Workspace files live in localStorage in the browser; the desktop
@@ -493,8 +538,16 @@ async function deleteVariable(id: string): Promise<void> {
 async function showProblems(): Promise<void> {
   const diagnostics = validateQuietly();
   const body = el("div", { class: "problems" });
-  if (diagnostics.length === 0) {
+  if (diagnostics.length === 0 && importErrors.length === 0) {
     body.append(el("p", { class: "inspector__hint", text: t("problems.empty") }));
+  }
+  for (const error of importErrors) {
+    body.append(
+      el("div", { class: "problems__item problems__item--error" }, [
+        el("span", { class: "problems__badge", text: "import" }),
+        el("div", {}, [el("div", { text: t(error.messageKey, error.params) })]),
+      ]),
+    );
   }
   for (const diagnostic of diagnostics) {
     const key = `diag.${diagnostic.code}`;
