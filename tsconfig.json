@@ -13,8 +13,26 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["node"]
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@nexus/ir": [
+        "packages/ir/src/index.ts"
+      ],
+      "@nexus/i18n": [
+        "packages/i18n/src/index.ts"
+      ],
+      "@nexus/engine": [
+        "packages/engine/src/index.ts"
+      ]
+    }
   },
   "include": [
     "packages/*/src/**/*.ts",

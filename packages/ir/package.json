@@ -1,0 +1,10 @@
+{
+  "name": "@nexus/ir",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Nexus Blocks language intermediate representation",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

@@ -1,0 +1,83 @@
+import { createId } from "./ids.ts";
+import {
+  DOCUMENT_FORMAT,
+  DOCUMENT_VERSION,
+  IR_FORMAT,
+  IR_VERSION,
+  type BlockNode,
+  type NexusDocument,
+  type Project,
+  type Value,
+  type ValueType,
+  type VariableDef,
+} from "./model.ts";
+
+export interface ProjectOptions {
+  name?: string;
+  locale?: string;
+}
+
+/** Create an empty project with no scripts. */
+export function createProject(options: ProjectOptions = {}): Project {
+  const now = new Date().toISOString();
+  return {
+    format: IR_FORMAT,
+    version: IR_VERSION,
+    id: createId("p"),
+    name: options.name ?? "Untitled",
+    locale: options.locale ?? "zh-CN",
+    createdAt: now,
+    updatedAt: now,
+    variables: [],
+    functions: [],
+    scripts: [],
+    metadata: {},
+  };
+}
+
+export function createDocument(project: Project): NexusDocument {
+  return {
+    format: DOCUMENT_FORMAT,
+    version: DOCUMENT_VERSION,
+    project,
+    editor: { positions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
+  };
+}
+
+export interface BlockInit {
+  id?: string;
+  fields?: Record<string, string | number | boolean>;
+  inputs?: Record<string, BlockNode | BlockNode[]>;
+}
+
+export function createBlock(type: string, init: BlockInit = {}): BlockNode {
+  const node: BlockNode = { id: init.id ?? createId(), type };
+  if (init.fields) node.fields = { ...init.fields };
+  if (init.inputs) node.inputs = { ...init.inputs };
+  return node;
+}
+
+export function createVariable(name: string, type: ValueType = "any", initial: Value | null = null): VariableDef {
+  return { id: createId("v"), name, type, initial };
+}
+
+/** Refresh `updatedAt` without touching anything else. */
+export function touchProject(project: Project): Project {
+  return { ...project, updatedAt: new Date().toISOString() };
+}
+
+/**
+ * A tiny starter program: `print("Hello, world!")` behind a start hat. Used by
+ * the editor for new projects and by end-to-end tests.
+ */
+export function createHelloWorldScript(): BlockNode {
+  return createBlock("control.start", {
+    inputs: {
+      body: [
+        createBlock("io.print", {
+          fields: { text: "Hello, world!" },
+        }),
+      ],
+    },
+  });
+}
