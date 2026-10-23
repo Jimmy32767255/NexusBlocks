@@ -1,0 +1,17 @@
+{
+  "name": "@nexus/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Nexus Blocks desktop shell (Tauri 2)",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:no-bundle": "tauri build --no-bundle"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.9.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}

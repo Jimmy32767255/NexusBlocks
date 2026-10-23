@@ -4,6 +4,7 @@ node_modules/
 # build output
 dist/
 target/
+apps/desktop/src-tauri/gen/
 
 # local caches (CARGO_HOME / npm cache live inside the repo sandbox)
 .cache/
