@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { JSDOM } from "jsdom";
-import { createStarterDocument, defaultRegistry } from "@nexus/engine";
-import { createDocument, createProject, findBlock } from "@nexus/ir";
+import { createProjectRegistry, createStarterDocument, defaultRegistry } from "@nexus/engine";
+import { createBlock, createDocument, createProject, findBlock } from "@nexus/ir";
 
 const dom = new JSDOM("<!doctype html><html lang=\"en\"><body></body></html>", {
   url: "http://localhost/",
@@ -141,5 +141,36 @@ describe("editor rendering", () => {
 
     lines[0]?.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
     assert.deepEqual(selected, [print.id]);
+  });
+
+  it("adds a dynamic call block for every function definition", () => {
+    const document = createDocument(createProject());
+    const definition = createBlock("func.define", {
+      fields: { name: "twice", params: "x: number", returnType: "number" },
+      inputs: { body: [] },
+    });
+    document.project.scripts.push(definition);
+    const callType = `func.call:${definition.id}`;
+    const call = createBlock(callType, {
+      inputs: { x: createBlock("math.number", { fields: { value: 2 } }) },
+    });
+    document.project.scripts.push(createBlock("control.start", { inputs: { body: [call] } }));
+
+    const registry = createProjectRegistry(document.project);
+    const toolbox = renderToolbox({ registry, onInsert: () => {}, onDragStart: () => {} });
+    const types = [...toolbox.querySelectorAll<HTMLElement>("[data-toolbox]")].map(
+      (row) => row.dataset.toolbox,
+    );
+    assert.ok(types.includes("func.define"));
+    assert.ok(types.includes(callType));
+
+    const canvas = renderCanvas(document, {
+      registry,
+      selectedId: null,
+      variables: document.project.variables,
+      zoom: 1,
+      interactive: false,
+    });
+    assert.match(canvas.root.textContent ?? "", /twice/);
   });
 });
