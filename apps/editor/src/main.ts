@@ -32,12 +32,15 @@ import { toast } from "./toast.ts";
 import { renderToolbar } from "./toolbar.ts";
 import { renderToolbox } from "./toolbox.ts";
 import { renderVariables } from "./variables.ts";
+import { chooseWorkspace, createDesktopHost, isDesktopShell } from "./desktop.ts";
 
 import "./styles.css";
 
 const mount = document.querySelector<HTMLElement>("#app");
 if (!mount) throw new Error("Editor root element #app is missing");
 const host: HTMLElement = mount;
+// Real file system in the Tauri shell; the browser keeps the localStorage host.
+const desktopHost = isDesktopShell() ? createDesktopHost(handleEvent) : null;
 
 setUiLocale(currentLocale());
 
@@ -174,6 +177,7 @@ function renderNow(): void {
     onLocaleChange: (locale) => changeLocale(locale),
     onHelp: () => void showHelp(),
     onDocs: () => void showDocs(),
+    onWorkspace: isDesktopShell() ? () => void changeWorkspaceFolder() : undefined,
     onRename: (name) => renameProject(name),
   });
 
@@ -269,6 +273,15 @@ function placeBlockAtCenter(type: string): void {
 
 /* ------------------------------------------------------------------ actions */
 
+async function changeWorkspaceFolder(): Promise<void> {
+  try {
+    const path = await chooseWorkspace();
+    if (path) toast(t("workspace.changed", { path }), "info");
+  } catch {
+    toast(t("workspace.failed"), "error");
+  }
+}
+
 async function run(): Promise<void> {
   if (store.state.status === "running") return;
   if (store.state.document.project.scripts.length === 0) {
@@ -284,8 +297,8 @@ async function run(): Promise<void> {
       signal: controller.signal,
       onEvent: handleEvent,
       // Workspace files live in localStorage in the browser; the desktop
-      // shell will provide a host backed by the real file system instead.
-      storage: window.localStorage,
+      // shell provides a host backed by the real file system instead.
+      ...(desktopHost ? { host: desktopHost } : { storage: window.localStorage }),
     });
   } finally {
     controller = null;

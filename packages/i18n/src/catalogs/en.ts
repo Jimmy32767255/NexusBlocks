@@ -22,6 +22,9 @@ export const en: Catalog = {
   "toolbar.language": "Language",
   "toolbar.help": "Shortcuts",
   "toolbar.docs": "Docs",
+  "toolbar.workspace": "Workspace folder",
+  "workspace.changed": "Workspace: {path}",
+  "workspace.failed": "Could not change the workspace folder",
 
   "language.en": "English",
   "language.zh-CN": "简体中文",

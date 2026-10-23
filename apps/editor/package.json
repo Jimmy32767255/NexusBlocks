@@ -12,7 +12,8 @@
   "dependencies": {
     "@nexus/engine": "workspace:*",
     "@nexus/i18n": "workspace:*",
-    "@nexus/ir": "workspace:*"
+    "@nexus/ir": "workspace:*",
+    "@tauri-apps/api": "^2.9.0"
   },
   "devDependencies": {
     "vite": "^7.3.7"

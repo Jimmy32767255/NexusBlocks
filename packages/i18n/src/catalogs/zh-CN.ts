@@ -19,6 +19,9 @@ export const zhCN: Catalog = {
   "toolbar.language": "语言",
   "toolbar.help": "快捷键",
   "toolbar.docs": "文档",
+  "toolbar.workspace": "工作区文件夹",
+  "workspace.changed": "工作区：{path}",
+  "workspace.failed": "无法切换工作区文件夹",
 
   "language.en": "English",
   "language.zh-CN": "简体中文",
