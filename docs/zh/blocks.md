@@ -27,6 +27,11 @@ interface BlockDefinition extends BlockSchema {
 | `control.if` | 控制 | 条件分支 | `condition` 布尔值，`then`、`else` 栈 |
 | `control.repeat` | 控制 | 重复执行 | `times` 数字、`body` 栈 |
 | `control.wait` | 控制 | 等待若干秒（可被「停止」中断） | `seconds` 数字 |
+| `control.throw` | 控制 | 抛出异常 | `value` 任意值 |
+| `control.try` | 控制 | 尝试/捕获容器 | `body`、`catches` 栈 |
+| `control.catch` | 控制 | 捕获任意异常（只能放在 try 的 catches） | `body` 栈 |
+| `control.catchType` | 控制 | 按类型捕获 | 属性 `exception`，`body` 栈 |
+| `control.catchAssign` | 控制 | 捕获并把错误信息写入变量 | 属性 `exception`、`target`，`body` 栈 |
 | `io.print` | 输出 | 打印到控制台 | `text` 任意值 |
 | `logic.boolean` | 逻辑 | 布尔字面量 | 属性 `value` |
 | `logic.compare` | 逻辑 | 比较运算（`== != < <= > >=`） | 属性 `op`，`a`、`b` 值 |
@@ -132,6 +137,15 @@ registry.grouped();         // 按类别分组，供工具箱
 ## 跳出循环
 
 `control.break` 抛出内部 `BreakSignal`，只由循环积木捕获（目前是 `control.repeat`）。如果在循环外执行，整次运行以 `runtime.error.breakOutsideLoop` 报错。`func.return` 用同一套控制流信号，两者都会安全穿过 `control.if` 等普通语句。
+
+## 错误处理
+
+`control.throw` 抛出 `ThrowSignal(value)`；`control.try` 执行 `body`，捕获 `ThrowSignal` 和 `RuntimeFailure`，按 `catches` 顺序用分支的 `exception` 字段匹配：
+
+- `any` 匹配全部；`error` 只匹配运行时错误；其余按被抛出值的类型（`text`/`number`/`boolean`/`list`/`dict`）匹配。
+- `control.catchAssign` 在匹配后调用 `ctx.setVariable(target, text)`，把异常转成当前语言的消息字符串；`RuntimeFailure` 的文本由运行入口注入的 `describeFailure` 本地化。
+- 没有匹配分支时原样重抛；`StopSignal`、`BreakSignal` 永不捕获，保证「停止」和跳出循环语义不变。
+- 校验要求捕获积木只能出现在 `control.try` 的 `catches` 栈中，且该栈只能放捕获积木（`catch.misplaced` / `catch.invalid`）。
 
 ## 文件操作
 
