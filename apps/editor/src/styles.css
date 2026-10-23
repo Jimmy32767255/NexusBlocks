@@ -511,7 +511,6 @@ button {
 
 .block {
   --block-min: 220px;
-  --block-max: 520px;
   position: relative;
   display: inline-flex;
   flex-direction: column;
@@ -523,14 +522,12 @@ button {
 
 .block--expression {
   --block-min: 150px;
-  --block-max: 380px;
 }
 
 .block__head {
   position: relative;
   width: max-content;
   min-width: var(--block-min);
-  max-width: var(--block-max);
   min-height: 42px;
   display: flex;
   align-items: center;
@@ -554,6 +551,7 @@ button {
 /* Blocks with a body are as wide as their mouth; the bar spans that width. */
 .block--c > .block__head {
   width: auto;
+  max-width: none;
   align-self: stretch;
 }
 
@@ -687,6 +685,7 @@ button {
 
 .port {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   min-width: 36px;
@@ -746,6 +745,7 @@ button {
 
 /* C-shaped body: a spine on the left and a bottom lip, never a full box. */
 .block__mouth {
+  align-self: stretch;
   border-left: 12px solid color-mix(in srgb, var(--block-color) 82%, #05080f);
   background: transparent;
 }
@@ -768,7 +768,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 2px 0 2px 4px;
+  padding: 2px 12px 2px 4px;
 }
 
 .stack__caption {
