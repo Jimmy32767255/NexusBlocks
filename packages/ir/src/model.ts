@@ -115,7 +115,7 @@ export interface Project {
 export interface EditorLayout {
   /** Top-left corner of each top-level (hat) block, in canvas coordinates. */
   positions: Record<BlockId, { x: number; y: number }>;
-  viewport?: { x: number; y: number; zoom: number };
+  viewport: { x: number; y: number; zoom: number };
 }
 
 /** The on-disk document: language plus presentation state. */

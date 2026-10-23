@@ -34,7 +34,7 @@ function toOrderedDocument(document: NexusDocument): unknown {
     project: orderedProject(document.project),
     editor: {
       positions: sortRecord(document.editor.positions ?? {}),
-      viewport: document.editor.viewport ?? { x: 0, y: 0, zoom: 1 },
+      viewport: document.editor.viewport,
     },
   };
 }
