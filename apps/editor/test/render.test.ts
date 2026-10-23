@@ -86,6 +86,14 @@ describe("editor rendering", () => {
     assert.equal(view.root.querySelectorAll(".script").length, 1);
     assert.equal(view.root.querySelectorAll(".block").length, 2);
     assert.equal(view.root.querySelector(".canvas__empty"), null);
+
+    // Hat blocks render one flat bar plus a C-shaped mouth, never a wrapping box.
+    const hat = view.root.querySelector(".block--hat")!;
+    assert.equal(hat.querySelectorAll(":scope > .block__mouth").length, 1);
+    assert.equal(hat.querySelectorAll(":scope > .block__foot").length, 1);
+    const statement = view.root.querySelector(".block--statement")!;
+    assert.equal(statement.querySelectorAll(":scope > .block__mouth").length, 0);
+    assert.equal(statement.querySelectorAll(":scope > .block__foot").length, 0);
   });
 
   it("renders the empty canvas state", () => {

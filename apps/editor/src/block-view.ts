@@ -55,6 +55,8 @@ export function renderBlock(node: BlockNode, context: BlockRenderContext): HTMLE
     root.append(renderStack(node, port, context));
   }
 
+  if (hasStack(definition)) root.append(el("div", { class: "block__foot" }));
+
   return root;
 }
 
@@ -212,6 +214,7 @@ function renderValuePort(node: BlockNode, port: PortDef, context: BlockRenderCon
 function renderStack(node: BlockNode, port: PortDef, context: BlockRenderContext): HTMLElement {
   const raw = node.inputs?.[port.name];
   const stack = Array.isArray(raw) ? raw : [];
+  const mouth = el("div", { class: "block__mouth" });
   const section = el("div", { class: "stack" });
   section.append(el("span", { class: "stack__caption", text: t(port.label) }));
   for (let index = 0; index <= stack.length; index += 1) {
@@ -224,5 +227,6 @@ function renderStack(node: BlockNode, port: PortDef, context: BlockRenderContext
     const child = stack[index];
     if (child) section.append(renderBlock(child, context));
   }
-  return section;
+  mouth.append(section);
+  return mouth;
 }
