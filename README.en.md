@@ -2,52 +2,62 @@
 
 English | [简体中文](README.md)
 
-Nexus Blocks is an **extensible visual programming environment**: you build programs out of blocks, but underneath sits a complete modern language instead of a toy that can only animate sprites.
+Nexus Blocks is an **extensible visual programming environment**: you build programs out of blocks, but underneath sits a complete modern language rather than a toy that can only animate sprites.
 
 ## Goals
 
-- **Full language power** — variables, functions, collections, control flow, first-class values. Every block maps onto the language IR.
-- **Extensible** — blocks, host capabilities, renderers, and language packs are all pluggable.
-- **Ready for system interaction** — the runtime calls the host through *capabilities*. The desktop shell (Tauri + Rust) can safely expose files, processes, and networking later. v0.1 ships none of those, but the architecture already reserves the place for them.
-- **Internationalized** — UI, block labels, runtime output, and documentation are all translatable. Chinese and English ship first.
-- **WebView first** — the editor is a plain web app; the desktop shell is the system WebView (Tauri).
+- **Real language semantics**: variables, control flow, expressions, and value semantics. Every block maps to exactly one IR node; the visual and textual views are two presentations of the same semantics.
+- **Extensible**: block definitions, capabilities, renderers, and language packs are independent. Adding a block never requires touching the editor core.
+- **Ready for system integration**: at runtime, effects travel through a `HostBridge` as capability calls (files, processes, network, …). A desktop shell can grant them per capability. v0.1 only ships `console.print`, but the seam is already there.
+- **Internationalised**: UI, block labels, runtime messages, and docs share one message catalogue (English and Simplified Chinese by default).
+- **WebView first**: the editor is a plain static web app (vanilla TypeScript + Vite) that can be embedded in any WebView (Tauri, Electron, mobile).
 
-## Status
+## Status (v0.1)
 
-v0.1 is being built: graphical editor, core blocks, runtime, English/Chinese translations, and documentation.
+Working today:
 
-## Repository layout
+- A complete visual editor: toolbox, drag & drop with snapping, nested blocks, canvas pan/zoom, inspector, variables panel, console, problems panel, undo/redo, and local autosave.
+- 12 built-in blocks: `control.start`, `control.if`, `control.repeat`, `io.print`, `logic.boolean`, `logic.compare`, `math.number`, `math.arithmetic`, `text.literal`, `text.join`, `var.set`, `var.get`.
+- An interpreter with a step limit, cancellation, event stream (logs, output, status, errors), and variable scopes.
+- English and Chinese UI, runtime messages, and program output in the project locale.
+- `pnpm test` covers IR, i18n, engine, and editor logic (40 cases).
+
+Not built yet (interfaces reserved): the desktop shell (Tauri), file/network/process capabilities, function blocks, list/set types, and code export.
+
+## Layout
 
 ```
-packages/ir          Language intermediate representation: model, serialization, validation
-packages/blocks      Block definitions and registry (UI agnostic)
-packages/runtime     Interpreter, capability host, execution event stream
-packages/i18n        Language packs and translation helpers
-apps/editor          Web editor (Vite + vanilla TS + SVG)
-apps/desktop         Tauri 2 desktop shell
-docs                 Architecture, IR, block, and i18n documentation
+packages/ir      Language IR: data model, JSON serialisation, validation, traversal, samples
+packages/engine  Block definitions & registry, interpreter, capability requests, runtime events
+packages/i18n    Message catalogues and translator
+apps/editor      Web editor (Vite + vanilla TypeScript)
+docs/zh          Architecture, IR, blocks, i18n, roadmap (Chinese)
 ```
 
 ## Quick start
 
+Requires Node.js 22+ and pnpm 10+.
+
 ```bash
 pnpm install
-pnpm dev            # open the editor at http://localhost:5173
-pnpm test           # run unit tests
-pnpm typecheck      # type checking
+pnpm dev        # editor at http://localhost:5173
+pnpm build      # static site in apps/editor/dist
+pnpm test       # unit tests
+pnpm typecheck  # strict type checking
 ```
 
-The desktop shell requires a Rust toolchain and WebKitGTK:
+Drag “when program starts” from the toolbox onto the canvas, drop “print” into it, and press Run: the console shows `Hello, world!`.
 
-```bash
-pnpm desktop         # run the Tauri window in dev mode
-pnpm desktop:build   # build the desktop binary
-```
+## Documentation
 
-## Design documents
+- [Documentation index](docs/README.md)
+- [Architecture](docs/zh/architecture.md)
+- [Language & IR](docs/zh/ir.md)
+- [Blocks](docs/zh/blocks.md)
+- [Editor guide (Chinese)](docs/zh/editor.md)
+- [i18n](docs/zh/i18n.md)
+- [Roadmap](docs/zh/roadmap.md)
 
-- [Architecture overview](docs/en/architecture.md)
-- [Language and IR](docs/en/ir.md)
-- [Block system](docs/en/blocks.md)
-- [Internationalization](docs/en/i18n.md)
-- [Roadmap](docs/en/roadmap.md)
+## Commit convention
+
+Prefixes: `init:` `add:` `feat:` `docs:` `i18n:` `mod:` `fix:` `del:`. One logical change per commit.
