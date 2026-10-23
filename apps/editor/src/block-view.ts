@@ -92,6 +92,27 @@ export function renderBlock(node: BlockNode, context: BlockRenderContext): HTMLE
   return root;
 }
 
+/**
+ * Stretch each C-block's bottom lip to the width of the block it wraps last, so
+ * nested scripts end flush instead of inheriting the widest child's width.
+ */
+export function syncCBlockFeet(root: ParentNode): void {
+  if (typeof window === "undefined") return;
+  const wrappers = Array.from(root.querySelectorAll<HTMLElement>(".block--c")).reverse();
+  for (const wrapper of wrappers) {
+    const foot = Array.from(wrapper.children).find((child) =>
+      (child as HTMLElement).classList?.contains("block__foot"),
+    ) as HTMLElement | undefined;
+    if (!foot) continue;
+    const mouth = wrapper.querySelector<HTMLElement>(":scope > .block__mouth");
+    const children = mouth?.querySelectorAll<HTMLElement>(":scope > .stack > .block") ?? [];
+    const last = children[children.length - 1];
+    const reference = last ?? wrapper.querySelector<HTMLElement>(":scope > .block__head");
+    const width = reference?.getBoundingClientRect().width ?? 0;
+    if (width > 0) foot.style.width = `${width}px`;
+  }
+}
+
 function hasStack(definition: BlockDefinition): boolean {
   return definition.ports.some((port) => port.kind === "stack");
 }
