@@ -596,7 +596,8 @@ button {
   align-self: stretch;
 }
 
-/* Only hats have a semicircular top; statements stay rounded rectangles. */
+/* Hats have a semicircular top, value blocks are capsules, terminal
+   statements a semicircular bottom; plain statements stay rounded. */
 .block--hat > .block__head {
   border-radius: 999px 999px 10px 10px;
   padding-top: 9px;
@@ -604,9 +605,13 @@ button {
 
 .block--expression > .block__head {
   min-height: 34px;
-  padding: 6px 10px;
-  border-radius: 9px;
+  padding: 6px 12px;
+  border-radius: 999px;
   gap: 5px;
+}
+
+.block--terminal > .block__head {
+  border-radius: 10px 10px 999px 999px;
 }
 
 .block--selected > .block__head {

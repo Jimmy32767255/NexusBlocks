@@ -113,6 +113,7 @@ export const functionBlocks: BlockDefinition[] = [
     type: FUNCTION_RETURN_TYPE,
     kind: "statement",
     category: "functions",
+    terminal: true,
     label: "block.func.return.label",
     description: "block.func.return.description",
     output: "void",

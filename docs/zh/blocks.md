@@ -111,6 +111,13 @@ interface ExecutionContext {
 - `list.add`、`list.set`、`dict.set` 就地修改容器（引用语义）；需要保留旧值应先复制。下标越界会抛 `runtime.error.badIndex`。
 - 变量本身可以声明为 `list` / `dict` 类型（新建变量对话框里选择），`var.get` 返回的就是同一个容器。
 
+## 积木形状
+
+- 帽子积木：顶部半圆，表示程序/函数的入口。
+- 操作语句：圆角长方形，上下都可继续连接。
+- 取值语句：胶囊形（两端半圆），只能插进值端口。
+- 终结语句（`control.break`、`control.throw`、`sys.exit`、`func.return`）：底部半圆，逻辑上后面不会再接语句。
+
 ## 函数
 
 函数是**画布上的 hat 积木**，不是单独的表单：

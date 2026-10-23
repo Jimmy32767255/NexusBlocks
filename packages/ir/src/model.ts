@@ -202,4 +202,6 @@ export interface BlockSchema {
   dynamicPorts?: (node: BlockNode) => PortDef[];
   /** Kept in the registry for old documents but never offered in the toolbox. */
   hidden?: boolean;
+  /** Statement that ends control flow, so nothing can be attached underneath. */
+  terminal?: boolean;
 }

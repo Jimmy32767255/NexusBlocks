@@ -368,3 +368,32 @@ describe("inline control sizing", () => {
     assert.equal(ifBlock.querySelectorAll(".stack__caption").length, 3);
   });
 });
+
+it("expression blocks render as capsules and terminal statements get their own class", () => {
+  const document = createStarterDocument();
+  document.project.scripts[0]!.inputs!.body = [
+    createBlock("control.break"),
+    createBlock("io.print", {
+      inputs: {
+        text: createBlock("math.arithmetic", {
+          fields: { op: "+" },
+          inputs: { a: createBlock("math.number", { fields: { value: 1 } }), b: createBlock("math.number", { fields: { value: 2 } }) },
+        }),
+      },
+    }),
+  ];
+  const canvas = renderCanvas(document, {
+    registry: defaultRegistry,
+    selectedId: null,
+    variables: [],
+    zoom: 1,
+    viewport: { x: 0, y: 0 },
+    interactive: false,
+  });
+  const terminal = canvas.root.querySelector(".block--terminal");
+  assert.ok(terminal);
+  assert.equal((terminal as HTMLElement | null)?.dataset.blockType, "control.break");
+  const expression = canvas.root.querySelector(".block--expression");
+  assert.ok(expression);
+  assert.equal((expression as HTMLElement | null)?.dataset.blockType, "math.arithmetic");
+});

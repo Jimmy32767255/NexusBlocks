@@ -8,6 +8,7 @@ export const systemBlocks: BlockDefinition[] = [
     type: "sys.exit",
     kind: "statement",
     category: "system",
+    terminal: true,
     label: "block.sys.exit.label",
     description: "block.sys.exit.description",
     output: "void",

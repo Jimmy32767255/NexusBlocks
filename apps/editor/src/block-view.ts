@@ -59,6 +59,7 @@ export function renderBlock(node: BlockNode, context: BlockRenderContext): HTMLE
       `block--${definition.kind}`,
       definition.category === "comment" ? "block--comment" : "",
       ports.some((port) => port.kind === "stack") ? "block--c" : "",
+      definition.terminal ? "block--terminal" : "",
       context.selectedId === node.id ? "block--selected" : "",
     ]
       .filter(Boolean)
