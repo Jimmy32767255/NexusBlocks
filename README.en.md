@@ -17,12 +17,12 @@ Nexus Blocks is an **extensible visual programming environment**: you build prog
 Working today:
 
 - A complete visual editor: toolbox, drag & drop with snapping, nested blocks, canvas pan/zoom, inspector, variables panel, console, problems panel, undo/redo, and local autosave.
-- 12 built-in blocks: `control.start`, `control.if`, `control.repeat`, `io.print`, `logic.boolean`, `logic.compare`, `math.number`, `math.arithmetic`, `text.literal`, `text.join`, `var.set`, `var.get`.
+- 26 built-in blocks across control/IO/logic/math/text/variables, plus waiting, lists and dictionaries, and function definitions/parameters. Every function definition also yields a dynamic call block.
 - An interpreter with a step limit, cancellation, event stream (logs, output, status, errors), and variable scopes.
 - English and Chinese UI, runtime messages, and program output in the project locale.
-- `pnpm test` covers IR, i18n, engine, and editor logic (50 cases).
+- `pnpm test` covers IR, i18n, engine, and editor logic (60 cases).
 
-Not built yet (interfaces reserved): the desktop shell (Tauri), file/network/process capabilities, function blocks, list/set types, and code export.
+Not built yet (interfaces reserved): the desktop shell (Tauri), file/network/process capabilities, advanced list/dict operations such as iteration and removal, and code export.
 
 ## Layout
 

@@ -19,22 +19,33 @@ interface BlockDefinition extends BlockSchema {
 - `label` / `description`：message key，由编辑器翻译。
 - `execute` 处理语句/ hat，`evaluate` 返回表达式值；两者都可以是 async。
 
-## 内置积木（12）
+## 内置积木
 
 | 类型 | 类别 | 说明 | 插槽 / 属性 |
 | --- | --- | --- | --- |
 | `control.start` | 控制 | 程序入口（hat） | `body` 栈 |
 | `control.if` | 控制 | 条件分支 | `condition` 布尔值，`then`、`else` 栈 |
 | `control.repeat` | 控制 | 重复执行 | `times` 数字、`body` 栈 |
-| `io.print` | 输入输出 | 打印到控制台 | `text` 任意值 |
+| `control.wait` | 控制 | 等待若干秒（可被「停止」中断） | `seconds` 数字 |
+| `io.print` | 输出 | 打印到控制台 | `text` 任意值 |
 | `logic.boolean` | 逻辑 | 布尔字面量 | 属性 `value` |
 | `logic.compare` | 逻辑 | 比较运算（`== != < <= > >=`） | 属性 `op`，`a`、`b` 值 |
 | `math.number` | 数学 | 数字字面量 | 属性 `value` |
 | `math.arithmetic` | 数学 | 四则运算（`+ - * / %`） | 属性 `op`，`a`、`b` 值 |
 | `text.literal` | 文本 | 文本字面量 | 属性 `value` |
 | `text.join` | 文本 | 连接两段文本 | `a`、`b` 值 |
-| `var.set` | 变量 | 给变量赋值 | 属性 `variable`（变量引用），`value` 值 |
+| `var.set` | 变量 | 给变量赋值 | 属性 `variable`，`value` 值 |
 | `var.get` | 变量 | 读取变量 | 属性 `variable` |
+| `list.literal` | 列表与字典 | JSON 列表字面量 | 属性 `items`，如 `[1, 2, 3]` |
+| `list.length` / `list.get` | 列表与字典 | 长度 / 按 0 起始下标取值 | `items` 列表，`index` 数字 |
+| `list.add` / `list.set` | 列表与字典 | 末尾追加 / 替换某项 | `items`、`index`、`value` |
+| `dict.literal` | 列表与字典 | JSON 字典字面量 | 属性 `items`，如 `{"name": "Ada"}` |
+| `dict.get` / `dict.has` | 列表与字典 | 按键取值 / 判断键存在 | `dict`、`key` |
+| `dict.keys` / `dict.set` | 列表与字典 | 所有键（列表）/ 按键写入 | `dict`、`key`、`value` |
+| `func.define` | 函数 | 定义函数（hat，函数体为 `body` 栈） | 属性 `name`、`params`（`名称: 类型`）、`returnType`，`body` 栈 |
+| `func.param` | 函数 | 读取当前函数的一个参数 | 属性 `name` |
+| `func.return` | 函数 | 立即返回，可带结果 | `value` 值 |
+| `func.call:<函数块 id>` | 函数 | 动态生成的调用块（无返回值时为语句，否则为表达式） | 每个参数一个值端口 |
 
 类别颜色在 `packages/engine/src/blocks/control.ts` 的 `CATEGORY_COLORS` 中定义（其他积木文件从这里导入）；工具箱顺序由 `packages/engine/src/registry.ts` 的 `CATEGORY_ORDER` 决定。
 
@@ -47,38 +58,64 @@ interface ExecutionContext {
   readonly project: Project;
   readonly host: HostBridge;
   readonly signal: AbortSignal;
-  evaluate(block: BlockNode): Promise<Value>;   // 执行表达式子树
-  input(block: BlockNode, port: string): Promise<Value>; // 端口值（含内联字面量）
-  literal(node: BlockNode, port: string): Value; // 端口内联字面量
-  stack(block: BlockNode, port: string): Promise<void>;  // 执行语句栈
-  run(block: BlockNode): Promise<void>;         // 执行单个语句
+  evaluate(node: BlockNode): Promise<Value>;          // 执行表达式子树
+  input(node: BlockNode, port: string): Promise<Value>; // 端口值（含内联字面量）
+  literal(node: BlockNode, port: string): Value;      // 端口内联字面量
+  stack(node: BlockNode, port: string): BlockNode[];  // 栈端口里的语句
+  run(blocks: BlockNode[]): Promise<void>;            // 顺序执行一组语句
   getVariable(id: string): Value;
   setVariable(id: string, value: Value): void;
-  coerce(value: Value, type: ValueType): Value; // 失败会抛运行时错误
+  getParam(name: string): Value;                      // 函数参数（仅函数体内）
+  callFunction(id: string, args: Value[]): Promise<Value>;
+  coerce(value: Value, type: ValueType, blockId: string): Value;
   variableName(id: string): string;
-  print(value: Value, blockId?: string): void;  // 走 HostBridge，产出 log 事件
-  tick(): void;                                  // 记一步，超限抛错
+  print(value: Value, blockId?: string): void;        // 走 HostBridge，产出 log 事件
+  tick(): Promise<void>;                              // 记一步，超限/停止时抛错
+  sleep(ms: number): Promise<void>;                   // 可被停止打断的等待
   fail(messageKey: string, params?: Record<string, string | number>): never;
 }
 ```
 
 约定：积木**不要**直接碰 `document`、DOM、文件系统或网络；所有副作用都通过 `ctx.host.invoke({ capability, args, blockId })`。这样宿主可以做权限控制，测试也可以注入假宿主。
 
+## 等待
+
+`control.wait` 读取 `seconds`（允许小数），调用 `ctx.sleep(seconds * 1000)`。等待期间不占步数；「停止」通过 `AbortSignal` 立即打断并让整次运行以 `stopped` 结束。宿主实现可以换成真实定时器或虚拟时钟（测试里注入 `ctx.host`/缩短时长即可）。
+
+## 列表与字典
+
+- 值就是纯 JSON：`Value[]` 与 `{ [key: string]: Value }`，可以跨进程传输、直接序列化。
+- 字面量积木把文本字段按 JSON 解析；格式不符会抛出可翻译错误 `runtime.error.badJson`。
+- `list.add`、`list.set`、`dict.set` 就地修改容器（引用语义）；需要保留旧值应先复制。下标越界会抛 `runtime.error.badIndex`。
+- 变量本身可以声明为 `list` / `dict` 类型（新建变量对话框里选择），`var.get` 返回的就是同一个容器。
+
+## 函数
+
+函数是**画布上的 hat 积木**，不是单独的表单：
+
+1. 从「函数」类别拖出 `func.define`，在属性面板填 `name`、`params`（如 `x: number, label: text`）和 `returnType`。
+2. 函数体直接嵌在它的 `body` 栈里；用 `func.param` 读取参数，`func.return` 返回值（不写则返回返回类型的默认值）。
+3. `func.define` 以**积木 id** 标识函数；调用块类型是 `func.call:<id>`，由 `createProjectRegistry(project)` 根据当前定义动态生成，因此重命名函数后调用块标签会自动更新。
+4. 参数只在该函数体内可见（无闭包、无全局隐式参数）；嵌套调用上限 64 层，超出报 `runtime.error.callDepth`。
+5. 删除函数定义时，编辑器会同时移除所有调用块，避免留下悬空引用。
+
+`runProject` 默认用 `createProjectRegistry(project)` 构建注册表；`defaultRegistry` 只含核心积木（不含调用块）。
+
 ## 注册与校验
 
 ```ts
-const registry = new BlockRegistry([...coreBlocks]);
+const registry = createProjectRegistry(project); // 核心积木 + 从项目定义生成的调用块
 registry.get("io.print");   // BlockDefinition | undefined
-registry.all();             // 按注册顺序
+registry.all();             // 按类别与类型排序
 registry.grouped();         // 按类别分组，供工具箱
 ```
 
-`defaultRegistry` 已注册全部内置积木。`validateProject` 接受任意 `BlockRegistry`（或 `BlockSchema` 来源），因此插件可以在自己的一套积木集上校验，而不影响核心。
+`validateProject` 接受任意 `BlockSchema` 来源；IR 侧会额外扫描 `func.define`，校验参数列表与 `func.param` 的作用域。插件可以传入自己的注册表，不影响核心。
 
 ## 新增一块积木
 
 1. 在 `packages/engine/src/blocks/` 新文件（或现有文件）里写 `BlockDefinition`。
-2. 加入 `src/blocks/index.ts` 的 `coreBlocks` 数组；如果需要新类别，同时更新 `CATEGORY_ORDER` 与 `CATEGORY_COLORS`。
+2. 加入 `src/registry.ts` 的 `coreBlocks` 数组；新类别同时更新 `CATEGORY_ORDER` 与 `CATEGORY_COLORS`。
 3. 在中英文语言包里加 `block.<type>.label`、`block.<type>.description` 以及字段/端口标签。测试会检查两种语言的 key 对齐。
 4. 在 `packages/engine/test/` 加执行用例（正常路径 + 错误路径），必要时补 IR 校验用例。
 5. 编辑器不需要改动：工具箱、画布、属性面板都从 schema 生成。
