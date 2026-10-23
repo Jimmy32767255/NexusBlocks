@@ -46,7 +46,7 @@ interface BlockDefinition extends BlockSchema {
 | `math.number` | 数学 | 数字字面量 | 属性 `value` |
 | `math.arithmetic` | 数学 | 四则运算（`+ - * / %`） | 属性 `op`，`a`、`b` 值 |
 | `text.literal` | 文本 | 文本字面量 | 属性 `value` |
-| `text.join` | 文本 | 连接两段文本 | `a`、`b` 值 |
+| `text.join` | 文本 | 连接文本（默认 2 段，可扩到 8 段） | `a`、`b`、`c`… 值 |
 | `var.set` | 变量 | 给变量赋值 | 属性 `variable`，`value` 值 |
 | `var.get` | 变量 | 读取变量 | 属性 `variable` |
 | `list.literal` | 列表与字典 | JSON 列表字面量 | 属性 `items`，如 `[1, 2, 3]` |
@@ -127,6 +127,16 @@ registry.get("io.print");   // BlockDefinition | undefined
 registry.all();             // 按类别与类型排序
 registry.grouped();         // 按类别分组，供工具箱
 ```
+
+### 可扩展积木
+
+部分积木支持在画布上直接增减内容，状态存在积木自己的字段里：
+
+- `text.join`：字段 `count`（2–8）。端口按 `a`、`b`、`c`… 依次生成。
+- `control.if`：字段 `elseIfs`（0–4）。每个否则如果分支生成 `elseIfN`（布尔条件）与 `elseIfNBody`（栈）两个端口，最后仍是 `else`。
+- `func.define`：`params` 是文本字段，画布上的 `+`/`−` 会按 `名称:类型` 语法追加或删除最后一个参数。
+
+这类端口由 `BlockSchema.dynamicPorts(node)` 给出；校验、渲染、拖拽和解释器都通过 `portsOf(schema, node)` 读取，因此插件的自定义积木也可以用同样方式实现可增长端口。
 
 `validateProject` 接受任意 `BlockSchema` 来源；IR 侧会额外扫描 `func.define`，校验参数列表与 `func.param` 的作用域。插件可以传入自己的注册表，不影响核心。
 
