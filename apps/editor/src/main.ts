@@ -653,12 +653,12 @@ host.addEventListener(
       const next = Math.min(2, Math.max(0.4, oldZoom * Math.exp(-event.deltaY * 0.0015)));
       if (Math.abs(next - oldZoom) < 0.001) return;
       const viewport = document.editor.viewport;
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const pointX = (centerX - viewport.x) / oldZoom;
-      const pointY = (centerY - viewport.y) / oldZoom;
-      viewport.x = centerX - pointX * next;
-      viewport.y = centerY - pointY * next;
+      const anchorX = event.clientX - rect.left;
+      const anchorY = event.clientY - rect.top;
+      const pointX = (anchorX - viewport.x) / oldZoom;
+      const pointY = (anchorY - viewport.y) / oldZoom;
+      viewport.x = anchorX - pointX * next;
+      viewport.y = anchorY - pointY * next;
       store.setZoom(next);
     } else {
       document.editor.viewport.x -= event.deltaX;
