@@ -2,6 +2,7 @@ import type { Project } from "@nexus/ir";
 import { scanFunctions } from "@nexus/ir";
 import type { BlockDefinition } from "./types.ts";
 import { controlBlocks } from "./blocks/control.ts";
+import { commentBlocks } from "./blocks/comment.ts";
 import { convertBlocks } from "./blocks/convert.ts";
 import { createFunctionCallBlock, functionBlocks } from "./blocks/functions.ts";
 import { dictBlocks } from "./blocks/dicts.ts";
@@ -29,6 +30,7 @@ export const CATEGORY_ORDER: readonly string[] = [
   "files",
   "modules",
   "system",
+  "comment",
 ];
 
 export class BlockRegistry {
@@ -111,6 +113,7 @@ export const coreBlocks: readonly BlockDefinition[] = [
   ...moduleBlocks,
   ...functionBlocks,
   ...systemBlocks,
+  ...commentBlocks,
 ];
 
 export const defaultRegistry = new BlockRegistry(coreBlocks);

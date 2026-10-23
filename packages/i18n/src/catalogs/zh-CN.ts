@@ -198,10 +198,15 @@ export const zhCN: Catalog = {
   "category.files": "文件",
   "category.modules": "模块",
   "category.system": "系统",
+  "category.comment": "注释",
 
   "block.control.start.label": "当程序启动时",
   "block.control.start.description": "程序的入口。按下“运行”后，这块积木下面的内容会执行一次。",
   "block.control.start.port.body": "执行",
+
+  "block.comment.note.label": "注释",
+  "block.comment.note.description": "写给人的说明，运行程序时什么也不做。",
+  "block.comment.note.field.text": "内容",
 
   "block.io.print.label": "输出",
   "block.io.print.description": "把一个值打印到控制台。",

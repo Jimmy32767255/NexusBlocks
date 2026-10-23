@@ -56,6 +56,7 @@ export function renderBlock(node: BlockNode, context: BlockRenderContext): HTMLE
     class: [
       "block",
       `block--${definition.kind}`,
+      definition.category === "comment" ? "block--comment" : "",
       hasStack(definition) ? "block--c" : "",
       context.selectedId === node.id ? "block--selected" : "",
     ]

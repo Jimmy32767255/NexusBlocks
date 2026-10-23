@@ -201,10 +201,15 @@ export const en: Catalog = {
   "category.files": "Files",
   "category.modules": "Modules",
   "category.system": "System",
+  "category.comment": "Comments",
 
   "block.control.start.label": "when program starts",
   "block.control.start.description": "Entry point. Everything under this block runs once when you press Run.",
   "block.control.start.port.body": "do",
+
+  "block.comment.note.label": "comment",
+  "block.comment.note.description": "A note for humans. It does nothing when the program runs.",
+  "block.comment.note.field.text": "text",
 
   "block.io.print.label": "print",
   "block.io.print.description": "Write a value to the console.",

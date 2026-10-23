@@ -1338,3 +1338,30 @@ button {
     display: none;
   }
 }
+
+/* Comments are notes, not actions: muted, dotted and italic. */
+.block--comment > .block__head {
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.07) 0 6px,
+      rgba(255, 255, 255, 0.02) 6px 12px
+    ),
+    rgba(60, 50, 20, 0.55);
+  border-style: dashed;
+  border-color: rgba(214, 192, 120, 0.55);
+}
+
+.block--comment .block__label,
+.block--comment .block__input {
+  font-style: italic;
+}
+
+.block--comment .block__label {
+  color: #efe3b8;
+}
+
+.block--comment .block__input {
+  border-color: rgba(214, 192, 120, 0.35);
+  color: #f3ead0;
+}

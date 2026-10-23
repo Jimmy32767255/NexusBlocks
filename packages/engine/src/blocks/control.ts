@@ -16,6 +16,7 @@ export const CATEGORY_COLORS = {
   modules: "#c47f42",
   system: "#7d8794",
   convert: "#57a58f",
+  comment: "#a8975c",
 } as const;
 
 const CONTROL = CATEGORY_COLORS.control;
