@@ -26,6 +26,9 @@ interface BlockDefinition extends BlockSchema {
 | `control.start` | 控制 | 程序入口（hat） | `body` 栈 |
 | `control.if` | 控制 | 条件分支 | `condition` 布尔值，`then`、`else` 栈 |
 | `control.repeat` | 控制 | 重复执行 | `times` 数字、`body` 栈 |
+| `control.forever` | 控制 | 无限循环（靠「跳出循环」或「停止」退出） | `body` 栈 |
+| `control.while` | 控制 | 条件为真时重复 | `condition` 布尔值、`body` 栈 |
+| `control.repeatWith` | 控制 | 重复并计数，当前轮次从 1 开始写入变量 | `times` 数字、`body` 栈，属性 `variable` |
 | `control.wait` | 控制 | 等待若干秒（可被「停止」中断） | `seconds` 数字 |
 | `control.throw` | 控制 | 抛出异常 | `value` 任意值 |
 | `control.try` | 控制 | 尝试/捕获容器 | `body`、`catches` 栈 |
@@ -134,9 +137,16 @@ registry.grouped();         // 按类别分组，供工具箱
 
 注册表在构造后视为不可变；积木定义里的数组（`fields`、`ports`）不应被运行时修改。文档树本身是可变的（编辑器就地修改以节省内存），但引擎在运行期间只读。
 
+## 循环语义
+
+- `control.repeat`：先把 `times` 求值为非负整数，再重复执行 `body`。
+- `control.forever`：每轮先 `tick` 再执行 `body`；`BreakSignal` 退出循环；仍受 `stepLimit` 限制，不会把运行器卡死。
+- `control.while`：每轮开始前重新求值 `condition`，为假就结束；条件里的变量或函数调用会随轮次变化。
+- `control.repeatWith`：先固定 `times`，然后第 1..N 轮把轮次写入 `variable`（1 起）；循环结束后变量保留最后一轮的值；`break` 时立即停止并保留当前值。
+
 ## 跳出循环
 
-`control.break` 抛出内部 `BreakSignal`，只由循环积木捕获（目前是 `control.repeat`）。如果在循环外执行，整次运行以 `runtime.error.breakOutsideLoop` 报错。`func.return` 用同一套控制流信号，两者都会安全穿过 `control.if` 等普通语句。
+`control.break` 抛出内部 `BreakSignal`，只由循环积木捕获（`control.repeat`、`control.forever`、`control.while`、`control.repeatWith`）。如果在循环外执行，整次运行以 `runtime.error.breakOutsideLoop` 报错。`func.return` 用同一套控制流信号，两者都会安全穿过 `control.if` 等普通语句。
 
 ## 错误处理
 
