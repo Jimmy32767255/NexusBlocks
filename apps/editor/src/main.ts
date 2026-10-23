@@ -283,6 +283,9 @@ async function run(): Promise<void> {
       registry,
       signal: controller.signal,
       onEvent: handleEvent,
+      // Workspace files live in localStorage in the browser; the desktop
+      // shell will provide a host backed by the real file system instead.
+      storage: window.localStorage,
     });
   } finally {
     controller = null;
