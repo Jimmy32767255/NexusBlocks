@@ -27,6 +27,7 @@ import { renderConsole } from "./console.ts";
 import { confirmDialog, helpBody, openDialog, variableDialog } from "./dialogs.ts";
 import { el } from "./dom.ts";
 import { startBlockDrag, startToolboxDrag, type DragDeps } from "./drag.ts";
+import { autoSizeControl } from "./block-view.ts";
 import { createScriptWith, defaultScriptPosition, newBlockInstance, removeBlock, unplugPort } from "./edits.ts";
 import { currentLocale, hasKey, setUiLocale, t } from "./i18n.ts";
 import { icon } from "./icons.ts";
@@ -722,6 +723,13 @@ host.addEventListener("click", (event) => {
     return;
   }
   if (target.closest(".canvas")) store.select(null);
+});
+
+host.addEventListener("input", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLInputElement && (target.dataset.field || target.dataset.literal)) {
+    autoSizeControl(target);
+  }
 });
 
 host.addEventListener("change", (event) => {

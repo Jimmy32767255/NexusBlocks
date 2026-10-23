@@ -3,6 +3,37 @@ import type { BlockNode, FieldDef, PortDef } from "@nexus/ir";
 import { el } from "./dom.ts";
 import { t } from "./i18n.ts";
 
+const MEASURE_FONT = '12.5px "Inter", "Segoe UI", system-ui, sans-serif';
+let measureContext: CanvasRenderingContext2D | null = null;
+
+function measureText(text: string): number {
+  if (typeof document === "undefined") return text.length * 7;
+  measureContext ??= document.createElement("canvas").getContext("2d");
+  if (!measureContext) return text.length * 7;
+  measureContext.font = MEASURE_FONT;
+  return measureContext.measureText(text).width;
+}
+
+function clampWidth(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, Math.ceil(value)));
+}
+
+/** Resize an inline field/select to roughly the width of its current content. */
+export function autoSizeControl(control: HTMLInputElement | HTMLSelectElement): void {
+  if (control.tagName === "SELECT") {
+    const select = control as HTMLSelectElement;
+    const label = select.selectedOptions[0]?.textContent ?? "";
+    select.style.width = `${clampWidth(measureText(label) + 42, 64, 220)}px`;
+    return;
+  }
+  const input = control as HTMLInputElement;
+  if (input.type === "number") {
+    input.style.width = `${clampWidth(measureText(input.value) + 24, 44, 170)}px`;
+    return;
+  }
+  input.style.width = `${clampWidth(measureText(input.value) + 22, 54, 320)}px`;
+}
+
 export interface BlockRenderContext {
   registry: BlockRegistry;
   selectedId: string | null;
@@ -75,7 +106,7 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
 
   switch (field.kind) {
     case "number": {
-      return el("input", {
+      const input = el("input", {
         class: "block__input block__input--number",
         attrs: {
           type: "number",
@@ -87,6 +118,8 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
         },
         dataset: { field: field.name },
       });
+      autoSizeControl(input);
+      return input;
     }
     case "select": {
       const select = el("select", {
@@ -102,6 +135,7 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
           }),
         );
       }
+      autoSizeControl(select);
       return select;
     }
     case "boolean": {
@@ -118,6 +152,7 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
           }),
         );
       }
+      autoSizeControl(select);
       return select;
     }
     case "variable": {
@@ -137,12 +172,13 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
           }),
         );
       }
+      autoSizeControl(select);
       return select;
     }
     case "text":
     default: {
       const text = String(raw ?? "");
-      return el("input", {
+      const input = el("input", {
         class: "block__input block__input--text",
         attrs: {
           type: "text",
@@ -154,6 +190,8 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
         },
         dataset: { field: field.name },
       });
+      autoSizeControl(input);
+      return input;
     }
   }
 }
@@ -186,6 +224,7 @@ function renderValuePort(node: BlockNode, port: PortDef, context: BlockRenderCon
         );
       }
       select.dataset.literal = port.name;
+      autoSizeControl(select);
       chip.append(select);
     } else {
       const text = String(value ?? "");
@@ -200,6 +239,7 @@ function renderValuePort(node: BlockNode, port: PortDef, context: BlockRenderCon
         },
       });
       input.dataset.literal = port.name;
+      autoSizeControl(input);
       chip.append(input);
     }
   }

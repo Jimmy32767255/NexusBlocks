@@ -182,3 +182,34 @@ describe("editor rendering", () => {
     assert.match(canvas.root.textContent ?? "", /twice/);
   });
 });
+
+describe("inline control sizing", () => {
+  it("fits control widths to their content within the limits", async () => {
+    const { autoSizeControl } = await import("../src/block-view.ts");
+
+    const text = document.createElement("input");
+    text.type = "text";
+    text.value = "abc";
+    autoSizeControl(text);
+    assert.equal(text.style.width, "54px");
+
+    text.value = "x".repeat(100);
+    autoSizeControl(text);
+    assert.equal(text.style.width, "320px");
+
+    const number = document.createElement("input");
+    number.type = "number";
+    number.value = "1234567890";
+    autoSizeControl(number);
+    assert.equal(number.style.width, "94px");
+
+    const select = document.createElement("select");
+    const option = document.createElement("option");
+    option.textContent = "hello world";
+    option.value = "x";
+    select.append(option);
+    select.value = "x";
+    autoSizeControl(select);
+    assert.equal(select.style.width, "119px");
+  });
+});
