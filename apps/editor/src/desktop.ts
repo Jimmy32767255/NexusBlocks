@@ -53,10 +53,16 @@ export function createDesktopHost(
         sink({ kind: "log", level: "info", text, blockId: request.blockId, time: Date.now() });
         return null;
       }
+      // Rust writes text: match the browser host by rendering values the same
+      // way the console does (objects as JSON).
+      const args =
+        request.capability === "fs.write"
+          ? [request.args[0], display(request.args[1] as Value)]
+          : request.args;
       const response = (await invoke("capability_invoke", {
         request: {
           capability: request.capability,
-          args: request.args,
+          args,
           blockId: request.blockId,
         },
       })) as DesktopResponse | null;

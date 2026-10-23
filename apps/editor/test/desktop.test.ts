@@ -57,6 +57,22 @@ test("file capabilities round-trip through capability_invoke", async () => {
   });
 });
 
+test("fs.write sends non-text content as text, like the browser host", async () => {
+  let seen: unknown = null;
+  const host = createDesktopHost(() => {}, async (_command, args) => {
+    seen = args;
+    return { ok: true, value: true };
+  });
+  await host?.invoke({ capability: "fs.write", args: ["data.json", { ok: true }] });
+  assert.deepEqual(seen, {
+    request: {
+      capability: "fs.write",
+      args: ["data.json", '{"ok":true}'],
+      blockId: undefined,
+    },
+  });
+});
+
 test("shell failures surface as translatable host errors", async () => {
   const host = createDesktopHost(() => {}, async () => ({
     ok: false,
