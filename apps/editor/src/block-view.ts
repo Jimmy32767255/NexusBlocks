@@ -94,7 +94,10 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
       });
       for (const option of field.options ?? []) {
         select.append(
-          el("option", { text: option.label, attrs: { value: option.value, selected: option.value === raw } }),
+          el("option", {
+            text: option.labelKey ? t(option.labelKey) : option.label,
+            attrs: { value: option.value, selected: option.value === raw },
+          }),
         );
       }
       return select;

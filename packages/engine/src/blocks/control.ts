@@ -1,4 +1,5 @@
-import { BreakSignal } from "../errors.ts";
+import { toDisplayText, typeOf } from "@nexus/ir";
+import { BreakSignal, RuntimeFailure, StopSignal, ThrowSignal } from "../errors.ts";
 import type { BlockDefinition } from "../types.ts";
 
 /** Category colours are shared by the toolbox and the canvas. */
@@ -16,6 +17,23 @@ export const CATEGORY_COLORS = {
 } as const;
 
 const CONTROL = CATEGORY_COLORS.control;
+
+const EXCEPTION_FILTERS = ["any", "error", "text", "number", "boolean", "list", "dict"] as const;
+
+function exceptionOptions(): { value: string; label: string; labelKey: string }[] {
+  return EXCEPTION_FILTERS.map((value) => ({
+    value,
+    label: value,
+    labelKey: `block.control.catch.option.${value}`,
+  }));
+}
+
+/** Does a catch branch accept this thrown value or runtime failure? */
+function matchesException(filter: string, error: ThrowSignal | RuntimeFailure): boolean {
+  if (filter === "any") return true;
+  if (error instanceof RuntimeFailure) return filter === "error";
+  return typeOf(error.value) === filter;
+}
 
 export const controlBlocks: BlockDefinition[] = [
   {
@@ -95,6 +113,124 @@ export const controlBlocks: BlockDefinition[] = [
     execute() {
       throw new BreakSignal();
     },
+  },
+  {
+    type: "control.throw",
+    kind: "statement",
+    category: "control",
+    label: "block.control.throw.label",
+    description: "block.control.throw.description",
+    output: "void",
+    color: CONTROL,
+    fields: [],
+    ports: [
+      { name: "value", label: "block.control.throw.port.value", kind: "value", type: "any", default: "error" },
+    ],
+    async execute(ctx, node) {
+      const value = await ctx.input(node, "value");
+      throw new ThrowSignal(value, node.id);
+    },
+  },
+  {
+    type: "control.try",
+    kind: "statement",
+    category: "control",
+    label: "block.control.try.label",
+    description: "block.control.try.description",
+    output: "void",
+    color: CONTROL,
+    fields: [],
+    ports: [
+      { name: "body", label: "block.control.try.port.body", kind: "stack" },
+      { name: "catches", label: "block.control.try.port.catches", kind: "stack" },
+    ],
+    async execute(ctx, node) {
+      let caught: unknown;
+      try {
+        await ctx.run(ctx.stack(node, "body"));
+        return;
+      } catch (error) {
+        if (error instanceof StopSignal || error instanceof BreakSignal) throw error;
+        caught = error;
+      }
+      if (!(caught instanceof ThrowSignal) && !(caught instanceof RuntimeFailure)) throw caught;
+
+      for (const branch of ctx.stack(node, "catches")) {
+        const filter = String(branch.fields?.exception ?? "any");
+        if (!matchesException(filter, caught)) continue;
+        const target = branch.fields?.target;
+        if (typeof target === "string" && target) {
+          const text =
+            caught instanceof RuntimeFailure
+              ? ctx.describeFailure(caught)
+              : toDisplayText(caught.value);
+          ctx.setVariable(target, text);
+        }
+        await ctx.run(ctx.stack(branch, "body"));
+        return;
+      }
+      throw caught;
+    },
+  },
+  {
+    type: "control.catch",
+    kind: "statement",
+    category: "control",
+    label: "block.control.catch.label",
+    description: "block.control.catch.description",
+    output: "void",
+    color: CONTROL,
+    fields: [],
+    ports: [{ name: "body", label: "block.control.catch.port.body", kind: "stack" }],
+    /** Catch branches only run when their owning try block hands over control. */
+    execute() {},
+  },
+  {
+    type: "control.catchType",
+    kind: "statement",
+    category: "control",
+    label: "block.control.catchType.label",
+    description: "block.control.catchType.description",
+    output: "void",
+    color: CONTROL,
+    fields: [
+      {
+        name: "exception",
+        kind: "select",
+        label: "block.control.catch.field.exception",
+        default: "error",
+        options: exceptionOptions(),
+      },
+    ],
+    ports: [{ name: "body", label: "block.control.catch.port.body", kind: "stack" }],
+    execute() {},
+  },
+  {
+    type: "control.catchAssign",
+    kind: "statement",
+    category: "control",
+    label: "block.control.catchAssign.label",
+    description: "block.control.catchAssign.description",
+    output: "void",
+    color: CONTROL,
+    fields: [
+      {
+        name: "exception",
+        kind: "select",
+        label: "block.control.catch.field.exception",
+        default: "error",
+        options: exceptionOptions(),
+      },
+      {
+        name: "target",
+        kind: "variable",
+        label: "block.control.catchAssign.field.target",
+        default: "",
+        required: true,
+      },
+    ],
+    ports: [{ name: "body", label: "block.control.catch.port.body", kind: "stack" }],
+    execute() {},
   },
   {
     type: "control.wait",

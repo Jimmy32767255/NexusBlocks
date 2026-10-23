@@ -149,6 +149,8 @@ export interface FieldOption {
   value: string;
   /** Display text for the option (operators such as `+` are language-neutral). */
   label: string;
+  /** Optional translation key; takes precedence over `label` in the editor. */
+  labelKey?: string;
 }
 
 export interface FieldDef {

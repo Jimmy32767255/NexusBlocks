@@ -6,6 +6,7 @@ import type {
 } from "./model.ts";
 import { isAssignable } from "./values.ts";
 import { walkBlocks } from "./traverse.ts";
+import { CATCH_PORT, isCatchType, TRY_TYPE } from "./exceptions.ts";
 import {
   FUNCTION_PARAM_TYPE,
   FUNCTION_RETURN_TYPE,
@@ -32,7 +33,9 @@ export type DiagnosticCode =
   | "variable.duplicateName"
   | "variable.invalidName"
   | "function.invalidParams"
-  | "function.unknownParam";
+  | "function.unknownParam"
+  | "catch.misplaced"
+  | "catch.invalid";
 
 export type DiagnosticSeverity = "error" | "warning";
 
@@ -148,6 +151,7 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
       }
 
       checkFunctionScope(node, owners, ctx.path, diagnostics);
+      checkCatchPlacement(node, ctx.parent, ctx.port, ctx.path, diagnostics);
       checkKind(node, schema, ctx.parent === null, ctx.path, diagnostics);
       checkFields(node, schema, variableIds, ctx.path, diagnostics);
       checkInputs(node, schema, schemas, ctx.path, diagnostics);
@@ -183,6 +187,7 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
           });
           return;
         }
+        checkCatchPlacement(node, ctx.parent, ctx.port, ctx.path, diagnostics);
         checkKind(node, schema, false, ctx.path, diagnostics);
         checkFields(node, schema, variableIds, ctx.path, diagnostics);
         checkInputs(node, schema, schemas, ctx.path, diagnostics);
@@ -229,6 +234,41 @@ function checkFunctionScope(
         params: { name },
       });
     }
+  }
+}
+
+function checkCatchPlacement(
+  node: BlockNode,
+  parent: BlockNode | null,
+  port: string | null,
+  path: string,
+  diagnostics: Diagnostic[],
+): void {
+  if (isCatchType(node.type)) {
+    if (parent?.type !== TRY_TYPE || port !== CATCH_PORT) {
+      diagnostics.push({
+        severity: "error",
+        code: "catch.misplaced",
+        message: "Catch branches may only be attached to a try block",
+        path,
+        blockId: node.id,
+        params: { type: node.type },
+      });
+    }
+  }
+  if (node.type !== TRY_TYPE) return;
+  const branches = node.inputs?.[CATCH_PORT];
+  if (!Array.isArray(branches)) return;
+  for (const branch of branches) {
+    if (isCatchType(branch.type)) continue;
+    diagnostics.push({
+      severity: "error",
+      code: "catch.invalid",
+      message: `Try branches must be catch blocks, found ${branch.type}`,
+      path: `${path}.${CATCH_PORT}`,
+      blockId: branch.id,
+      params: { type: branch.type },
+    });
   }
 }
 

@@ -17,6 +17,19 @@ export class RuntimeFailure extends Error {
   }
 }
 
+/** Raised by the throw block; `value` is the exception payload. */
+export class ThrowSignal extends Error {
+  readonly value: import("@nexus/ir").Value;
+  readonly blockId?: string;
+
+  constructor(value: import("@nexus/ir").Value, blockId?: string) {
+    super("thrown");
+    this.name = "ThrowSignal";
+    this.value = value;
+    this.blockId = blockId;
+  }
+}
+
 /** Internal control-flow signal for cooperative cancellation. */
 export class StopSignal extends Error {
   constructor() {

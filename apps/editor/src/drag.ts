@@ -1,5 +1,13 @@
 import type { BlockRegistry } from "@nexus/engine";
-import { findBlock, isAssignable, type BlockNode, type ValueType } from "@nexus/ir";
+import {
+  CATCH_PORT,
+  findBlock,
+  isAssignable,
+  isCatchType,
+  TRY_TYPE,
+  type BlockNode,
+  type ValueType,
+} from "@nexus/ir";
 import { renderBlock } from "./block-view.ts";
 import {
   createScriptWith,
@@ -336,6 +344,7 @@ function applyDrop(payload: Payload, target: DropTarget | null, deps: DragDeps):
 
   if (target.type === "slot") {
     if (!canInsert(store, deps, target.parentId, target.port)) return false;
+    if (!catchFits(store, deps, node, target.parentId, target.port)) return false;
     store.pushHistory(snapshot);
     store.update(
       (document) => {
@@ -347,6 +356,7 @@ function applyDrop(payload: Payload, target: DropTarget | null, deps: DragDeps):
   }
 
   if (target.type === "canvas") {
+    if (isCatchType(node.type)) return false;
     store.pushHistory(snapshot);
     store.update(
       (document) => {
@@ -361,6 +371,7 @@ function applyDrop(payload: Payload, target: DropTarget | null, deps: DragDeps):
     const insertion = insertionAfterBlock(target.blockId, target.el, deps);
     if (!insertion) return false;
     if (!canInsert(store, deps, insertion.parentId, insertion.port)) return false;
+    if (!catchFits(store, deps, node, insertion.parentId, insertion.port)) return false;
     store.pushHistory(snapshot);
     store.update(
       (document) => {
@@ -372,6 +383,20 @@ function applyDrop(payload: Payload, target: DropTarget | null, deps: DragDeps):
   }
 
   return false;
+}
+
+/** Catch branches belong in a try block's catch stack, and nowhere else. */
+function catchFits(
+  store: Store,
+  deps: DragDeps,
+  node: BlockNode,
+  parentId: string,
+  port: string,
+): boolean {
+  const parent = findBlock(store.state.document.project, parentId);
+  const slot = parent?.type === TRY_TYPE && port === CATCH_PORT;
+  if (isCatchType(node.type)) return slot;
+  return !slot;
 }
 
 function canInsert(store: Store, deps: DragDeps, parentId: string, port: string): boolean {

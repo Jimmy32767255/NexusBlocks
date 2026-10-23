@@ -8,6 +8,7 @@ import type {
 } from "@nexus/ir";
 import type { BlockRegistry } from "./registry.ts";
 import type { KeyValueStorage } from "./host.ts";
+import type { RuntimeFailure } from "./errors.ts";
 
 export interface BlockDefinition extends BlockSchema {
   /** Accent colour for the canvas. */
@@ -56,6 +57,8 @@ export interface ExecutionContext {
   sleep(ms: number): Promise<void>;
   /** Throw a translatable runtime failure attributed to the current block. */
   fail(messageKey: string, params?: Record<string, string | number>): never;
+  /** Human-readable text for a runtime failure, using the caller's locale. */
+  describeFailure(failure: RuntimeFailure): string;
 }
 
 export interface CapabilityDescriptor {
@@ -121,6 +124,8 @@ export interface RunOptions {
   storage?: KeyValueStorage;
   /** How many interpreted blocks between event-loop yields. */
   yieldEvery?: number;
+  /** Localised text for caught runtime failures; defaults to the message key. */
+  describeFailure?: (failure: RuntimeFailure) => string;
 }
 
 export type LiteralMap = Record<string, FieldValue>;

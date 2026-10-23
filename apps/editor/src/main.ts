@@ -7,6 +7,7 @@ import {
   type BlockRegistry,
   type ImportError,
   type RuntimeEvent,
+  type RuntimeFailure,
 } from "@nexus/engine";
 import {
   countBlocks,
@@ -14,6 +15,7 @@ import {
   createProject,
   createVariable,
   findBlock,
+  isCatchType,
   walkProject,
   type BlockNode,
   type Diagnostic,
@@ -272,6 +274,10 @@ function dragDeps(): DragDeps {
 function placeBlockAtCenter(type: string): void {
   const definition = registry.get(type);
   if (!definition) return;
+  if (isCatchType(type)) {
+    toast(t("toast.catchNeedsTry"), "error");
+    return;
+  }
   const result = newBlockInstance(registry, store.state.document.project, type);
   if (!result.ok) {
     toast(t(result.reason === "variable" ? "toast.variableRequired" : "toast.dropInvalid"), "error");
@@ -331,6 +337,7 @@ async function run(): Promise<void> {
     await runProject(store.state.document.project, {
       signal: controller.signal,
       onEvent: handleEvent,
+      describeFailure: translateFailure,
       // Workspace files live in localStorage in the browser; the desktop
       // shell provides a host backed by the real file system instead.
       ...(desktopHost ? { host: desktopHost } : { storage: window.localStorage }),
@@ -343,6 +350,15 @@ async function run(): Promise<void> {
 
 function stop(): void {
   controller?.abort();
+}
+
+/** Localised text for a caught runtime failure, falling back to its key. */
+function translateFailure(failure: RuntimeFailure): string {
+  try {
+    return t(failure.messageKey, failure.params);
+  } catch {
+    return failure.messageKey;
+  }
 }
 
 function handleEvent(event: RuntimeEvent): void {

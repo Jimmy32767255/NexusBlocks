@@ -22,6 +22,8 @@ export interface InterpreterOptions {
   signal: AbortSignal;
   stepLimit?: number;
   yieldEvery?: number;
+  /** Localised text for caught runtime failures; defaults to the message key. */
+  describeFailure?: (failure: RuntimeFailure) => string;
 }
 
 export const DEFAULT_STEP_LIMIT = 100_000;
@@ -37,6 +39,8 @@ export class Interpreter implements ExecutionContext {
   readonly project: Project;
   readonly host: HostBridge;
   readonly signal: AbortSignal;
+
+  private readonly describeFailureText: (failure: RuntimeFailure) => string;
 
   private readonly registry: BlockRegistry;
   private readonly emit: (event: RuntimeEvent) => void;
@@ -54,6 +58,7 @@ export class Interpreter implements ExecutionContext {
     this.registry = registry;
     this.host = options.host;
     this.emit = options.emit;
+    this.describeFailureText = options.describeFailure ?? ((failure) => failure.messageKey);
     this.signal = options.signal;
     this.stepLimit = options.stepLimit ?? DEFAULT_STEP_LIMIT;
     this.yieldEvery = Math.max(1, options.yieldEvery ?? DEFAULT_YIELD_EVERY);
@@ -187,6 +192,10 @@ export class Interpreter implements ExecutionContext {
       this.fail("runtime.error.badNumber", { value: toDisplayText(value) });
     }
     this.fail("runtime.error.badType", { from: typeof value === "object" ? "object" : typeof value, to: type });
+  }
+
+  describeFailure(failure: RuntimeFailure): string {
+    return this.describeFailureText(failure);
   }
 
   variableName(id: string): string {
