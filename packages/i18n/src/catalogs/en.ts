@@ -139,6 +139,7 @@ export const en: Catalog = {
   "runtime.error.divisionByZero": "Division by zero",
   "runtime.error.stepLimit": "Step limit exceeded ({limit} steps). Is a loop missing an exit condition?",
   "runtime.error.exitCode": "Program exited with status {code}.",
+  "runtime.error.toNumber": "Cannot convert “{value}” to a number.",
   "runtime.error.capability": "Capability “{capability}” is not available in this host",
   "runtime.error.internal": "Internal error: {detail}",
 
@@ -189,6 +190,7 @@ export const en: Catalog = {
   "category.io": "Output",
   "category.text": "Text",
   "category.math": "Math",
+  "category.convert": "Convert",
   "category.logic": "Logic",
   "category.variables": "Variables",
   "category.data": "Lists & dictionaries",
@@ -385,4 +387,10 @@ export const en: Catalog = {
   "diag.catch.misplaced": "Catch blocks can only be placed inside a try block's catch branches",
   "diag.catch.invalid": "Try catch branches must contain catch blocks",
   "toast.catchNeedsTry": "Drop catch blocks into a try block's catch branches",
+  "block.convert.toNumber.label": "convert [text] to number",
+  "block.convert.toNumber.description": "Parse the whole text as a decimal number; anything that is not a number raises an error.",
+  "block.convert.toNumber.port.text": "text",
+  "block.convert.toString.label": "convert [value] to text",
+  "block.convert.toString.description": "Turn a value into its text form (numbers keep their decimal spelling).",
+  "block.convert.toString.port.value": "value",
 };

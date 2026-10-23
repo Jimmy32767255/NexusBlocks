@@ -136,6 +136,7 @@ export const zhCN: Catalog = {
   "runtime.error.divisionByZero": "除数不能为零",
   "runtime.error.stepLimit": "超出步数上限（{limit} 步）。是不是有循环缺少退出条件？",
   "runtime.error.exitCode": "程序以状态码 {code} 结束。",
+  "runtime.error.toNumber": "无法把“{value}”转换为数值。",
   "runtime.error.capability": "当前宿主不支持能力“{capability}”",
   "runtime.error.internal": "内部错误：{detail}",
 
@@ -186,6 +187,7 @@ export const zhCN: Catalog = {
   "category.io": "输出",
   "category.text": "文本",
   "category.math": "数学",
+  "category.convert": "转换",
   "category.logic": "逻辑",
   "category.variables": "变量",
   "category.data": "列表与字典",
@@ -382,4 +384,10 @@ export const zhCN: Catalog = {
   "diag.catch.misplaced": "捕获积木只能放在尝试积木的捕获分支里",
   "diag.catch.invalid": "尝试的捕获分支里必须是捕获积木",
   "toast.catchNeedsTry": "把捕获积木拖进尝试积木的捕获分支",
+  "block.convert.toNumber.label": "转换 [文本] 为数值",
+  "block.convert.toNumber.description": "把整段文本解析成十进制数值；只要包含数字以外的内容就报错。",
+  "block.convert.toNumber.port.text": "文本",
+  "block.convert.toString.label": "转换 [值] 为字符串",
+  "block.convert.toString.description": "把值转成字符串（数值会保留十进制写法）。",
+  "block.convert.toString.port.value": "值",
 };

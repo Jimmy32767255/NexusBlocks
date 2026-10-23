@@ -671,3 +671,57 @@ test("exit is not swallowed by try/catch", async () => {
   assert.equal(result.status, "finished");
   assert.deepEqual(loggedTexts(events), []);
 });
+
+test("convert text to number parses the whole numeric string", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toNumber", {
+            inputs: { text: createBlock("text.literal", { fields: { value: "  -12.5 " } }) },
+          }),
+        },
+      }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["-12.5"]);
+});
+
+test("convert text to number rejects mixed content", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toNumber", {
+            inputs: { text: createBlock("text.literal", { fields: { value: "12abc" } }) },
+          }),
+        },
+      }),
+    ]),
+  );
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.toNumber");
+  assert.deepEqual(result.error?.params, { value: "12abc" });
+});
+
+test("convert number to text keeps the decimal spelling", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: { value: createBlock("math.number", { fields: { value: 123 } }) },
+          }),
+        },
+      }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["123"]);
+});
