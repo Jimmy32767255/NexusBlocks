@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createDocument, createProject, findBlock } from "@nexus/ir";
+import { createBlock, createDocument, createProject, findBlock } from "@nexus/ir";
 import { createStarterDocument, defaultRegistry } from "@nexus/engine";
 import {
   appendToScript,
@@ -148,5 +148,22 @@ describe("editor edits", () => {
     const print = instance("io.print", document);
     assert.equal(appendToScript(document.project, print), false);
     assert.equal(document.project.scripts.length, 0);
+  });
+
+  it("removes call blocks when their function definition is deleted", () => {
+    const document = createDocument(createProject());
+    const definition = createBlock("func.define", {
+      fields: { name: "twice", params: "x: number", returnType: "number" },
+      inputs: { body: [] },
+    });
+    const callType = `func.call:${definition.id}`;
+    const call = createBlock(callType, { inputs: {} });
+    const print = createBlock("io.print", { inputs: { text: call } });
+    const start = createBlock("control.start", { inputs: { body: [print] } });
+    document.project.scripts.push(definition, start);
+
+    assert.equal(removeBlock(document, definition.id), true);
+    assert.deepEqual(document.project.scripts.map((node) => node.type), ["control.start"]);
+    assert.equal(findBlock(document.project, print.id)?.inputs?.text, undefined);
   });
 });

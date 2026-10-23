@@ -79,6 +79,7 @@ export const en: Catalog = {
   "variables.usedBy": "Used by {count} blocks",
   "variables.invalidName": "Use letters, numbers or underscores; the name cannot start with a digit.",
   "variables.duplicateName": "A variable with this name already exists.",
+  "variables.invalidInitial": "The initial value does not match the chosen type.",
   "variables.confirmDelete": "Delete “{name}”? Blocks that use it will lose their variable.",
 
   "console.empty": "Run the program to see its output here.",

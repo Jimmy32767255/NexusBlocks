@@ -199,3 +199,132 @@ export function helpBody(text: string): HTMLElement {
   }
   return wrapper;
 }
+
+export interface VariableDialogOptions {
+  title: string;
+  nameLabel: string;
+  typeLabel: string;
+  initialLabel: string;
+  initialName: string;
+  types: { value: string; label: string }[];
+  validateName: (name: string) => string | null;
+}
+
+export interface VariableDialogResult {
+  name: string;
+  type: string;
+  initial: string;
+}
+
+/** Name + type + initial-value dialog used when creating a variable. */
+export function variableDialog(options: VariableDialogOptions): Promise<VariableDialogResult | null> {
+  return new Promise((resolve) => {
+    let unmount = (): void => {};
+    const close = (value: VariableDialogResult | null): void => {
+      unmount();
+      resolve(value);
+    };
+
+    const name = el("input", {
+      class: "input",
+      attrs: { type: "text", value: options.initialName, autocomplete: "off" },
+    });
+    const type = el("select", { class: "input" });
+    for (const option of options.types) {
+      type.append(el("option", { attrs: { value: option.value }, text: option.label }));
+    }
+    type.value = "any";
+    const initial = el("input", {
+      class: "input",
+      attrs: { type: "text", value: "", autocomplete: "off", placeholder: "null" },
+    });
+    const error = el("p", { class: "field-error" });
+
+    const form = el("form", { class: "modal__form" }, [
+      el("label", { class: "field" }, [
+        el("span", { class: "field__label", text: options.nameLabel }),
+        name,
+      ]),
+      el("label", { class: "field" }, [
+        el("span", { class: "field__label", text: options.typeLabel }),
+        type,
+      ]),
+      el("label", { class: "field" }, [
+        el("span", { class: "field__label", text: options.initialLabel }),
+        initial,
+      ]),
+      error,
+    ]);
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const trimmed = name.value.trim();
+      const problem = options.validateName(trimmed);
+      if (problem) {
+        error.textContent = problem;
+        name.focus();
+        return;
+      }
+      const raw = initial.value.trim();
+      if (raw !== "") {
+        if (type.value === "number" && !Number.isFinite(Number(raw))) {
+          error.textContent = t("variables.invalidInitial");
+          initial.focus();
+          return;
+        }
+        if (type.value === "list" || type.value === "dict") {
+          try {
+            const parsed: unknown = JSON.parse(raw);
+            const expectsArray = type.value === "list";
+            if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed) !== expectsArray) {
+              throw new Error("shape");
+            }
+          } catch {
+            error.textContent = t("variables.invalidInitial");
+            initial.focus();
+            return;
+          }
+        }
+      }
+      close({ name: trimmed, type: type.value, initial: raw });
+    });
+
+    const card = el("div", {
+      class: "modal__card",
+      attrs: { role: "dialog", "aria-modal": "true", "aria-label": options.title },
+    });
+    card.append(
+      el("header", { class: "modal__head" }, [
+        el("h2", { class: "modal__title", text: options.title }),
+        el(
+          "button",
+          {
+            class: "icon-button",
+            attrs: { type: "button", title: t("common.close") },
+            on: { click: () => close(null) },
+          },
+          [icon("close", 18)],
+        ),
+      ]),
+      el("div", { class: "modal__body" }, [form]),
+      el("div", { class: "modal__actions" }, [
+        el("button", {
+          class: "button",
+          text: t("common.cancel"),
+          attrs: { type: "button" },
+          on: { click: () => close(null) },
+        }),
+        el("button", {
+          class: "button button--primary",
+          text: t("common.confirm"),
+          attrs: { type: "button" },
+          on: { click: () => form.requestSubmit() },
+        }),
+      ]),
+    );
+
+    unmount = mount(card, () => close(null));
+    name.focus();
+    name.select();
+  });
+}

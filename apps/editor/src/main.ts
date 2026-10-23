@@ -14,10 +14,12 @@ import {
   walkProject,
   type BlockNode,
   type Diagnostic,
+  type Value,
+  type ValueType,
 } from "@nexus/ir";
 import { renderCanvas } from "./canvas.ts";
 import { renderConsole } from "./console.ts";
-import { confirmDialog, helpBody, openDialog, promptDialog } from "./dialogs.ts";
+import { confirmDialog, helpBody, openDialog, variableDialog } from "./dialogs.ts";
 import { el } from "./dom.ts";
 import { startBlockDrag, startToolboxDrag, type DragDeps } from "./drag.ts";
 import { createScriptWith, defaultScriptPosition, newBlockInstance, removeBlock, unplugPort } from "./edits.ts";
@@ -422,22 +424,35 @@ function selectVariable(id: string): void {
   if (variable) toast(variable.name);
 }
 
+const VARIABLE_TYPES: ValueType[] = ["any", "text", "number", "boolean", "list", "dict"];
+
 async function addVariable(): Promise<void> {
   const project = store.state.document.project;
   const suggested = nextVariableName(project.variables.map((variable) => variable.name));
-  const name = await promptDialog({
+  const result = await variableDialog({
     title: t("variables.add"),
-    label: t("variables.promptName"),
-    initial: suggested,
-    validate: (value) => {
+    nameLabel: t("variables.promptName"),
+    typeLabel: t("variables.type"),
+    initialLabel: t("variables.initial"),
+    initialName: suggested,
+    types: VARIABLE_TYPES.map((type) => ({ value: type, label: t(`type.${type}`) })),
+    validateName: (value) => {
       if (!/^[\p{L}_][\p{L}\p{N}_]*$/u.test(value)) return t("variables.invalidName");
       if (project.variables.some((variable) => variable.name === value)) return t("variables.duplicateName");
       return null;
     },
   });
-  if (name === null) return;
+  if (result === null) return;
+  const type = result.type as ValueType;
+  let initial: Value | null = null;
+  if (result.initial !== "") {
+    if (type === "number") initial = Number(result.initial);
+    else if (type === "boolean") initial = result.initial === "true";
+    else if (type === "list" || type === "dict") initial = JSON.parse(result.initial) as Value;
+    else initial = result.initial;
+  }
   store.update((document) => {
-    document.project.variables.push(createVariable(name, "any", null));
+    document.project.variables.push(createVariable(result.name, type, initial));
   });
 }
 

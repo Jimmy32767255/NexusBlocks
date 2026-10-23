@@ -76,6 +76,7 @@ export const zhCN: Catalog = {
   "variables.usedBy": "被 {count} 块积木使用",
   "variables.invalidName": "只能使用字母、数字或下划线，且不能以数字开头。",
   "variables.duplicateName": "已存在同名变量。",
+  "variables.invalidInitial": "初始值与所选类型不匹配。",
   "variables.confirmDelete": "删除“{name}”？使用它的积木会失去该变量。",
 
   "console.empty": "运行程序后，输出会显示在这里。",

@@ -1,7 +1,10 @@
 import {
   createBlock,
   findBlock,
+  FUNCTION_DEFINE_TYPE,
+  functionCallType,
   walkBlocks,
+  walkProject,
   type BlockNode,
   type BlockWalkContext,
   type NexusDocument,
@@ -103,6 +106,8 @@ export function locateBlock(project: Project, id: string): BlockLocation | null 
 
 export function removeBlock(document: NexusDocument, id: string): boolean {
   const { project } = document;
+  const target = findBlock(project, id);
+  const callType = target?.type === FUNCTION_DEFINE_TYPE ? functionCallType(target.id) : null;
   let removed = removeFromStack(project.scripts, id);
   if (!removed) {
     for (const fn of project.functions) {
@@ -112,8 +117,28 @@ export function removeBlock(document: NexusDocument, id: string): boolean {
       }
     }
   }
-  if (removed) delete document.editor.positions[id];
+  if (removed) {
+    delete document.editor.positions[id];
+    // Deleting a definition must not leave dangling calls behind.
+    if (callType) removeCalls(project, callType);
+  }
   return removed;
+}
+
+function removeCalls(project: Project, type: string): void {
+  walkProject(project, (node) => {
+    const inputs = node.inputs;
+    if (!inputs) return;
+    for (const [port, value] of Object.entries(inputs)) {
+      if (Array.isArray(value)) {
+        const kept = value.filter((child) => child.type !== type);
+        if (kept.length === 0) delete inputs[port];
+        else inputs[port] = kept;
+      } else if (value.type === type) {
+        delete inputs[port];
+      }
+    }
+  });
 }
 
 function removeFromStack(stack: BlockNode[], id: string): boolean {
