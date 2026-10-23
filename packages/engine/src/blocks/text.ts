@@ -1,4 +1,5 @@
 import { countField, toDisplayText, type BlockNode, type FieldDef, type PortDef } from "@nexus/ir";
+import { RuntimeFailure } from "../errors.ts";
 import type { BlockDefinition } from "../types.ts";
 import { CATEGORY_COLORS } from "./control.ts";
 
@@ -57,6 +58,51 @@ export const textBlocks: BlockDefinition[] = [
         result += toDisplayText(await ctx.input(node, port.name));
       }
       return result;
+    },
+  },
+  {
+    type: "text.splitAt",
+    kind: "expression",
+    category: "text",
+    label: "block.text.splitAt.label",
+    description: "block.text.splitAt.description",
+    output: "text",
+    color: TEXT,
+    fields: [],
+    ports: [
+      { name: "text", label: "block.text.splitAt.port.text", kind: "value", type: "text", default: "" },
+      { name: "separator", label: "block.text.splitAt.port.separator", kind: "value", type: "text", default: "," },
+      { name: "index", label: "block.text.splitAt.port.index", kind: "value", type: "number", default: 1 },
+    ],
+    async evaluate(ctx, node) {
+      const text = toDisplayText(await ctx.input(node, "text"));
+      const separator = toDisplayText(await ctx.input(node, "separator"));
+      const index = Math.floor(Number(await ctx.input(node, "index")) || 0);
+      if (separator === "") throw new RuntimeFailure("runtime.error.splitSeparator");
+      const parts = text.split(separator);
+      if (index < 1 || index > parts.length) {
+        throw new RuntimeFailure("runtime.error.splitIndex", { index, length: parts.length });
+      }
+      return parts[index - 1] ?? "";
+    },
+  },
+  {
+    type: "text.contains",
+    kind: "expression",
+    category: "text",
+    label: "block.text.contains.label",
+    description: "block.text.contains.description",
+    output: "boolean",
+    color: TEXT,
+    fields: [],
+    ports: [
+      { name: "text", label: "block.text.contains.port.text", kind: "value", type: "text", default: "" },
+      { name: "needle", label: "block.text.contains.port.needle", kind: "value", type: "text", default: "" },
+    ],
+    async evaluate(ctx, node) {
+      const text = toDisplayText(await ctx.input(node, "text"));
+      const needle = toDisplayText(await ctx.input(node, "needle"));
+      return text.includes(needle);
     },
   },
 ];

@@ -817,3 +817,70 @@ test("count fields outside their bounds fail validation", async () => {
   assert.equal(result.status, "error");
   assert.equal(result.error?.messageKey, "diag.block.invalidNumber");
 });
+
+test("text.splitAt returns the requested piece", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("text.splitAt", {
+            inputs: {
+              text: createBlock("text.literal", { fields: { value: "a,b,c" } }),
+              separator: createBlock("text.literal", { fields: { value: "," } }),
+              index: createBlock("math.number", { fields: { value: 2 } }),
+            },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("text.contains", {
+            inputs: {
+              text: createBlock("text.literal", { fields: { value: "hello" } }),
+              needle: createBlock("text.literal", { fields: { value: "ell" } }),
+            },
+          }),
+        },
+      }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["b", "true"]);
+});
+
+test("text.splitAt rejects empty separators and missing pieces", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("text.splitAt", {
+            fields: { separator: "", index: 1 },
+            inputs: { text: createBlock("text.literal", { fields: { value: "abc" } }) },
+          }),
+        },
+      }),
+    ]),
+  );
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.splitSeparator");
+
+  const outOfRange = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("text.splitAt", {
+            fields: { separator: ",", index: 9 },
+            inputs: { text: createBlock("text.literal", { fields: { value: "a,b" } }) },
+          }),
+        },
+      }),
+    ]),
+  );
+  const second = await runProject(outOfRange);
+  assert.equal(second.status, "error");
+  assert.equal(second.error?.messageKey, "runtime.error.splitIndex");
+  assert.deepEqual(second.error?.params, { index: 9, length: 2 });
+});

@@ -47,6 +47,8 @@ interface BlockDefinition extends BlockSchema {
 | `math.arithmetic` | 数学 | 四则运算（`+ - * / %`） | 属性 `op`，`a`、`b` 值 |
 | `text.literal` | 文本 | 文本字面量 | 属性 `value` |
 | `text.join` | 文本 | 连接文本（默认 2 段，可扩到 8 段） | `a`、`b`、`c`… 值 |
+| `text.splitAt` | 文本 | 以分隔符拆分后取第 n 段（1 起）；空分隔符报错 | `text`、`separator`、`index` 值 |
+| `text.contains` | 文本 | 判断包含关系 | `text`、`needle` 值 |
 | `var.set` | 变量 | 给变量赋值 | 属性 `variable`，`value` 值 |
 | `var.get` | 变量 | 读取变量 | 属性 `variable` |
 | `list.literal` | 列表与字典 | JSON 列表字面量 | 属性 `items`，如 `[1, 2, 3]` |
