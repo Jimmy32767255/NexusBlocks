@@ -4,6 +4,7 @@ import {
   findBlock,
   isAssignable,
   isCatchType,
+  portsOf,
   TRY_TYPE,
   type BlockNode,
   type ValueType,
@@ -433,7 +434,10 @@ function canInsert(store: Store, deps: DragDeps, parentId: string, port: string)
   const parent = findBlock(store.state.document.project, parentId);
   if (!parent) return false;
   const definition = deps.registry.get(parent.type);
-  if (!definition?.ports.some((candidate) => candidate.name === port && candidate.kind === "stack")) {
+  if (
+    !definition ||
+    !portsOf(definition, parent).some((candidate) => candidate.name === port && candidate.kind === "stack")
+  ) {
     return false;
   }
   const existing = parent.inputs?.[port];

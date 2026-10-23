@@ -18,6 +18,10 @@ import {
   isCatchType,
   walkProject,
   type BlockNode,
+  countField,
+  formatParams,
+  parseParams,
+  portsOf,
   serializeDocument,
   type Diagnostic,
   type Value,
@@ -331,9 +335,11 @@ function placeBlockAtCenter(type: string): void {
     if (definition.kind === "expression") {
       const target = selected ? findBlock(document.project, selected.id) : null;
       const parentDef = target ? registry.get(target.type) : undefined;
-      const port = parentDef?.ports.find(
-        (candidate) => candidate.kind === "value" && target?.inputs?.[candidate.name] === undefined,
-      );
+      const port = target && parentDef
+        ? portsOf(parentDef, target).find(
+            (candidate) => candidate.kind === "value" && target.inputs?.[candidate.name] === undefined,
+          )
+        : undefined;
       if (target && port) (target.inputs ??= {})[port.name] = node;
       return;
     }
@@ -560,6 +566,49 @@ function setBlockValue(blockId: string, key: string, value: string | number | bo
   });
 }
 
+/** Add/remove a `count`-driven port, dropping inputs that no longer exist. */
+function adjustGrowCount(blockId: string, fieldName: string, delta: number): void {
+  store.update((document) => {
+    const block = findBlock(document.project, blockId);
+    const definition = block ? registry.get(block.type) : undefined;
+    const field = definition?.fields.find((candidate) => candidate.name === fieldName);
+    if (!block || !definition || !field || field.kind !== "count") return;
+    const current = countField(block, field);
+    const min = field.min ?? 0;
+    const max = field.max ?? Number.MAX_SAFE_INTEGER;
+    const next = Math.max(min, Math.min(max, current + delta));
+    if (next === current) return;
+    (block.fields ??= {})[fieldName] = next;
+    const names = new Set(portsOf(definition, block).map((port) => port.name));
+    for (const port of Object.keys(block.inputs ?? {})) {
+      if (!names.has(port)) delete block.inputs![port];
+    }
+  });
+  store.select(blockId);
+}
+
+/** Append/remove one parameter on a function definition. */
+function adjustParams(blockId: string, fieldName: string, delta: number): void {
+  store.update((document) => {
+    const block = findBlock(document.project, blockId);
+    if (!block) return;
+    const parsed = parseParams(String(block.fields?.[fieldName] ?? ""));
+    if (parsed.errors.length > 0) return;
+    const params = [...parsed.params];
+    if (delta > 0) {
+      if (params.length >= 8) return;
+      let index = 1;
+      while (params.some((param) => param.name === `arg${index}`)) index += 1;
+      params.push({ name: `arg${index}`, type: "any" });
+    } else {
+      if (params.length === 0) return;
+      params.pop();
+    }
+    (block.fields ??= {})[fieldName] = formatParams(params);
+  });
+  store.select(blockId);
+}
+
 const VARIABLE_NAME = /^[\p{L}_][\p{L}\p{N}_]*$/u;
 
 function renameVariable(id: string, rawName: string): string | null {
@@ -783,6 +832,18 @@ host.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
   if (target.closest(".toolbox, .topbar, .side, .modal, .toasts")) return;
+  const grow = target.closest<HTMLElement>("[data-grow]");
+  const growBlock = grow?.closest<HTMLElement>(".block")?.dataset.blockId;
+  if (grow && growBlock && grow.dataset.field) {
+    adjustGrowCount(growBlock, grow.dataset.field, grow.dataset.grow === "add" ? 1 : -1);
+    return;
+  }
+  const param = target.closest<HTMLElement>("[data-param]");
+  const paramBlock = param?.closest<HTMLElement>(".block")?.dataset.blockId;
+  if (param && paramBlock && param.dataset.field) {
+    adjustParams(paramBlock, param.dataset.field, param.dataset.param === "add" ? 1 : -1);
+    return;
+  }
   const blockEl = target.closest<HTMLElement>(".block");
   if (blockEl?.dataset.blockId && target.closest(".block__head")) {
     store.select(blockEl.dataset.blockId);
@@ -819,7 +880,9 @@ host.addEventListener("change", (event) => {
     if (fieldDef?.kind === "number") value = target.value === "" ? 0 : Number(target.value);
     if (fieldDef?.kind === "boolean") value = target.value === "true";
   } else {
-    const port = definition?.ports.find((candidate) => candidate.name === literal);
+    const port = block && definition
+      ? portsOf(definition, block).find((candidate) => candidate.name === literal)
+      : undefined;
     if (port?.type === "number") value = target.value === "" ? 0 : Number(target.value);
     if (port?.type === "boolean") value = target.value === "true";
   }

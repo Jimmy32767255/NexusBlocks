@@ -230,6 +230,8 @@ export const en: Catalog = {
   "block.text.join.description": "Join two values into one piece of text.",
   "block.text.join.port.a": "a",
   "block.text.join.port.b": "b",
+  "block.text.join.port.item": "item",
+  "block.text.join.field.count": "inputs",
 
   "block.math.number.label": "number",
   "block.math.number.description": "A number literal.",
@@ -256,6 +258,13 @@ export const en: Catalog = {
   "block.control.if.port.condition": "condition",
   "block.control.if.port.then": "then",
   "block.control.if.port.else": "else",
+  "block.control.if.port.elseIfCondition": "else if condition",
+  "block.control.if.port.elseIfBody": "else if body",
+  "block.control.if.field.elseIfs": "else-if branches",
+  "block.grow.add": "Add item",
+  "block.grow.remove": "Remove item",
+  "block.grow.addParam": "Add parameter",
+  "block.grow.removeParam": "Remove parameter",
 
   "block.control.repeat.label": "repeat",
   "block.control.repeat.description": "Run the body a number of times.",

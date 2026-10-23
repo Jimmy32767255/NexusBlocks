@@ -4,6 +4,7 @@ import {
   defaultValue,
   FUNCTION_DEFINE_TYPE,
   isImportType,
+  portsOf,
   toDisplayText,
   type BlockNode,
   type FunctionDecl,
@@ -113,7 +114,8 @@ export class Interpreter implements ExecutionContext {
       this.currentBlockId = node.id;
       return value;
     }
-    const portDef = this.definitionFor(node).ports.find(
+    const definition = this.definitionFor(node);
+    const portDef = portsOf(definition, node).find(
       (candidate) => candidate.name === port && candidate.kind === "value",
     );
     const type = portDef?.type ?? "any";
@@ -125,7 +127,8 @@ export class Interpreter implements ExecutionContext {
   literal(node: BlockNode, port: string): Value {
     const raw = node.fields?.[port];
     if (raw !== undefined) return raw;
-    const portDef = this.definitionFor(node).ports.find(
+    const definition = this.definitionFor(node);
+    const portDef = portsOf(definition, node).find(
       (candidate) => candidate.name === port && candidate.kind === "value",
     );
     return portDef?.default ?? defaultValue(portDef?.type ?? "any");

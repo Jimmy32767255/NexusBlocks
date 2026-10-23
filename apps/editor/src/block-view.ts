@@ -1,5 +1,5 @@
 import type { BlockDefinition, BlockRegistry } from "@nexus/engine";
-import type { BlockNode, FieldDef, PortDef } from "@nexus/ir";
+import { countField, portsOf, type BlockNode, type FieldDef, type PortDef } from "@nexus/ir";
 import { el } from "./dom.ts";
 import { t } from "./i18n.ts";
 
@@ -52,12 +52,13 @@ export function renderBlock(node: BlockNode, context: BlockRenderContext): HTMLE
     });
   }
 
+  const ports = portsOf(definition, node);
   const root = el("div", {
     class: [
       "block",
       `block--${definition.kind}`,
       definition.category === "comment" ? "block--comment" : "",
-      hasStack(definition) ? "block--c" : "",
+      ports.some((port) => port.kind === "stack") ? "block--c" : "",
       context.selectedId === node.id ? "block--selected" : "",
     ]
       .filter(Boolean)
@@ -75,19 +76,19 @@ export function renderBlock(node: BlockNode, context: BlockRenderContext): HTMLE
     head.append(renderField(node, field, context));
   }
 
-  for (const port of definition.ports) {
+  for (const port of ports) {
     if (port.kind !== "value") continue;
     head.append(renderValuePort(node, port, context));
   }
 
   root.append(head);
 
-  for (const port of definition.ports) {
+  for (const port of ports) {
     if (port.kind !== "stack") continue;
     root.append(renderStack(node, port, context));
   }
 
-  if (hasStack(definition)) root.append(el("div", { class: "block__foot" }));
+  if (ports.some((port) => port.kind === "stack")) root.append(el("div", { class: "block__foot" }));
 
   return root;
 }
@@ -113,10 +114,6 @@ export function syncCBlockFeet(root: ParentNode): void {
   }
 }
 
-function hasStack(definition: BlockDefinition): boolean {
-  return definition.ports.some((port) => port.kind === "stack");
-}
-
 function valueChild(node: BlockNode, port: string): BlockNode | null {
   const value = node.inputs?.[port];
   return value && !Array.isArray(value) ? value : null;
@@ -127,6 +124,56 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
   const title = t(field.label);
 
   switch (field.kind) {
+    case "count": {
+      const current = countField(node, field);
+      const min = field.min ?? 0;
+      const max = field.max ?? Number.MAX_SAFE_INTEGER;
+      const step = (action: "add" | "remove") =>
+        el("button", {
+          class: "block__step",
+          text: action === "add" ? "+" : "−",
+          attrs: {
+            type: "button",
+            title: t(action === "add" ? "block.grow.add" : "block.grow.remove"),
+            "aria-label": t(action === "add" ? "block.grow.add" : "block.grow.remove"),
+            disabled: !context.interactive || (action === "add" ? current >= max : current <= min),
+          },
+          dataset: { grow: action, field: field.name },
+        });
+      return el("span", { class: "block__counter", attrs: { title } }, [
+        step("remove"),
+        el("span", { class: "block__counter-value", text: String(current) }),
+        step("add"),
+      ]);
+    }
+    case "params": {
+      const input = el("input", {
+        class: "block__input block__params",
+        attrs: {
+          type: "text",
+          value: String(raw),
+          title,
+          "aria-label": title,
+          placeholder: "a:text, b:number",
+          disabled: !context.interactive,
+        },
+        dataset: { field: field.name },
+      });
+      autoSizeControl(input);
+      const button = (action: "add" | "remove") =>
+        el("button", {
+          class: "block__step",
+          text: action === "add" ? "+" : "−",
+          attrs: {
+            type: "button",
+            title: t(action === "add" ? "block.grow.addParam" : "block.grow.removeParam"),
+            "aria-label": t(action === "add" ? "block.grow.addParam" : "block.grow.removeParam"),
+            disabled: !context.interactive,
+          },
+          dataset: { param: action, field: field.name },
+        });
+      return el("span", { class: "block__params-group" }, [input, button("remove"), button("add")]);
+    }
     case "number": {
       const input = el("input", {
         class: "block__input block__input--number",

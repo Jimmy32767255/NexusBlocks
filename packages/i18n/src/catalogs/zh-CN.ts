@@ -227,6 +227,8 @@ export const zhCN: Catalog = {
   "block.text.join.description": "把两个值拼成一段文字。",
   "block.text.join.port.a": "甲",
   "block.text.join.port.b": "乙",
+  "block.text.join.port.item": "内容",
+  "block.text.join.field.count": "连接项",
 
   "block.math.number.label": "数字",
   "block.math.number.description": "一个数字字面量。",
@@ -253,6 +255,13 @@ export const zhCN: Catalog = {
   "block.control.if.port.condition": "条件",
   "block.control.if.port.then": "那么",
   "block.control.if.port.else": "否则",
+  "block.control.if.port.elseIfCondition": "否则如果条件",
+  "block.control.if.port.elseIfBody": "否则如果执行",
+  "block.control.if.field.elseIfs": "否则如果分支",
+  "block.grow.add": "增加一项",
+  "block.grow.remove": "减少一项",
+  "block.grow.addParam": "增加参数",
+  "block.grow.removeParam": "减少参数",
 
   "block.control.repeat.label": "重复",
   "block.control.repeat.description": "把里面的内容执行若干次。",

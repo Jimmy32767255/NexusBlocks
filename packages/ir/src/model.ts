@@ -135,7 +135,7 @@ export interface PortDef {
   default?: FieldValue;
 }
 
-export type FieldKind = "text" | "number" | "select" | "boolean" | "variable";
+export type FieldKind = "text" | "number" | "select" | "boolean" | "variable" | "count" | "params";
 
 export interface FieldOption {
   value: string;
@@ -154,6 +154,28 @@ export interface FieldDef {
   options?: FieldOption[];
   /** Soft validation hint for text/number fields. */
   required?: boolean;
+  /** Bounds for `count` fields (how many ports/params the block currently uses). */
+  min?: number;
+  max?: number;
+}
+
+/** Ports of a block instance, including any that depend on its state. */
+export function portsOf(schema: BlockSchema, node: BlockNode): PortDef[] {
+  return schema.dynamicPorts ? schema.dynamicPorts(node) : schema.ports;
+}
+
+/** Read a bounded `count` field, falling back to its schema default. */
+export function countField(
+  node: BlockNode,
+  field: FieldDef | undefined,
+  fallback = 0,
+): number {
+  const raw = node.fields?.[field?.name ?? ""];
+  const value = typeof raw === "number" && Number.isFinite(raw) ? raw : field?.default;
+  const number = typeof value === "number" ? value : fallback;
+  const min = field?.min ?? 0;
+  const max = field?.max ?? Number.MAX_SAFE_INTEGER;
+  return Math.max(min, Math.min(max, Math.floor(number)));
 }
 
 /**
@@ -173,4 +195,9 @@ export interface BlockSchema {
   output: ValueType;
   fields: FieldDef[];
   ports: PortDef[];
+  /**
+   * Ports that depend on the block's own state, e.g. the number of join inputs
+   * or else-if branches. When present it fully replaces `ports`.
+   */
+  dynamicPorts?: (node: BlockNode) => PortDef[];
 }

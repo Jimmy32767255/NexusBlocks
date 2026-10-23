@@ -333,4 +333,38 @@ describe("inline control sizing", () => {
     autoSizeControl(select);
     assert.equal(select.style.width, "119px");
   });
+
+  it("renders growable join inputs and else-if branches", () => {
+    const document = createDocument(createProject());
+    document.project.scripts = [
+      {
+        id: "s",
+        type: "control.start",
+        inputs: {
+          body: [
+            { id: "j", type: "text.join", fields: { count: 3 } },
+            { id: "i", type: "control.if", fields: { elseIfs: 1 } },
+          ],
+        },
+      },
+    ];
+    const view = renderCanvas(document, {
+      registry: defaultRegistry,
+      selectedId: null,
+      variables: [],
+      zoom: 1,
+      viewport: { x: 0, y: 0 },
+      interactive: true,
+    });
+    const join = view.surface.querySelector<HTMLElement>('[data-block-id="j"]');
+    assert.ok(join);
+    assert.equal(join.querySelectorAll(".port").length, 3);
+    assert.ok(join.querySelector('.block__counter [data-grow="add"]'));
+    assert.ok(join.querySelector('.block__counter [data-grow="remove"]'));
+
+    const ifBlock = view.surface.querySelector<HTMLElement>('[data-block-id="i"]');
+    assert.ok(ifBlock);
+    assert.equal(ifBlock.querySelectorAll(".block__mouth").length, 3);
+    assert.equal(ifBlock.querySelectorAll(".stack__caption").length, 3);
+  });
 });

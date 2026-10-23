@@ -34,7 +34,7 @@ export const functionBlocks: BlockDefinition[] = [
     color: FUNCTIONS,
     fields: [
       { name: "name", kind: "text", label: "block.func.define.field.name", default: "function", required: true },
-      { name: "params", kind: "text", label: "block.func.define.field.params", default: "" },
+      { name: "params", kind: "params", label: "block.func.define.field.params", default: "" },
       {
         name: "returnType",
         kind: "select",

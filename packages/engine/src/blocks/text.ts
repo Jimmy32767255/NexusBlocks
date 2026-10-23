@@ -1,8 +1,28 @@
-import { toDisplayText } from "@nexus/ir";
+import { countField, toDisplayText, type BlockNode, type FieldDef, type PortDef } from "@nexus/ir";
 import type { BlockDefinition } from "../types.ts";
 import { CATEGORY_COLORS } from "./control.ts";
 
 const TEXT = CATEGORY_COLORS.text;
+
+const JOIN_COUNT: FieldDef = {
+  name: "count",
+  kind: "count",
+  label: "block.text.join.field.count",
+  default: 2,
+  min: 2,
+  max: 8,
+};
+
+function joinPorts(node: BlockNode): PortDef[] {
+  const count = countField(node, JOIN_COUNT);
+  return Array.from({ length: count }, (_, index) => ({
+    name: String.fromCharCode(97 + index),
+    label: index < 2 ? `block.text.join.port.${index === 0 ? "a" : "b"}` : "block.text.join.port.item",
+    kind: "value" as const,
+    type: "text" as const,
+    default: "",
+  }));
+}
 
 export const textBlocks: BlockDefinition[] = [
   {
@@ -28,15 +48,15 @@ export const textBlocks: BlockDefinition[] = [
     description: "block.text.join.description",
     output: "text",
     color: TEXT,
-    fields: [],
-    ports: [
-      { name: "a", label: "block.text.join.port.a", kind: "value", type: "text", default: "" },
-      { name: "b", label: "block.text.join.port.b", kind: "value", type: "text", default: "" },
-    ],
+    fields: [JOIN_COUNT],
+    ports: [],
+    dynamicPorts: joinPorts,
     async evaluate(ctx, node) {
-      const a = await ctx.input(node, "a");
-      const b = await ctx.input(node, "b");
-      return `${toDisplayText(a)}${toDisplayText(b)}`;
+      let result = "";
+      for (const port of joinPorts(node)) {
+        result += toDisplayText(await ctx.input(node, port.name));
+      }
+      return result;
     },
   },
 ];

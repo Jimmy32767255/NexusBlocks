@@ -757,3 +757,63 @@ test("convert number to text keeps the decimal spelling", async () => {
   assert.equal(result.status, "finished");
   assert.deepEqual(loggedTexts(events), ["123"]);
 });
+
+test("text.join grows to the requested number of inputs", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("text.join", {
+            fields: { count: 3 },
+            inputs: {
+              a: createBlock("text.literal", { fields: { value: "a" } }),
+              b: createBlock("text.literal", { fields: { value: "b" } }),
+              c: createBlock("text.literal", { fields: { value: "c" } }),
+            },
+          }),
+        },
+      }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["abc"]);
+});
+
+test("if blocks run the matching else-if branch", async () => {
+  const project = projectWith(
+    start([
+      createBlock("control.if", {
+        fields: { elseIfs: 2 },
+        inputs: {
+          condition: createBlock("logic.boolean", { fields: { value: false } }),
+          elseIf1: createBlock("logic.boolean", { fields: { value: false } }),
+          elseIf2: createBlock("logic.boolean", { fields: { value: true } }),
+          elseIf2Body: [createBlock("io.print", { fields: { text: "two" } })],
+          then: [createBlock("io.print", { fields: { text: "then" } })],
+          else: [createBlock("io.print", { fields: { text: "else" } })],
+        },
+      }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["two"]);
+});
+
+test("count fields outside their bounds fail validation", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("text.join", { fields: { count: 99 } }),
+        },
+      }),
+    ]),
+  );
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "diag.block.invalidNumber");
+});

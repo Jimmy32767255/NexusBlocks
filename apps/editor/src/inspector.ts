@@ -1,5 +1,5 @@
 import type { BlockRegistry } from "@nexus/engine";
-import type { BlockNode, FieldDef, PortDef } from "@nexus/ir";
+import { countField, portsOf, type BlockNode, type FieldDef, type PortDef } from "@nexus/ir";
 import { el } from "./dom.ts";
 import { icon } from "./icons.ts";
 import { t } from "./i18n.ts";
@@ -94,7 +94,7 @@ export function renderInspector(options: InspectorOptions): HTMLElement {
 
   const ports = el("div", { class: "inspector__section" });
   ports.append(el("h4", { class: "inspector__section-title", text: t("inspector.ports") }));
-  const valuePorts = definition.ports.filter((port) => port.kind === "value");
+  const valuePorts = portsOf(definition, node).filter((port) => port.kind === "value");
   if (valuePorts.length === 0) {
     ports.append(el("p", { class: "inspector__hint", text: t("inspector.noPorts") }));
   }
@@ -128,6 +128,28 @@ function renderInspectorField(node: BlockNode, field: FieldDef, options: Inspect
   let control: HTMLElement;
 
   switch (field.kind) {
+    case "count": {
+      const current = countField(node, field);
+      const min = field.min ?? 0;
+      const max = field.max ?? Number.MAX_SAFE_INTEGER;
+      const input = el("input", {
+        class: "input",
+        attrs: { type: "number", step: "1", min, max, value: String(current) },
+      });
+      input.addEventListener("change", () => {
+        const next = Math.max(min, Math.min(max, Math.floor(Number(input.value) || 0)));
+        input.value = String(next);
+        options.onFieldChange(node.id, field.name, next);
+      });
+      control = input;
+      break;
+    }
+    case "params": {
+      const input = el("input", { class: "input", attrs: { type: "text", value: String(raw) } });
+      input.addEventListener("change", () => options.onFieldChange(node.id, field.name, input.value));
+      control = input;
+      break;
+    }
     case "number": {
       const input = el("input", {
         class: "input",

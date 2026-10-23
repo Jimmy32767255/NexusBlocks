@@ -1,4 +1,4 @@
-import { toDisplayText, typeOf } from "@nexus/ir";
+import { countField, toDisplayText, typeOf, type FieldDef, type PortDef } from "@nexus/ir";
 import { BreakSignal, RuntimeFailure, StopSignal, ThrowSignal } from "../errors.ts";
 import type { BlockDefinition } from "../types.ts";
 
@@ -18,6 +18,15 @@ export const CATEGORY_COLORS = {
   convert: "#57a58f",
   comment: "#a8975c",
 } as const;
+
+const IF_ELSEIFS: FieldDef = {
+  name: "elseIfs",
+  kind: "count",
+  label: "block.control.if.field.elseIfs",
+  default: 0,
+  min: 0,
+  max: 4,
+};
 
 const CONTROL = CATEGORY_COLORS.control;
 
@@ -61,19 +70,35 @@ export const controlBlocks: BlockDefinition[] = [
     description: "block.control.if.description",
     output: "void",
     color: CONTROL,
-    fields: [],
-    ports: [
-      { name: "condition", label: "block.control.if.port.condition", kind: "value", type: "boolean", default: false },
-      { name: "then", label: "block.control.if.port.then", kind: "stack" },
-      { name: "else", label: "block.control.if.port.else", kind: "stack" },
-    ],
-    async execute(ctx, node) {
-      const condition = await ctx.input(node, "condition");
-      if (condition) {
-        await ctx.run(ctx.stack(node, "then"));
-      } else {
-        await ctx.run(ctx.stack(node, "else"));
+    fields: [IF_ELSEIFS],
+    ports: [],
+    dynamicPorts(node): PortDef[] {
+      const count = countField(node, IF_ELSEIFS);
+      const ports: PortDef[] = [
+        { name: "condition", label: "block.control.if.port.condition", kind: "value", type: "boolean", default: false },
+        { name: "then", label: "block.control.if.port.then", kind: "stack" },
+      ];
+      for (let index = 1; index <= count; index += 1) {
+        ports.push(
+          { name: `elseIf${index}`, label: "block.control.if.port.elseIfCondition", kind: "value", type: "boolean", default: false },
+          { name: `elseIf${index}Body`, label: "block.control.if.port.elseIfBody", kind: "stack" },
+        );
       }
+      ports.push({ name: "else", label: "block.control.if.port.else", kind: "stack" });
+      return ports;
+    },
+    async execute(ctx, node) {
+      if (await ctx.input(node, "condition")) {
+        await ctx.run(ctx.stack(node, "then"));
+        return;
+      }
+      for (let index = 1; index <= countField(node, IF_ELSEIFS); index += 1) {
+        if (await ctx.input(node, `elseIf${index}`)) {
+          await ctx.run(ctx.stack(node, `elseIf${index}Body`));
+          return;
+        }
+      }
+      await ctx.run(ctx.stack(node, "else"));
     },
   },
   {

@@ -1,8 +1,9 @@
-import type {
-  BlockNode,
-  BlockSchema,
-  Project,
-  ValueType,
+import {
+  portsOf,
+  type BlockNode,
+  type BlockSchema,
+  type Project,
+  type ValueType,
 } from "./model.ts";
 import { isAssignable } from "./values.ts";
 import { walkBlocks } from "./traverse.ts";
@@ -316,6 +317,39 @@ function checkFields(
     }
     const fieldPath = `${path}.fields.${def.name}`;
     switch (def.kind) {
+      case "count": {
+        const min = def.min ?? 0;
+        const max = def.max ?? Number.MAX_SAFE_INTEGER;
+        if (
+          typeof value !== "number" ||
+          !Number.isInteger(value) ||
+          value < min ||
+          value > max
+        ) {
+          diagnostics.push({
+            severity: "error",
+            code: "block.invalidNumber",
+            message: `Field "${def.name}" must be an integer between ${min} and ${max}`,
+            path: fieldPath,
+            blockId: node.id,
+            params: { field: def.name },
+          });
+        }
+        break;
+      }
+      case "params":
+      case "text":
+        if (typeof value !== "string") {
+          diagnostics.push({
+            severity: "warning",
+            code: "block.kindMismatch",
+            message: `Field "${def.name}" should be text`,
+            path: fieldPath,
+            blockId: node.id,
+            params: { field: def.name },
+          });
+        }
+        break;
       case "number":
         if (typeof value !== "number" || !Number.isFinite(value)) {
           diagnostics.push({
@@ -382,7 +416,7 @@ function checkFields(
   for (const key of Object.keys(fields)) {
     if (schema.fields.some((def) => def.name === key)) continue;
     // Inline literals live next to the value port they fill, e.g. `text`.
-    const inlinePort = schema.ports.find((port) => port.name === key && port.kind === "value");
+    const inlinePort = portsOf(schema, node).find((port) => port.name === key && port.kind === "value");
     if (inlinePort) {
       checkInlineLiteral(key, fields[key], inlinePort.type ?? "any", node, path, diagnostics);
       continue;
@@ -448,7 +482,7 @@ function checkInputs(
 ): void {
   const inputs = node.inputs ?? {};
   for (const [portName, value] of Object.entries(inputs)) {
-    const port = schema.ports.find((candidate) => candidate.name === portName);
+    const port = portsOf(schema, node).find((candidate) => candidate.name === portName);
     const portPath = `${path}.${portName}`;
     if (!port) {
       diagnostics.push({
