@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   createBlock,
   createProject,
+  createVariable,
   functionCallType,
   validateProject,
   type BlockNode,
@@ -62,4 +63,35 @@ test("legacy func.define still reads as a value function", () => {
   project.scripts.push(hat);
   const diagnostics = validateProject(project, createProjectRegistry(project));
   assert.equal(diagnostics.filter((d) => d.severity === "error").length, 0, JSON.stringify(diagnostics));
+});
+
+test("variables can be passed as function arguments", async () => {
+  const hat = createBlock("func.define_value", {
+    id: "sq",
+    fields: { name: "square", params: "x: number", returnType: "number" },
+    inputs: { body: [createBlock("func.return", {
+      inputs: { value: createBlock("math.arithmetic", {
+        fields: { op: "*" },
+        inputs: { a: createBlock("func.param", { fields: { name: "x" } }), b: createBlock("func.param", { fields: { name: "x" } }) },
+      }) },
+    })] },
+  });
+  const variable = createVariable("n", "number", 4);
+  const call = createBlock(functionCallType("sq"), {
+    inputs: { x: createBlock("var.get", { fields: { variable: variable.id } }) },
+  });
+  const main = createBlock("control.start", { inputs: { body: [
+    createBlock("io.print", { inputs: { text: call } }),
+  ] } });
+  const project: Project = createProject({ name: "vars" });
+  project.variables.push(variable);
+  project.scripts.push(hat, main);
+
+  const registry = createProjectRegistry(project);
+  const diagnostics = validateProject(project, registry);
+  assert.equal(diagnostics.filter((d) => d.severity === "error").length, 0, JSON.stringify(diagnostics));
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { registry, onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(events.filter((e) => e.kind === "log").map((e) => (e.kind === "log" ? e.text : "")), ["16"]);
 });

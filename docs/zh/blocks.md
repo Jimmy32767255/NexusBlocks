@@ -115,10 +115,10 @@ interface ExecutionContext {
 
 函数是**画布上的 hat 积木**，不是单独的表单：
 
-1. 从「函数」类别拖出 `func.define`，在属性面板填 `name`、`params`（如 `x: number, label: text`）和 `returnType`。
-2. 函数体直接嵌在它的 `body` 栈里；用 `func.param` 读取参数，`func.return` 返回值（不写则返回返回类型的默认值）。
-3. `func.define` 以**积木 id** 标识函数；调用块类型是 `func.call:<id>`，由 `createProjectRegistry(project)` 根据当前定义动态生成，因此重命名函数后调用块标签会自动更新。
-4. 参数只在该函数体内可见（无闭包、无全局隐式参数）；嵌套调用上限 64 层，超出报 `runtime.error.callDepth`。
+1. 从「函数」类别拖出 `func.define_value`（取值函数，在属性面板再选 `returnType`）或 `func.define_action`（操作函数，不返回值），填 `name`、`params`（如 `x: number, label: text`）。
+2. 函数体直接嵌在它的 `body` 栈里；用 `func.param` 读取参数。取值函数里用 `func.return` 返回值（不写则返回返回类型的默认值）；操作函数里不允许 `func.return`，校验报 `function.returnInAction`。
+3. 定义块以**积木 id** 标识函数；调用块类型是 `func.call:<id>`，由 `createProjectRegistry(project)` 根据当前定义动态生成，因此重命名函数后调用块标签会自动更新。
+4. 调用块的参数端口可以连接任意取值积木，包括变量（`var.get`）；运行时按参数声明的类型强制转换，所以把变量传入 `x: number` 时取的是变量当时的值。参数只在该函数体内可见（无闭包），嵌套调用上限 64 层，超出报 `runtime.error.callDepth`。
 5. 删除函数定义时，编辑器会同时移除所有调用块，避免留下悬空引用。
 
 `runProject` 默认用 `createProjectRegistry(project)` 构建注册表；`defaultRegistry` 只含核心积木（不含调用块）。
