@@ -618,6 +618,38 @@ test("pass does nothing and execution continues", async () => {
   assert.deepEqual(loggedTexts(events), ["ok"]);
 });
 
+test("comments never change program output or state", async () => {
+  const project = projectWith(
+    start([
+      createBlock("comment.note", { fields: { text: "explain the next line" } }),
+      createBlock("io.print", { fields: { text: "ok" } }),
+      createBlock("comment.note", { fields: { text: "" } }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["ok"]);
+});
+
+test("comments can hold arbitrary text without failing validation", async () => {
+  const project = projectWith(
+    start([createBlock("comment.note", { fields: { text: "含中文 / with symbols #{}" } })]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), []);
+});
+
+test("every category has a toolbox label", () => {
+  for (const { category } of defaultRegistry.grouped()) {
+    const key = `category.${category}`;
+    assert.ok(key in en, `missing en: ${key}`);
+    assert.ok(key in zhCN, `missing zh-CN: ${key}`);
+  }
+});
+
 test("exit with status 0 finishes the run immediately", async () => {
   const project = projectWith(
     start([

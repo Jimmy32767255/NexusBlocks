@@ -116,6 +116,27 @@ describe("editor rendering", () => {
     for (const wrapper of wrappers) assert.equal(wrapper.getAttribute("style"), null);
   });
 
+  it("renders comments as notes with a dashed, italic head", () => {
+    const doc = createDocument(createProject());
+    const note = createBlock("comment.note", { fields: { text: "remember to test" } });
+    doc.project.scripts.push(createBlock("control.start", { inputs: { body: [note] } }));
+
+    const view = renderCanvas(doc, {
+      registry: defaultRegistry,
+      selectedId: null,
+      variables: [],
+      zoom: 1,
+      viewport: { x: 0, y: 0 },
+      interactive: true,
+    });
+
+    const block = view.root.querySelector<HTMLElement>("[data-block-id='" + note.id + "']")!;
+    assert.ok(block.classList.contains("block--comment"));
+    const input = block.querySelector<HTMLInputElement>("input")!;
+    assert.equal(input.value, "remember to test");
+    assert.equal(input.getAttribute("aria-label"), "内容");
+  });
+
   it("renders the empty canvas state", () => {
     const view = renderCanvas(createDocument(createProject()), {
       registry: defaultRegistry,
