@@ -20,7 +20,7 @@ Working today:
 - 12 built-in blocks: `control.start`, `control.if`, `control.repeat`, `io.print`, `logic.boolean`, `logic.compare`, `math.number`, `math.arithmetic`, `text.literal`, `text.join`, `var.set`, `var.get`.
 - An interpreter with a step limit, cancellation, event stream (logs, output, status, errors), and variable scopes.
 - English and Chinese UI, runtime messages, and program output in the project locale.
-- `pnpm test` covers IR, i18n, engine, and editor logic (46 cases).
+- `pnpm test` covers IR, i18n, engine, and editor logic (50 cases).
 
 Not built yet (interfaces reserved): the desktop shell (Tauri), file/network/process capabilities, function blocks, list/set types, and code export.
 
