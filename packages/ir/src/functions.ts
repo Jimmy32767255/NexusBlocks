@@ -8,8 +8,17 @@ import {
 } from "./model.ts";
 import { walkBlocks } from "./traverse.ts";
 
-/** The hat block that defines a function on the canvas. */
+/** Legacy hat that defines a function; read as a value function. */
 export const FUNCTION_DEFINE_TYPE = "func.define" as const;
+/** Hat defining a function that returns a value. */
+export const FUNCTION_DEFINE_VALUE_TYPE = "func.define_value" as const;
+/** Hat defining a function that is used as a statement. */
+export const FUNCTION_DEFINE_ACTION_TYPE = "func.define_action" as const;
+export const FUNCTION_DEFINE_TYPES = [
+  FUNCTION_DEFINE_TYPE,
+  FUNCTION_DEFINE_VALUE_TYPE,
+  FUNCTION_DEFINE_ACTION_TYPE,
+] as const;
 /** Expression/statement prefix for generated function call blocks. */
 export const FUNCTION_CALL_PREFIX = "func.call:" as const;
 /** Expression that reads a parameter inside a function body. */
@@ -23,9 +32,12 @@ export interface FunctionParam {
   type: ValueType;
 }
 
+export type FunctionKind = "value" | "action";
+
 export interface FunctionDecl {
   /** The defining block's id; call blocks reference it. */
   id: string;
+  kind: FunctionKind;
   name: string;
   params: FunctionParam[];
   returnType: ValueType;
@@ -88,13 +100,16 @@ export function isValueType(value: unknown): value is ValueType {
 export function functionDeclFromNode(node: BlockNode): { decl: FunctionDecl; errors: string[] } {
   const name = String(node.fields?.name ?? "").trim();
   const parsed = parseParams(String(node.fields?.params ?? ""));
-  const returnType = isValueType(node.fields?.returnType) ? node.fields!.returnType : "any";
+  const kind: FunctionKind = node.type === FUNCTION_DEFINE_ACTION_TYPE ? "action" : "value";
+  const savedReturn = isValueType(node.fields?.returnType) ? node.fields!.returnType : "any";
+  const returnType: ValueType = kind === "action" ? "void" : savedReturn;
   return {
     decl: {
       id: node.id,
+      kind,
       name: name || node.id,
       params: parsed.params,
-      returnType: returnType as ValueType,
+      returnType,
       node,
     },
     errors: parsed.errors,
@@ -104,8 +119,12 @@ export function functionDeclFromNode(node: BlockNode): { decl: FunctionDecl; err
 /** Functions defined by top-level `func.define` hats, in canvas order. */
 export function collectFunctions(scripts: readonly BlockNode[]): FunctionDecl[] {
   return scripts
-    .filter((node) => node.type === FUNCTION_DEFINE_TYPE)
+    .filter((node) => isFunctionDefine(node.type))
     .map((node) => functionDeclFromNode(node).decl);
+}
+
+export function isFunctionDefine(type: string): boolean {
+  return (FUNCTION_DEFINE_TYPES as readonly string[]).includes(type);
 }
 
 export function functionCallType(functionId: string): string {
@@ -134,7 +153,7 @@ export function createFunctionCallSchema(decl: FunctionDecl): BlockSchema {
   const ports = decl.params.map(paramPort);
   return {
     type: functionCallType(decl.id),
-    kind: decl.returnType === "void" ? "statement" : "expression",
+    kind: decl.kind === "action" ? "statement" : "expression",
     category: "functions",
     label: decl.name,
     output: decl.returnType,
@@ -165,7 +184,7 @@ export function scanFunctions(scripts: readonly BlockNode[]): FunctionScan {
   const errors: { blockId: string; message: string }[] = [];
   const schemas = new Map<string, BlockSchema>();
   for (const node of scripts) {
-    if (node.type !== FUNCTION_DEFINE_TYPE) continue;
+    if (!isFunctionDefine(node.type)) continue;
     const { decl, errors: parseErrors } = functionDeclFromNode(node);
     for (const message of parseErrors) errors.push({ blockId: node.id, message });
     decls.push(decl);

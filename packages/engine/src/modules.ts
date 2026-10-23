@@ -1,5 +1,5 @@
 import {
-  FUNCTION_DEFINE_TYPE,
+  isFunctionDefine,
   functionDeclFromNode,
   importSpecOf,
   parseDocument,
@@ -105,7 +105,7 @@ export async function resolveImports(
       files.push(spec.path);
       const moduleProject = parsed.document.project;
       const definitions = moduleProject.scripts.filter(
-        (candidate) => candidate.type === FUNCTION_DEFINE_TYPE,
+        (candidate) => isFunctionDefine(candidate.type),
       );
       const selected = selectFunctions(definitions, spec, errors);
       for (const definition of selected) {
@@ -162,7 +162,7 @@ function readError(error: unknown, blockId: string, file: string): ImportError {
 
 function collectFunctionIds(project: Project): string[] {
   return project.scripts
-    .filter((node) => node.type === FUNCTION_DEFINE_TYPE)
+    .filter((node) => isFunctionDefine(node.type))
     .map((node) => node.id);
 }
 

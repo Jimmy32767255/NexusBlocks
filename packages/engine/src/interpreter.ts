@@ -2,7 +2,7 @@ import {
   coerce as coerceValue,
   collectFunctions,
   defaultValue,
-  FUNCTION_DEFINE_TYPE,
+  isFunctionDefine,
   isImportType,
   portsOf,
   toDisplayText,
@@ -81,7 +81,7 @@ export class Interpreter implements ExecutionContext {
 
   async runScripts(scripts: BlockNode[]): Promise<void> {
     await this.run(
-      scripts.filter((node) => node.type !== FUNCTION_DEFINE_TYPE && !isImportType(node.type)),
+      scripts.filter((node) => !isFunctionDefine(node.type) && !isImportType(node.type)),
     );
   }
 
@@ -162,9 +162,8 @@ export class Interpreter implements ExecutionContext {
       await this.run((decl.node.inputs?.body as BlockNode[] | undefined) ?? []);
     } catch (error) {
       if (error instanceof ReturnSignal) {
-        return decl.returnType === "void"
-          ? null
-          : this.coerce(error.value, decl.returnType, decl.node.id);
+        if (decl.kind === "action") this.fail("runtime.error.returnInAction", { name: decl.name });
+        return this.coerce(error.value, decl.returnType, decl.node.id);
       }
       throw error;
     } finally {

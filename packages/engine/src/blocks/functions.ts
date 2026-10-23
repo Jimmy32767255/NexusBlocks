@@ -1,5 +1,7 @@
 import {
+  FUNCTION_DEFINE_ACTION_TYPE,
   FUNCTION_DEFINE_TYPE,
+  FUNCTION_DEFINE_VALUE_TYPE,
   FUNCTION_PARAM_TYPE,
   FUNCTION_RETURN_TYPE,
   createFunctionCallSchema,
@@ -23,18 +25,22 @@ export class ReturnSignal extends Error {
   }
 }
 
+const DEFINE_FIELDS: BlockDefinition["fields"] = [
+  { name: "name", kind: "text", label: "block.func.define.field.name", default: "function", required: true },
+  { name: "params", kind: "params", label: "block.func.define.field.params", default: "" },
+];
+
 export const functionBlocks: BlockDefinition[] = [
   {
-    type: FUNCTION_DEFINE_TYPE,
+    type: FUNCTION_DEFINE_VALUE_TYPE,
     kind: "hat",
     category: "functions",
-    label: "block.func.define.label",
-    description: "block.func.define.description",
+    label: "block.func.defineValue.label",
+    description: "block.func.defineValue.description",
     output: "void",
     color: FUNCTIONS,
     fields: [
-      { name: "name", kind: "text", label: "block.func.define.field.name", default: "function", required: true },
-      { name: "params", kind: "params", label: "block.func.define.field.params", default: "" },
+      ...DEFINE_FIELDS,
       {
         name: "returnType",
         kind: "select",
@@ -47,13 +53,44 @@ export const functionBlocks: BlockDefinition[] = [
           { value: "boolean", label: "boolean" },
           { value: "list", label: "list" },
           { value: "dict", label: "dict" },
-          { value: "void", label: "void" },
         ],
       },
     ],
     ports: [{ name: "body", label: "block.func.define.port.body", kind: "stack" }],
     execute() {
       // Definitions are only run when called.
+    },
+  },
+  {
+    type: FUNCTION_DEFINE_ACTION_TYPE,
+    kind: "hat",
+    category: "functions",
+    label: "block.func.defineAction.label",
+    description: "block.func.defineAction.description",
+    output: "void",
+    color: FUNCTIONS,
+    fields: DEFINE_FIELDS,
+    ports: [{ name: "body", label: "block.func.define.port.body", kind: "stack" }],
+    execute() {
+      // Definitions are only run when called.
+    },
+  },
+  {
+    type: FUNCTION_DEFINE_TYPE,
+    kind: "hat",
+    category: "functions",
+    label: "block.func.legacy.label",
+    description: "block.func.legacy.description",
+    output: "void",
+    color: FUNCTIONS,
+    hidden: true,
+    fields: [
+      ...DEFINE_FIELDS,
+      { name: "returnType", kind: "text", label: "block.func.define.field.returnType", default: "any" },
+    ],
+    ports: [{ name: "body", label: "block.func.define.port.body", kind: "stack" }],
+    execute() {
+      // Legacy definitions open as value functions.
     },
   },
   {

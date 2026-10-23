@@ -44,7 +44,7 @@ describe("editor rendering", () => {
     });
 
     const items = toolbox.querySelectorAll<HTMLElement>(".toolbox__item");
-    assert.equal(items.length, defaultRegistry.all().length);
+    assert.equal(items.length, defaultRegistry.all().filter((definition) => !definition.hidden).length);
     assert.ok(toolbox.querySelectorAll(".toolbox__group").length >= 4);
 
     const search = toolbox.querySelector<HTMLInputElement>("input[type=search]")!;
@@ -273,7 +273,7 @@ describe("editor rendering", () => {
 
   it("adds a dynamic call block for every function definition", () => {
     const document = createDocument(createProject());
-    const definition = createBlock("func.define", {
+    const definition = createBlock("func.define_value", {
       fields: { name: "twice", params: "x: number", returnType: "number" },
       inputs: { body: [] },
     });
@@ -289,7 +289,7 @@ describe("editor rendering", () => {
     const types = [...toolbox.querySelectorAll<HTMLElement>("[data-toolbox]")].map(
       (row) => row.dataset.toolbox,
     );
-    assert.ok(types.includes("func.define"));
+    assert.ok(types.includes("func.define_value"));
     assert.ok(types.includes(callType));
 
     const canvas = renderCanvas(document, {

@@ -1,7 +1,7 @@
 import {
   createBlock,
   findBlock,
-  FUNCTION_DEFINE_TYPE,
+  isFunctionDefine,
   functionCallType,
   walkBlocks,
   walkProject,
@@ -107,7 +107,7 @@ export function locateBlock(project: Project, id: string): BlockLocation | null 
 export function removeBlock(document: NexusDocument, id: string): boolean {
   const { project } = document;
   const target = findBlock(project, id);
-  const callType = target?.type === FUNCTION_DEFINE_TYPE ? functionCallType(target.id) : null;
+  const callType = target && isFunctionDefine(target.type) ? functionCallType(target.id) : null;
   let removed = removeFromStack(project.scripts, id);
   if (!removed) {
     for (const fn of project.functions) {

@@ -64,6 +64,7 @@ export class BlockRegistry {
   grouped(): { category: string; blocks: BlockDefinition[] }[] {
     const groups = new Map<string, BlockDefinition[]>();
     for (const definition of this.all()) {
+      if (definition.hidden) continue;
       const bucket = groups.get(definition.category);
       if (bucket) bucket.push(definition);
       else groups.set(definition.category, [definition]);

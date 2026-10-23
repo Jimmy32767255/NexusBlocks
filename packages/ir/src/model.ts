@@ -200,4 +200,6 @@ export interface BlockSchema {
    * or else-if branches. When present it fully replaces `ports`.
    */
   dynamicPorts?: (node: BlockNode) => PortDef[];
+  /** Kept in the registry for old documents but never offered in the toolbox. */
+  hidden?: boolean;
 }

@@ -396,7 +396,7 @@ function defineFunction(
   returnType: string,
   body: BlockNode[],
 ): BlockNode {
-  return createBlock("func.define", {
+  return createBlock(returnType === "void" ? "func.define_action" : "func.define_value", {
     fields: { name, params, returnType },
     inputs: { body },
   });

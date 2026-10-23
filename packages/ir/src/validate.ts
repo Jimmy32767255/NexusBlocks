@@ -35,6 +35,8 @@ export type DiagnosticCode =
   | "variable.invalidName"
   | "function.invalidParams"
   | "function.unknownParam"
+  | "function.misplacedReturn"
+  | "function.returnInAction"
   | "catch.misplaced"
   | "catch.invalid";
 
@@ -204,12 +206,33 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
 
 function checkFunctionScope(
   node: BlockNode,
-  owners: Map<string, { params: { name: string }[] }>,
+  owners: Map<string, { name: string; kind: "value" | "action"; params: { name: string }[] }>,
   path: string,
   diagnostics: Diagnostic[],
 ): void {
   if (node.type !== FUNCTION_PARAM_TYPE && node.type !== FUNCTION_RETURN_TYPE) return;
   const owner = owners.get(node.id);
+  if (node.type === FUNCTION_RETURN_TYPE) {
+    if (!owner) {
+      diagnostics.push({
+        severity: "error",
+        code: "function.misplacedReturn",
+        message: "Return may only be used inside a function",
+        path,
+        blockId: node.id,
+      });
+    } else if (owner.kind === "action") {
+      diagnostics.push({
+        severity: "error",
+        code: "function.returnInAction",
+        message: "Return may only be used inside a value function",
+        path,
+        blockId: node.id,
+        params: { name: owner.name },
+      });
+    }
+    return;
+  }
   if (!owner) {
     if (node.type === FUNCTION_PARAM_TYPE) {
       diagnostics.push({
