@@ -31,6 +31,7 @@ interface BlockDefinition extends BlockSchema {
 | `control.repeatWith` | 控制 | 重复并计数，当前轮次从 1 开始写入变量 | `times` 数字、`body` 栈，属性 `variable` |
 | `control.wait` | 控制 | 等待若干秒（可被「停止」中断） | `seconds` 数字 |
 | `control.pass` | 控制 | 空语句，什么也不做 | — |
+| `comment.note` | 注释 | 注释语句，运行时不产生任何效果 | 属性 `text` |
 | `sys.exit` | 系统 | 立即结束整个程序 | `code` 数字状态码 |
 | `control.throw` | 控制 | 抛出异常 | `value` 任意值 |
 | `control.try` | 控制 | 尝试/捕获容器 | `body`、`catches` 栈 |
