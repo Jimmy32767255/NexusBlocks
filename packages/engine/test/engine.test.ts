@@ -1,0 +1,251 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  createBlock,
+  createProject,
+  createVariable,
+  type BlockNode,
+  type Project,
+} from "@nexus/ir";
+import {
+  BlockRegistry,
+  coreBlocks,
+  createHelloWorldProject,
+  defaultRegistry,
+  runProject,
+  type BlockDefinition,
+  type RuntimeEvent,
+} from "../src/index.ts";
+import { en, zhCN } from "@nexus/i18n";
+
+function start(body: BlockNode[]): BlockNode {
+  return createBlock("control.start", { inputs: { body } });
+}
+
+function projectWith(...scripts: BlockNode[]): Project {
+  const project = createProject();
+  project.scripts = scripts;
+  return project;
+}
+
+function loggedTexts(events: RuntimeEvent[]): string[] {
+  return events.filter((event) => event.kind === "log").map((event) => (event as { text: string }).text);
+}
+
+test("hello world prints exactly one line", async () => {
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(createHelloWorldProject("en"), { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["Hello, world!"]);
+});
+
+test("variables and arithmetic feed text.join", async () => {
+  const project = createProject();
+  const total = createVariable("total", "number", 0);
+  project.variables.push(total);
+  project.scripts = [
+    start([
+      createBlock("var.set", {
+        fields: { variable: total.id },
+        inputs: {
+          value: createBlock("math.arithmetic", {
+            fields: { op: "+" },
+            inputs: {
+              a: createBlock("math.number", { fields: { value: 1 } }),
+              b: createBlock("math.number", { fields: { value: 2 } }),
+            },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("text.join", {
+            inputs: {
+              a: createBlock("text.literal", { fields: { value: "total=" } }),
+              b: createBlock("var.get", { fields: { variable: total.id } }),
+            },
+          }),
+        },
+      }),
+    ]),
+  ];
+
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["total=3"]);
+});
+
+test("repeat runs its body the requested number of times", async () => {
+  const project = projectWith(
+    start([
+      createBlock("control.repeat", {
+        inputs: {
+          times: createBlock("math.number", { fields: { value: 3 } }),
+          body: [createBlock("io.print", { fields: { text: "hi" } })],
+        },
+      }),
+    ]),
+  );
+
+  const events: RuntimeEvent[] = [];
+  await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.deepEqual(loggedTexts(events), ["hi", "hi", "hi"]);
+});
+
+test("if/else picks a branch from a comparison", async () => {
+  const project = projectWith(
+    start([
+      createBlock("control.if", {
+        inputs: {
+          condition: createBlock("logic.compare", {
+            fields: { op: ">=" },
+            inputs: {
+              a: createBlock("math.number", { fields: { value: 2 } }),
+              b: createBlock("math.number", { fields: { value: 3 } }),
+            },
+          }),
+          then: [createBlock("io.print", { fields: { text: "yes" } })],
+          else: [createBlock("io.print", { fields: { text: "no" } })],
+        },
+      }),
+    ]),
+  );
+
+  const events: RuntimeEvent[] = [];
+  await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.deepEqual(loggedTexts(events), ["no"]);
+});
+
+test("division by zero reports a translatable error", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("math.arithmetic", {
+            fields: { op: "/" },
+            inputs: {
+              a: createBlock("math.number", { fields: { value: 1 } }),
+              b: createBlock("math.number", { fields: { value: 0 } }),
+            },
+          }),
+        },
+      }),
+    ]),
+  );
+
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.divisionByZero");
+});
+
+test("the step limit stops runaway loops", async () => {
+  const project = projectWith(
+    start([
+      createBlock("control.repeat", {
+        inputs: {
+          times: createBlock("math.number", { fields: { value: 1000 } }),
+          body: [createBlock("io.print", { fields: { text: "again" } })],
+        },
+      }),
+    ]),
+  );
+
+  const result = await runProject(project, { stepLimit: 40 });
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.stepLimit");
+});
+
+test("aborting the signal stops the program", async () => {
+  const project = projectWith(
+    start([
+      createBlock("control.repeat", {
+        inputs: {
+          times: createBlock("math.number", { fields: { value: 10_000 } }),
+          body: [createBlock("io.print", { fields: { text: "tick" } })],
+        },
+      }),
+    ]),
+  );
+
+  const controller = new AbortController();
+  const logs: string[] = [];
+  const result = await runProject(project, {
+    signal: controller.signal,
+    onEvent: (event) => {
+      if (event.kind === "log") {
+        logs.push(event.text);
+        if (logs.length === 1) controller.abort();
+      }
+    },
+  });
+
+  assert.equal(result.status, "stopped");
+  assert.equal(logs.length, 1);
+});
+
+test("invalid programs fail before executing", async () => {
+  const project = createProject();
+  project.scripts = [createBlock("io.print", { fields: { text: "naked" } })];
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "diag.block.kindMismatch");
+});
+
+test("empty projects finish immediately", async () => {
+  const result = await runProject(createProject());
+  assert.equal(result.status, "finished");
+  assert.equal(result.steps, 0);
+});
+
+test("hosts can extend the language without touching the interpreter", async () => {
+  const ping: BlockDefinition = {
+    type: "test.ping",
+    kind: "expression",
+    category: "io",
+    label: "test.ping",
+    output: "text",
+    color: "#000000",
+    fields: [],
+    ports: [],
+    async evaluate(ctx) {
+      return ctx.host.invoke({ capability: "test.ping", args: [] });
+    },
+  };
+  const registry = new BlockRegistry([...coreBlocks, ping]);
+  const host = {
+    name: "test",
+    capabilities: () => [],
+    async invoke(request: { capability: string }) {
+      return `pong:${request.capability}`;
+    },
+  };
+
+  const project = projectWith(
+    start([createBlock("io.print", { inputs: { text: createBlock("test.ping") } })]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, {
+    registry,
+    host,
+    onEvent: (event) => events.push(event),
+  });
+
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["pong:test.ping"]);
+});
+
+test("every block string is translated in English and Chinese", () => {
+  for (const definition of defaultRegistry.all()) {
+    const keys = [
+      definition.label,
+      definition.description ?? "",
+      ...definition.fields.map((field) => field.label),
+      ...definition.ports.map((port) => port.label),
+    ].filter(Boolean);
+    for (const key of keys) {
+      assert.ok(key in en, `missing en: ${key}`);
+      assert.ok(key in zhCN, `missing zh-CN: ${key}`);
+    }
+  }
+});

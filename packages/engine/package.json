@@ -1,0 +1,16 @@
+{
+  "name": "@nexus/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Nexus Blocks block definitions, interpreter and capability host",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@nexus/ir": "workspace:*"
+  },
+  "devDependencies": {
+    "@nexus/i18n": "workspace:*"
+  }
+}
