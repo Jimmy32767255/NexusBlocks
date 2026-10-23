@@ -1,6 +1,6 @@
 # 桌面外壳（Tauri 2）
 
-浏览器版把工作区文件放在 `localStorage` 里，刷新不丢，但它不是真实文件系统。桌面外壳解决这一层：同一个编辑器 bundle 运行在 Tauri 的 WebView 中，文件能力由 Rust 进程落到用户选定的目录。
+浏览器版把文件放在 `localStorage` 里，刷新不丢，但它不是真实文件系统。桌面外壳解决这一层：同一个编辑器 bundle 运行在 Tauri 的 WebView 中，文件能力由 Rust 进程直接落到本机磁盘。
 
 ```
 ┌─────────────────────────────┐
@@ -10,7 +10,7 @@
                │ invoke("capability_invoke")
 ┌──────────────▼──────────────┐
 │ Rust 主进程（src-tauri）    │
-│  工作区根目录 + 路径校验    │
+│  绝对路径 / ~ / 主目录相对  │
 │  fs.read / write / ...      │
 └─────────────────────────────┘
 ```
@@ -31,15 +31,25 @@ pnpm desktop:build    # 构建安装包（默认 deb）
 
 `pnpm desktop` 会先启动编辑器的 Vite 开发服务器，再打开原生窗口；编辑器代码改动仍然热更新。
 
-## 工作区与文件
+## 文件路径
 
-- 首次启动使用应用数据目录下的 `workspace/`（Linux 约为 `~/.local/share/dev.nexus.blocks/workspace`）。
-- 顶栏「工作区文件夹」按钮调用系统目录选择框，选择后立即生效并写入配置，下次启动沿用。
-- 积木里的路径一律是**工作区内的相对路径**，用 `/` 分隔。`fs.*` 只在这个根目录内解析：
-  - 拒绝 `..`、绝对路径、空段、控制字符；
-  - 已存在的路径会做 canonicalize 检查，符号链接指到工作区外同样会被拒绝；
-  - 读取/写入上限 100 万字符，写入先写临时文件再 `rename`，避免留下半截文件。
-- 路径、大小等错误以 message key 返回（`runtime.error.filePath` 等），控制台显示为当前语言的提示。
+桌面版**不设工作区根目录**，积木里的路径按下面的规则解析：
+
+| 写法 | 解析结果 |
+| --- | --- |
+| `/home/me/notes.txt`、`C:\notes.txt` | 绝对路径，原样使用 |
+| `~/notes.txt` | 相对用户主目录 |
+| `notes.txt`、`projects/demo.txt` | 相对用户主目录 |
+| 空路径 | `file.list` 列主目录；其余积木报 `runtime.error.filePath` |
+
+其他约束：
+
+- 单个文件读取/写入上限 100 万字符；
+- 写入会先创建父目录，然后写临时文件再 `rename`，失败不会留下半截文件；
+- 路径为空、包含控制字符或超过 1024 字符时报 `runtime.error.filePath`；
+- 文件不存在、无权限分别映射为 `runtime.error.fileNotFound` / `runtime.error.fileDenied`，控制台按当前语言显示。
+
+浏览器版仍然只能访问 `localStorage` 里的扁平文件，不支持目录与绝对路径；桌面版没有这个限制。
 
 ## 能力与安全模型
 
@@ -48,13 +58,14 @@ pnpm desktop:build    # 构建安装包（默认 deb）
 | 能力 | 风险 | 说明 |
 | --- | --- | --- |
 | `console.print` | none | 由编辑器本地处理，不进 Rust |
-| `fs.read` / `fs.write` | medium | 读写工作区文本文件 |
+| `fs.read` / `fs.write` | medium | 读写文本文件 |
 | `fs.exists` / `fs.list` / `fs.delete` | low / low / medium | 查询、列目录、删除 |
 
-桌面宿主在 `apps/editor/src/desktop.ts` 中实现：检测到 `__TAURI_INTERNALS__` 时替换掉浏览器宿主，其余代码不变。Rust 侧的命令是：
+桌面宿主在 `apps/editor/src/desktop.ts` 中实现：检测到 `__TAURI_INTERNALS__` 时替换掉浏览器宿主，其余代码不变。Rust 侧只有一个统一命令：
 
-- `capability_invoke(request)` — 统一入口，返回 `{ ok, value }` 或 `{ ok: false, error: { messageKey } }`
-- `workspace_get` / `workspace_choose` — 读取与切换工作区
+- `capability_invoke(request)` — 返回 `{ ok, value }` 或 `{ ok: false, error: { messageKey } }`
+
+> ⚠️ 安全边界：桌面版当前对 `fs.*` **默认全部授权**，程序可以读写当前用户有权访问的任意文件。后续计划加入按项目的能力授权面板与审计日志；在装上之前，只运行你信任的项目。
 
 后续要把能力扩展到进程、网络时，仍然是「新增能力 + 在 Rust 侧加一条路由」，编辑器与积木无需感知具体实现。
 

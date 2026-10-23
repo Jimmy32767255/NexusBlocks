@@ -46,11 +46,11 @@ interface BlockDefinition extends BlockSchema {
 | `func.param` | 函数 | 读取当前函数的一个参数 | 属性 `name` |
 | `func.return` | 函数 | 立即返回，可带结果 | `value` 值 |
 | `func.call:<函数块 id>` | 函数 | 动态生成的调用块（无返回值时为语句，否则为表达式） | 每个参数一个值端口 |
-| `file.read` | 文件 | 读取工作区文本文件 | `path` |
-| `file.write` | 文件 | 写入（覆盖）工作区文件 | `path`、`content` |
+| `file.read` | 文件 | 读取文本文件（绝对路径、`~/…` 或主目录相对路径） | `path` |
+| `file.write` | 文件 | 写入（覆盖）文本文件 | `path`、`content` |
 | `file.exists` | 文件 | 文件是否存在 | `path` |
 | `file.delete` | 文件 | 删除文件 | `path` |
-| `file.list` | 文件 | 列出工作区文件名（列表） | — |
+| `file.list` | 文件 | 列出文件夹中的文件名（列表，留空为主目录） | — |
 
 类别颜色在 `packages/engine/src/blocks/control.ts` 的 `CATEGORY_COLORS` 中定义（其他积木文件从这里导入）；工具箱顺序由 `packages/engine/src/registry.ts` 的 `CATEGORY_ORDER` 决定。
 
@@ -137,8 +137,8 @@ registry.grouped();         // 按类别分组，供工具箱
 
 文件积木不直接碰磁盘，而是调用宿主能力 `fs.read` / `fs.write` / `fs.exists` / `fs.delete` / `fs.list`：
 
-- **浏览器/编辑器**：宿主把文件存在 `localStorage` 的 `nexus-blocks:workspace-files` 里（注入 `storage` 才启用这组能力），刷新页面后文件仍在；路径是工作区内的扁平名字。
+- **浏览器/编辑器**：宿主把文件存在 `localStorage` 的 `nexus-blocks:workspace-files` 里（注入 `storage` 才启用这组能力），刷新页面后文件仍在；路径是扁平名字，不支持目录。
 - **路径规则**：统一用 `/`，禁止绝对路径、空段、`.`、`..` 和控制字符（`normalizePath`），违规报 `runtime.error.filePath`；单个文件上限 100 万字符。
-- **桌面壳**：未来的 Tauri 宿主实现同名能力，把工作区映射到项目目录（并加权限面板）；语言层不用改。
+- **桌面壳**：Tauri 宿主实现同名能力，直接读写本机文件系统，`fs.*` 不做根目录限制；语言层不用改。
 
 读取不存在的文件报 `runtime.error.fileNotFound`，删除同样。

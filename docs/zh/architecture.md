@@ -62,7 +62,7 @@ interface HostBridge {
 }
 ```
 
-`HostRequest` 带 `capability`、`args` 和发起调用的 `blockId`，宿主可据此审计与追问授权。默认宿主实现 `console.print`；传入 `storage` 时还会启用 `fs.read` / `fs.write` / `fs.exists` / `fs.delete` / `fs.list`（浏览器里是 localStorage 工作区）。桌面壳将实现真实的文件系统、`net.fetch`、`proc.spawn` 等，并按用户授权逐项开放。
+`HostRequest` 带 `capability`、`args` 和发起调用的 `blockId`，宿主可据此审计与追问授权。默认宿主实现 `console.print`；传入 `storage` 时还会启用 `fs.read` / `fs.write` / `fs.exists` / `fs.delete` / `fs.list`（浏览器里是 localStorage 工作区）。桌面壳已经实现真实的文件系统（不设工作区根目录，路径按绝对路径 / `~/…` / 主目录相对路径解析），后续 `net.fetch`、`proc.spawn` 等继续按能力逐项加入。
 
 ## 国际化
 
