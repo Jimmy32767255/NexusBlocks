@@ -4,6 +4,7 @@ import {
   createBlock,
   createProject,
   createVariable,
+  functionCallType,
   type BlockNode,
   type Project,
 } from "@nexus/ir";
@@ -385,4 +386,89 @@ test("dictionaries support get, has, keys and set", async () => {
   const result = await runProject(project, { onEvent: (event) => events.push(event) });
   assert.equal(result.status, "finished");
   assert.deepEqual(loggedTexts(events), ["Ada", "true", "[name, age]"]);
+});
+
+function defineFunction(
+  name: string,
+  params: string,
+  returnType: string,
+  body: BlockNode[],
+): BlockNode {
+  return createBlock("func.define", {
+    fields: { name, params, returnType },
+    inputs: { body },
+  });
+}
+
+function callFunctionBlock(definition: BlockNode, inputs: Record<string, BlockNode> = {}): BlockNode {
+  return createBlock(functionCallType(definition.id), { inputs });
+}
+
+test("functions receive arguments and return values", async () => {
+  const square = defineFunction("square", "x: number", "number", [
+    createBlock("func.return", {
+      inputs: {
+        value: createBlock("math.arithmetic", {
+          fields: { op: "*" },
+          inputs: {
+            a: createBlock("func.param", { fields: { name: "x" } }),
+            b: createBlock("func.param", { fields: { name: "x" } }),
+          },
+        }),
+      },
+    }),
+  ]);
+  const project = projectWith(
+    square,
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: callFunctionBlock(square, { x: createBlock("math.number", { fields: { value: 5 } }) }),
+        },
+      }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["25"]);
+});
+
+test("a function definition never runs by itself", async () => {
+  const noop = defineFunction("noop", "", "void", [
+    createBlock("io.print", { fields: { text: "inside" } }),
+  ]);
+  const project = projectWith(
+    noop,
+    start([createBlock("io.print", { fields: { text: "main" } })]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["main"]);
+});
+
+test("parameter blocks outside their function are rejected", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: { text: createBlock("func.param", { fields: { name: "x" } }) },
+      }),
+    ]),
+  );
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "diag.function.unknownParam");
+});
+
+test("runaway recursion reports the call depth limit", async () => {
+  const recursive = defineFunction("loop", "", "void", [
+    callFunctionBlock(createBlock("control.start")),
+  ]);
+  // The body calls itself; the program calls it once from the start hat.
+  (recursive.inputs!.body as BlockNode[])[0] = callFunctionBlock(recursive);
+  const project = projectWith(recursive, start([callFunctionBlock(recursive)]));
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.callDepth");
 });

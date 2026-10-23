@@ -39,6 +39,10 @@ export interface ExecutionContext {
 
   getVariable(id: string): Value;
   setVariable(id: string, value: Value): void;
+  /** Read a parameter of the function currently running. */
+  getParam(name: string): Value;
+  /** Invoke a function defined on the canvas and return its result. */
+  callFunction(id: string, args: Value[]): Promise<Value>;
   /** Convert a value to the port type, failing with a user-facing error. */
   coerce(value: Value, type: ValueType, blockId: string): Value;
   variableName(id: string): string;

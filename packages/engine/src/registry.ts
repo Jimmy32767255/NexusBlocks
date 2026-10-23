@@ -1,5 +1,8 @@
+import type { Project } from "@nexus/ir";
+import { scanFunctions } from "@nexus/ir";
 import type { BlockDefinition } from "./types.ts";
 import { controlBlocks } from "./blocks/control.ts";
+import { createFunctionCallBlock, functionBlocks } from "./blocks/functions.ts";
 import { dictBlocks } from "./blocks/dicts.ts";
 import { listBlocks } from "./blocks/lists.ts";
 import { ioBlocks } from "./blocks/io.ts";
@@ -16,6 +19,7 @@ export const CATEGORY_ORDER: readonly string[] = [
   "math",
   "logic",
   "variables",
+  "functions",
   "data",
 ];
 
@@ -94,6 +98,24 @@ export const coreBlocks: readonly BlockDefinition[] = [
   ...variableBlocks,
   ...listBlocks,
   ...dictBlocks,
+  ...functionBlocks,
 ];
 
 export const defaultRegistry = new BlockRegistry(coreBlocks);
+
+/**
+ * Core blocks plus one call block per function defined on the canvas.
+ * The editor and the runner rebuild this whenever the program changes, so a
+ * function call type always matches the current definitions.
+ */
+export function createProjectRegistry(project: Project): BlockRegistry {
+  const seen = new Set<string>();
+  const calls = scanFunctions(project.scripts)
+    .decls.filter((decl) => {
+      if (seen.has(decl.id)) return false;
+      seen.add(decl.id);
+      return true;
+    })
+    .map((decl) => createFunctionCallBlock(decl));
+  return new BlockRegistry([...coreBlocks, ...calls]);
+}

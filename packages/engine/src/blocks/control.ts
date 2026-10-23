@@ -9,6 +9,7 @@ export const CATEGORY_COLORS = {
   logic: "#e2607f",
   variables: "#e88432",
   data: "#2aa6a6",
+  functions: "#9b6bff",
 } as const;
 
 const CONTROL = CATEGORY_COLORS.control;

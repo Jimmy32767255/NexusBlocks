@@ -1,6 +1,6 @@
 import {
+  createProjectRegistry,
   createStarterDocument,
-  defaultRegistry,
   runProject,
   type BlockRegistry,
   type RuntimeEvent,
@@ -40,7 +40,7 @@ const host: HTMLElement = mount;
 setUiLocale(currentLocale());
 
 const store = new Store(loadAutosave() ?? createStarterDocument(currentLocale()));
-const registry: BlockRegistry = defaultRegistry;
+let registry: BlockRegistry = createProjectRegistry(store.state.document.project);
 
 let controller: AbortController | null = null;
 let surface: HTMLElement | null = null;
@@ -78,6 +78,8 @@ function renderNow(): void {
   const state = store.state;
   const document = state.document;
   const running = state.status === "running";
+  // Function call blocks are derived from the definitions on the canvas.
+  registry = createProjectRegistry(document.project);
 
   const toolbox = renderToolbox({
     registry,

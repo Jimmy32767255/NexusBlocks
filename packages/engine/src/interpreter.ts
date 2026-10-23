@@ -1,12 +1,16 @@
 import {
   coerce as coerceValue,
+  collectFunctions,
   defaultValue,
+  FUNCTION_DEFINE_TYPE,
   toDisplayText,
   type BlockNode,
+  type FunctionDecl,
   type Project,
   type Value,
   type ValueType,
 } from "@nexus/ir";
+import { ReturnSignal } from "./blocks/functions.ts";
 import { RuntimeFailure, StopSignal } from "./errors.ts";
 import type { BlockRegistry } from "./registry.ts";
 import type { BlockDefinition, ExecutionContext, HostBridge, RuntimeEvent } from "./types.ts";
@@ -21,6 +25,7 @@ export interface InterpreterOptions {
 
 export const DEFAULT_STEP_LIMIT = 100_000;
 export const DEFAULT_YIELD_EVERY = 256;
+export const DEFAULT_CALL_DEPTH = 64;
 
 /**
  * Tree-walking interpreter. It owns no globals: variables live per run, and
@@ -37,6 +42,8 @@ export class Interpreter implements ExecutionContext {
   private readonly stepLimit: number;
   private readonly yieldEvery: number;
   private readonly variables = new Map<string, Value>();
+  private readonly functions = new Map<string, FunctionDecl>();
+  private readonly frames: Map<string, Value>[] = [];
 
   private steps = 0;
   private currentBlockId: string | undefined;
@@ -50,6 +57,9 @@ export class Interpreter implements ExecutionContext {
     this.stepLimit = options.stepLimit ?? DEFAULT_STEP_LIMIT;
     this.yieldEvery = Math.max(1, options.yieldEvery ?? DEFAULT_YIELD_EVERY);
 
+    for (const decl of collectFunctions(project.scripts)) {
+      this.functions.set(decl.id, decl);
+    }
     for (const variable of project.variables) {
       this.variables.set(
         variable.id,
@@ -63,7 +73,7 @@ export class Interpreter implements ExecutionContext {
   }
 
   async runScripts(scripts: BlockNode[]): Promise<void> {
-    await this.run(scripts);
+    await this.run(scripts.filter((node) => node.type !== FUNCTION_DEFINE_TYPE));
   }
 
   async run(blocks: BlockNode[]): Promise<void> {
@@ -116,6 +126,40 @@ export class Interpreter implements ExecutionContext {
   stack(node: BlockNode, port: string): BlockNode[] {
     const value = node.inputs?.[port];
     return Array.isArray(value) ? value : [];
+  }
+
+  getParam(name: string): Value {
+    const frame = this.frames[this.frames.length - 1];
+    if (!frame || !frame.has(name)) {
+      this.fail("runtime.error.paramScope", { name });
+    }
+    return frame.get(name) ?? null;
+  }
+
+  async callFunction(id: string, args: Value[]): Promise<Value> {
+    const decl = this.functions.get(id);
+    if (!decl) this.fail("runtime.error.unknownFunction", { name: id });
+    if (this.frames.length >= DEFAULT_CALL_DEPTH) {
+      this.fail("runtime.error.callDepth", { limit: DEFAULT_CALL_DEPTH });
+    }
+    const frame = new Map<string, Value>();
+    decl.params.forEach((param, index) => {
+      frame.set(param.name, this.coerce(args[index] ?? defaultValue(param.type), param.type, decl.node.id));
+    });
+    this.frames.push(frame);
+    try {
+      await this.run((decl.node.inputs?.body as BlockNode[] | undefined) ?? []);
+    } catch (error) {
+      if (error instanceof ReturnSignal) {
+        return decl.returnType === "void"
+          ? null
+          : this.coerce(error.value, decl.returnType, decl.node.id);
+      }
+      throw error;
+    } finally {
+      this.frames.pop();
+    }
+    return defaultValue(decl.returnType);
   }
 
   getVariable(id: string): Value {

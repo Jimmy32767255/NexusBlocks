@@ -6,6 +6,12 @@ import type {
 } from "./model.ts";
 import { isAssignable } from "./values.ts";
 import { walkBlocks } from "./traverse.ts";
+import {
+  FUNCTION_PARAM_TYPE,
+  FUNCTION_RETURN_TYPE,
+  functionOwners,
+  scanFunctions,
+} from "./functions.ts";
 
 export type DiagnosticCode =
   | "project.format"
@@ -24,7 +30,9 @@ export type DiagnosticCode =
   | "port.expectedStack"
   | "port.typeMismatch"
   | "variable.duplicateName"
-  | "variable.invalidName";
+  | "variable.invalidName"
+  | "function.invalidParams"
+  | "function.unknownParam";
 
 export type DiagnosticSeverity = "error" | "warning";
 
@@ -96,6 +104,21 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
   }
 
   const variableIds = new Set(project.variables.map((variable) => variable.id));
+  const functionScan = scanFunctions(project.scripts);
+  const owners = functionOwners(functionScan.decls);
+  const lookup = (type: string): BlockSchema | undefined =>
+    schemas.get(type) ?? functionScan.schemas.get(type);
+
+  for (const error of functionScan.errors) {
+    diagnostics.push({
+      severity: "error",
+      code: "function.invalidParams",
+      message: error.message,
+      path: `scripts.${error.blockId}.fields.params`,
+      blockId: error.blockId,
+      params: { message: error.message },
+    });
+  }
 
   walkBlocks(
     project.scripts,
@@ -111,7 +134,7 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
       }
       seenIds.add(node.id);
 
-      const schema = schemas.get(node.type);
+      const schema = lookup(node.type);
       if (!schema) {
         diagnostics.push({
           severity: "error",
@@ -124,6 +147,7 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
         return;
       }
 
+      checkFunctionScope(node, owners, ctx.path, diagnostics);
       checkKind(node, schema, ctx.parent === null, ctx.path, diagnostics);
       checkFields(node, schema, variableIds, ctx.path, diagnostics);
       checkInputs(node, schema, schemas, ctx.path, diagnostics);
@@ -147,7 +171,7 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
           });
         }
         seenIds.add(node.id);
-        const schema = schemas.get(node.type);
+        const schema = lookup(node.type);
         if (!schema) {
           diagnostics.push({
             severity: "error",
@@ -170,6 +194,42 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
   });
 
   return diagnostics;
+}
+
+function checkFunctionScope(
+  node: BlockNode,
+  owners: Map<string, { params: { name: string }[] }>,
+  path: string,
+  diagnostics: Diagnostic[],
+): void {
+  if (node.type !== FUNCTION_PARAM_TYPE && node.type !== FUNCTION_RETURN_TYPE) return;
+  const owner = owners.get(node.id);
+  if (!owner) {
+    if (node.type === FUNCTION_PARAM_TYPE) {
+      diagnostics.push({
+        severity: "error",
+        code: "function.unknownParam",
+        message: "Parameter blocks may only be used inside a function",
+        path,
+        blockId: node.id,
+        params: { name: String(node.fields?.name ?? "") },
+      });
+    }
+    return;
+  }
+  if (node.type === FUNCTION_PARAM_TYPE) {
+    const name = String(node.fields?.name ?? "");
+    if (!owner.params.some((param) => param.name === name)) {
+      diagnostics.push({
+        severity: "error",
+        code: "function.unknownParam",
+        message: `Function has no parameter named ${name}`,
+        path,
+        blockId: node.id,
+        params: { name },
+      });
+    }
+  }
 }
 
 function checkKind(

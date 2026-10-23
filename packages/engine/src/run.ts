@@ -2,7 +2,7 @@ import { validateProject, type Project } from "@nexus/ir";
 import { CapabilityUnavailableError, createLocalHost } from "./host.ts";
 import { Interpreter } from "./interpreter.ts";
 import { RuntimeFailure, StopSignal } from "./errors.ts";
-import { defaultRegistry } from "./registry.ts";
+import { createProjectRegistry } from "./registry.ts";
 import type { RunOptions, RunResult, RuntimeEvent } from "./types.ts";
 
 /**
@@ -13,7 +13,7 @@ import type { RunOptions, RunResult, RuntimeEvent } from "./types.ts";
 export async function runProject(project: Project, options: RunOptions = {}): Promise<RunResult> {
   const started = performance.now();
   const emit = options.onEvent ?? (() => {});
-  const registry = options.registry ?? defaultRegistry;
+  const registry = options.registry ?? createProjectRegistry(project);
 
   const diagnostics = validateProject(project, registry);
   const errors = diagnostics.filter((diagnostic) => diagnostic.severity === "error");
