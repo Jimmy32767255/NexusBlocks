@@ -38,6 +38,8 @@ interface BlockDefinition extends BlockSchema {
 | `control.catchType` | 控制 | 按类型捕获 | 属性 `exception`，`body` 栈 |
 | `control.catchAssign` | 控制 | 捕获并把错误信息写入变量 | 属性 `exception`、`target`，`body` 栈 |
 | `io.print` | 输出 | 打印到控制台 | `text` 任意值 |
+| `convert.toNumber` | 转换 | 把整段文本转成数值；含非数字内容报错 | `text` 文本 |
+| `convert.toString` | 转换 | 把值转成字符串 | `value` 任意值 |
 | `logic.boolean` | 逻辑 | 布尔字面量 | 属性 `value` |
 | `logic.compare` | 逻辑 | 比较运算（`== != < <= > >=`） | 属性 `op`，`a`、`b` 值 |
 | `math.number` | 数学 | 数字字面量 | 属性 `value` |
@@ -145,6 +147,11 @@ registry.grouped();         // 按类别分组，供工具箱
 - `control.forever`：每轮先 `tick` 再执行 `body`；`BreakSignal` 退出循环；仍受 `stepLimit` 限制，不会把运行器卡死。
 - `control.while`：每轮开始前重新求值 `condition`，为假就结束；条件里的变量或函数调用会随轮次变化。
 - `control.repeatWith`：先固定 `times`，然后第 1..N 轮把轮次写入 `variable`（1 起）；循环结束后变量保留最后一轮的值；`break` 时立即停止并保留当前值。
+
+## 类型转换
+
+- `convert.toNumber`：先修剪首尾空白，再要求整段文本是十进制数字（可选正负号、小数点、指数，如 `-12.5`、`1e3`）。`12abc`、空串、`Infinity` 等都会以 `runtime.error.toNumber` 报错，参数 `{value}` 保留原文本。数值输入直接透传。
+- `convert.toString`：用与 `io.print` 一致的显示规则把值转成文本；数值 123 → `"123"`，列表/字典输出 JSON 形式。
 
 ## 程序退出
 
