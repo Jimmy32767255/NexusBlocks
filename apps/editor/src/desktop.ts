@@ -35,7 +35,7 @@ async function defaultInvoke(command: string, args?: Record<string, unknown>): P
 
 /**
  * Host backed by the desktop shell: console lines stay in the editor, every
- * file capability is forwarded to Rust, which owns the workspace directory.
+ * file capability is forwarded to Rust and acts on the real file system.
  */
 export function createDesktopHost(
   sink: (event: RuntimeEvent) => void,
@@ -72,8 +72,3 @@ export function createDesktopHost(
   };
 }
 
-/** Ask the shell for a new workspace directory; resolves null when cancelled. */
-export async function chooseWorkspace(invoke: Invoke = defaultInvoke): Promise<string | null> {
-  const response = (await invoke("workspace_choose")) as { path?: string | null } | null;
-  return response?.path ?? null;
-}

@@ -23,8 +23,6 @@ export interface ToolbarOptions {
   onLocaleChange: (locale: string) => void;
   onHelp: () => void;
   onDocs: () => void;
-  /** Desktop shell only: open the native workspace folder picker. */
-  onWorkspace?: () => void;
   onRename: (name: string) => void;
 }
 
@@ -114,7 +112,6 @@ export function renderToolbar(options: ToolbarOptions): HTMLElement {
       iconButton("zoomIn", t("toolbar.zoomIn"), options.onZoomIn),
       iconButton("reset", t("toolbar.zoomReset"), options.onZoomReset),
       el("span", { class: "topbar__divider" }),
-      ...(options.onWorkspace ? [iconButton("folder", t("toolbar.workspace"), options.onWorkspace)] : []),
       language,
       iconButton("help", t("toolbar.help"), options.onHelp),
       iconButton("book", t("toolbar.docs"), options.onDocs),
