@@ -1,0 +1,715 @@
+import {
+  createStarterDocument,
+  defaultRegistry,
+  runProject,
+  type BlockRegistry,
+  type RuntimeEvent,
+} from "@nexus/engine";
+import {
+  countBlocks,
+  createDocument,
+  createProject,
+  createVariable,
+  findBlock,
+  walkProject,
+  type BlockNode,
+  type Diagnostic,
+} from "@nexus/ir";
+import { renderCanvas } from "./canvas.ts";
+import { renderConsole } from "./console.ts";
+import { confirmDialog, helpBody, openDialog, promptDialog } from "./dialogs.ts";
+import { el } from "./dom.ts";
+import { startBlockDrag, startToolboxDrag, type DragDeps } from "./drag.ts";
+import { createScriptWith, defaultScriptPosition, newBlockInstance, removeBlock, unplugPort } from "./edits.ts";
+import { currentLocale, hasKey, setUiLocale, t } from "./i18n.ts";
+import { icon } from "./icons.ts";
+import { renderInspector } from "./inspector.ts";
+import { downloadDocument, loadAutosave, pickDocument, saveAutosave } from "./persist.ts";
+import { Store, type RunStatus } from "./store.ts";
+import { toast } from "./toast.ts";
+import { renderToolbar } from "./toolbar.ts";
+import { renderToolbox } from "./toolbox.ts";
+import { renderVariables } from "./variables.ts";
+
+const mount = document.querySelector<HTMLElement>("#app");
+if (!mount) throw new Error("Editor root element #app is missing");
+const host: HTMLElement = mount;
+
+setUiLocale(currentLocale());
+
+const store = new Store(loadAutosave() ?? createStarterDocument(currentLocale()));
+const registry: BlockRegistry = defaultRegistry;
+
+let controller: AbortController | null = null;
+let surface: HTMLElement | null = null;
+let frame: number | null = null;
+let autosaveTimer: number | null = null;
+
+const STATUS_KEYS: Record<RunStatus, string> = {
+  idle: "status.idle",
+  running: "status.running",
+  finished: "status.finished",
+  stopped: "status.stopped",
+  error: "status.error",
+};
+
+store.subscribe(() => {
+  scheduleRender();
+  scheduleAutosave();
+});
+
+/* ------------------------------------------------------------------ render */
+
+function scheduleRender(): void {
+  if (frame !== null) return;
+  frame = requestAnimationFrame(() => {
+    frame = null;
+    renderNow();
+  });
+}
+
+function renderNow(): void {
+  if (frame !== null) {
+    cancelAnimationFrame(frame);
+    frame = null;
+  }
+  const state = store.state;
+  const document = state.document;
+  const running = state.status === "running";
+
+  const toolbox = renderToolbox({
+    registry,
+    onInsert: (type) => placeBlockAtCenter(type),
+    onDragStart: (event, type) => startToolboxDrag(event, type, dragDeps()),
+  });
+
+  const canvas = renderCanvas(document, {
+    registry,
+    selectedId: state.selectedId,
+    variables: document.project.variables,
+    zoom: state.zoom,
+    interactive: !running,
+  });
+  surface = canvas.surface;
+
+  const canvasHost = el("div", { class: "canvas-host" }, [canvas.root]);
+
+  const diagnostics = validateQuietly();
+  const errorCount = diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
+  const problems = el(
+    "button",
+    {
+      class: `statusbar__problems${errorCount > 0 ? " statusbar__problems--error" : ""}`,
+      attrs: { type: "button", title: t("panel.problems") },
+      on: { click: () => void showProblems() },
+    },
+    [
+      icon(errorCount > 0 ? "warning" : "terminal", 13),
+      el("span", {
+        text: diagnostics.length > 0 ? t("problems.count", { count: diagnostics.length }) : t("problems.none"),
+      }),
+    ],
+  );
+
+  const stage = el("section", { class: "stage" }, [
+    canvasHost,
+    el("div", { class: "statusbar" }, [
+      el("span", { class: `status status--${state.status}`, text: t(STATUS_KEYS[state.status]) }),
+      problems,
+      el("span", { class: "statusbar__spacer" }),
+      el("span", { text: t("canvas.blocks", { count: countBlocks(document.project) }) }),
+      el("span", { text: `${Math.round(state.zoom * 100)}%` }),
+    ]),
+  ]);
+
+  const selected = state.selectedId ? findBlock(document.project, state.selectedId) : null;
+
+  const side = el("aside", { class: "side" }, [
+    renderInspector({
+      registry,
+      selected,
+      variables: document.project.variables,
+      onFieldChange: setBlockValue,
+      onLiteralChange: setBlockValue,
+      onUnplug: (blockId, port) => unplug(blockId, port),
+      onDelete: (blockId) => deleteBlock(blockId),
+    }),
+    renderVariables({
+      variables: document.project.variables,
+      usage: variableUsage(),
+      onAdd: () => void addVariable(),
+      onDelete: (id) => void deleteVariable(id),
+      onSelectVariable: (id) => selectVariable(id),
+    }),
+    renderConsole({
+      logs: state.logs,
+      onClear: () => store.clearLogs(),
+      onSelectBlock: (blockId) => store.select(blockId),
+    }),
+  ]);
+
+  const toolbar = renderToolbar({
+    projectName: document.project.name,
+    locale: currentLocale(),
+    status: state.status,
+    canUndo: store.canUndo(),
+    canRedo: store.canRedo(),
+    zoom: state.zoom,
+    onRun: () => void run(),
+    onStop: () => stop(),
+    onNew: () => void newProject(),
+    onOpen: () => void openProject(),
+    onSave: () => save(),
+    onUndo: () => store.undo(),
+    onRedo: () => store.redo(),
+    onZoomIn: () => store.setZoom(store.state.zoom * 1.2),
+    onZoomOut: () => store.setZoom(store.state.zoom / 1.2),
+    onZoomReset: () => resetView(),
+    onLocaleChange: (locale) => changeLocale(locale),
+    onHelp: () => void showHelp(),
+    onDocs: () => void showDocs(),
+    onRename: (name) => renameProject(name),
+  });
+
+  host.replaceChildren(
+    el("div", { class: "app" }, [toolbar, el("main", { class: "workspace" }, [toolbox, stage, side])]),
+  );
+  applyViewport();
+}
+
+/* -------------------------------------------------------------------- data */
+
+function validateQuietly(): Diagnostic[] {
+  try {
+    return store.validate(registry);
+  } catch {
+    return [];
+  }
+}
+
+function variableUsage(): Map<string, number> {
+  const usage = new Map<string, number>();
+  walkProject(store.state.document.project, (node) => {
+    const definition = registry.get(node.type);
+    const field = definition?.fields.find((candidate) => candidate.kind === "variable");
+    if (!field) return;
+    const id = String(node.fields?.[field.name] ?? "");
+    if (id) usage.set(id, (usage.get(id) ?? 0) + 1);
+  });
+  return usage;
+}
+
+function dragDeps(): DragDeps {
+  return {
+    store,
+    registry,
+    variables: () => store.state.document.project.variables,
+    zoom: () => store.state.zoom,
+    surface: () => surface,
+    createInstance: (type) => newBlockInstance(registry, store.state.document.project, type),
+    placeBlockAtCenter: (type) => placeBlockAtCenter(type),
+    selectBlock: (id) => store.select(id),
+    toast: (key) => toast(t(key), "error"),
+    flush: () => renderNow(),
+  };
+}
+
+function placeBlockAtCenter(type: string): void {
+  const definition = registry.get(type);
+  if (!definition) return;
+  const result = newBlockInstance(registry, store.state.document.project, type);
+  if (!result.ok) {
+    toast(t(result.reason === "variable" ? "toast.variableRequired" : "toast.dropInvalid"), "error");
+    return;
+  }
+
+  const node = result.node;
+  const state = store.state;
+  const selected = state.selectedId ? findBlock(state.document.project, state.selectedId) : null;
+
+  if (definition.kind === "expression" && !selected) {
+    toast(t("toast.noTarget"), "error");
+    return;
+  }
+
+  const point = centerPoint() ?? defaultScriptPosition(state.document.project.scripts.length);
+  store.update((document) => {
+    if (definition.kind === "hat") {
+      document.project.scripts.push(node);
+      document.editor.positions[node.id] = point;
+      return;
+    }
+    if (definition.kind === "expression") {
+      const target = selected ? findBlock(document.project, selected.id) : null;
+      const parentDef = target ? registry.get(target.type) : undefined;
+      const port = parentDef?.ports.find(
+        (candidate) => candidate.kind === "value" && target?.inputs?.[candidate.name] === undefined,
+      );
+      if (target && port) (target.inputs ??= {})[port.name] = node;
+      return;
+    }
+    const last = document.project.scripts[document.project.scripts.length - 1];
+    if (!last) {
+      createScriptWith(document, node, point);
+      return;
+    }
+    const inputs = (last.inputs ??= {});
+    const existing = inputs.body;
+    const body = Array.isArray(existing) ? existing : [];
+    if (!Array.isArray(existing)) inputs.body = body;
+    body.push(node);
+  });
+}
+
+/* ------------------------------------------------------------------ actions */
+
+async function run(): Promise<void> {
+  if (store.state.status === "running") return;
+  if (store.state.document.project.scripts.length === 0) {
+    toast(t("toast.nothingToRun"), "error");
+    return;
+  }
+  controller = new AbortController();
+  store.clearLogs();
+  store.setStatus("running");
+  try {
+    await runProject(store.state.document.project, {
+      registry,
+      signal: controller.signal,
+      onEvent: handleEvent,
+    });
+  } finally {
+    controller = null;
+    scheduleAutosave();
+  }
+}
+
+function stop(): void {
+  controller?.abort();
+}
+
+function handleEvent(event: RuntimeEvent): void {
+  switch (event.kind) {
+    case "log":
+      store.pushLog({ level: event.level, text: event.text, blockId: event.blockId });
+      break;
+    case "error":
+      store.pushLog({
+        level: "error",
+        text: t(event.messageKey, event.params),
+        blockId: event.blockId,
+      });
+      break;
+    case "status":
+      if (event.status === "running") {
+        store.setStatus("running");
+        return;
+      }
+      store.setStatus(event.status);
+      if (event.status === "finished") {
+        store.pushLog({
+          level: "info",
+          text: t("console.finished", { ms: Math.round(event.durationMs ?? 0) }),
+        });
+      } else if (event.status === "stopped") {
+        store.pushLog({ level: "info", text: t("console.stopped") });
+      }
+      break;
+  }
+}
+
+async function newProject(): Promise<void> {
+  if (store.state.dirty) {
+    const proceed = await confirmDialog(t("dialog.newProject.body"), t("dialog.newProject.title"));
+    if (!proceed) return;
+  }
+  const document = createDocument(
+    createProject({ name: t("app.untitled"), locale: currentLocale() }),
+  );
+  store.replaceDocument(document);
+  saveAutosave(document);
+  toast(t("toast.newProject"));
+}
+
+async function openProject(): Promise<void> {
+  if (store.state.dirty) {
+    const proceed = await confirmDialog(t("dialog.open.body"), t("dialog.open.title"));
+    if (!proceed) return;
+  }
+  const result = await pickDocument();
+  if (!result) return;
+  if (!result.ok) {
+    toast(t("toast.invalidFile", { detail: result.error }), "error");
+    return;
+  }
+  store.replaceDocument(result.document);
+  saveAutosave(result.document);
+  toast(t("toast.opened"));
+  if (result.warnings.length > 0) {
+    await openDialog({
+      title: t("panel.problems"),
+      body: helpBody(result.warnings.join("\n")),
+      actions: [{ label: t("common.close"), value: "close", primary: true }],
+    });
+  }
+}
+
+function save(): void {
+  downloadDocument(store.state.document);
+  store.markSaved();
+  toast(t("toast.saved"));
+}
+
+function renameProject(name: string): void {
+  store.update((document) => {
+    document.project.name = name;
+  });
+}
+
+function resetView(): void {
+  store.update(
+    (document) => {
+      document.editor.viewport = { x: 0, y: 0, zoom: 1 };
+    },
+    { history: false, dirty: false },
+  );
+  store.setZoom(1);
+}
+
+function changeLocale(locale: string): void {
+  setUiLocale(locale);
+  store.setLocale(locale);
+  renderNow();
+}
+
+/* ---------------------------------------------------------------- shortcuts */
+
+function deleteSelected(): void {
+  const id = store.state.selectedId;
+  if (!id) return;
+  deleteBlock(id);
+}
+
+function deleteBlock(blockId: string): void {
+  store.update((document) => {
+    removeBlock(document, blockId);
+  });
+  store.select(null);
+  toast(t("toast.deleted"));
+}
+
+function unplug(blockId: string, port: string): void {
+  store.update((document) => {
+    unplugPort(document.project, blockId, port);
+  });
+}
+
+function setBlockValue(blockId: string, key: string, value: string | number | boolean): void {
+  store.update((document) => {
+    const block = findBlock(document.project, blockId);
+    if (!block) return;
+    block.fields ??= {};
+    block.fields[key] = value;
+  });
+}
+
+function selectVariable(id: string): void {
+  const variable = store.state.document.project.variables.find((candidate) => candidate.id === id);
+  if (variable) toast(variable.name);
+}
+
+async function addVariable(): Promise<void> {
+  const project = store.state.document.project;
+  const suggested = nextVariableName(project.variables.map((variable) => variable.name));
+  const name = await promptDialog({
+    title: t("variables.add"),
+    label: t("variables.promptName"),
+    initial: suggested,
+    validate: (value) => {
+      if (!/^[\p{L}_][\p{L}\p{N}_]*$/u.test(value)) return t("variables.invalidName");
+      if (project.variables.some((variable) => variable.name === value)) return t("variables.duplicateName");
+      return null;
+    },
+  });
+  if (name === null) return;
+  store.update((document) => {
+    document.project.variables.push(createVariable(name, "any", null));
+  });
+}
+
+function nextVariableName(existing: readonly string[]): string {
+  let index = 1;
+  while (existing.includes(`var${index}`)) index += 1;
+  return `var${index}`;
+}
+
+async function deleteVariable(id: string): Promise<void> {
+  const project = store.state.document.project;
+  const variable = project.variables.find((candidate) => candidate.id === id);
+  if (!variable) return;
+  const proceed = await confirmDialog(
+    t("variables.confirmDelete", { name: variable.name }),
+    t("common.delete"),
+  );
+  if (!proceed) return;
+  store.update((document) => {
+    document.project.variables = document.project.variables.filter((candidate) => candidate.id !== id);
+    const visit = (node: BlockNode): void => {
+      const definition = registry.get(node.type);
+      const field = definition?.fields.find((candidate) => candidate.kind === "variable");
+      if (field && node.fields?.[field.name] === id) node.fields[field.name] = "";
+    };
+    walkProject(document.project, (node) => visit(node));
+  });
+}
+
+/* ------------------------------------------------------------------ dialogs */
+
+async function showProblems(): Promise<void> {
+  const diagnostics = validateQuietly();
+  const body = el("div", { class: "problems" });
+  if (diagnostics.length === 0) {
+    body.append(el("p", { class: "inspector__hint", text: t("problems.empty") }));
+  }
+  for (const diagnostic of diagnostics) {
+    const key = `diag.${diagnostic.code}`;
+    body.append(
+      el("div", { class: `problems__item problems__item--${diagnostic.severity}` }, [
+        el("span", { class: "problems__badge", text: diagnostic.severity }),
+        el("div", {}, [
+          el("div", {
+            text: hasKey(key) ? t(key, diagnostic.params) : diagnostic.message,
+          }),
+          el("code", { class: "problems__path", text: diagnostic.path }),
+        ]),
+      ]),
+    );
+  }
+  await openDialog({
+    title: t("panel.problems"),
+    body,
+    actions: [{ label: t("common.close"), value: "close", primary: true }],
+  });
+}
+
+async function showHelp(): Promise<void> {
+  await openDialog({
+    title: t("help.title"),
+    body: helpBody(t("help.body")),
+    actions: [{ label: t("common.close"), value: "close", primary: true }],
+  });
+}
+
+async function showDocs(): Promise<void> {
+  await openDialog({
+    title: t("docs.title"),
+    body: helpBody(t("docs.body")),
+    actions: [{ label: t("common.close"), value: "close", primary: true }],
+  });
+}
+
+/* --------------------------------------------------------------- view maths */
+
+function centerPoint(): { x: number; y: number } | null {
+  const canvasEl = host.querySelector<HTMLElement>(".canvas");
+  if (!canvasEl) return null;
+  const rect = canvasEl.getBoundingClientRect();
+  const viewport = store.state.document.editor.viewport;
+  const zoom = store.state.zoom || 1;
+  return {
+    x: Math.round((rect.width / 2 - viewport.x) / zoom - 60),
+    y: Math.round((rect.height / 2 - viewport.y) / zoom - 20),
+  };
+}
+
+function applyViewport(): void {
+  if (!surface) return;
+  const viewport = store.state.document.editor.viewport;
+  surface.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${store.state.zoom})`;
+}
+
+function scheduleAutosave(): void {
+  if (autosaveTimer !== null) window.clearTimeout(autosaveTimer);
+  autosaveTimer = window.setTimeout(() => {
+    autosaveTimer = null;
+    saveAutosave(store.state.document);
+  }, 450);
+}
+
+/* ------------------------------------------------------------------ events */
+
+interface PanState {
+  startX: number;
+  startY: number;
+  viewportX: number;
+  viewportY: number;
+  moved: boolean;
+}
+
+let pan: PanState | null = null;
+
+host.addEventListener("pointerdown", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest("input, select, textarea")) return;
+
+  const blockEl = target.closest<HTMLElement>(".block");
+  if (blockEl?.dataset.blockId && event.button === 0) {
+    startBlockDrag(event, blockEl.dataset.blockId, dragDeps());
+    return;
+  }
+
+  if (target.closest(".canvas") && (event.button === 0 || event.button === 1)) {
+    const viewport = store.state.document.editor.viewport;
+    pan = {
+      startX: event.clientX,
+      startY: event.clientY,
+      viewportX: viewport.x,
+      viewportY: viewport.y,
+      moved: false,
+    };
+  }
+});
+
+window.addEventListener("pointermove", (event) => {
+  if (!pan) return;
+  const dx = event.clientX - pan.startX;
+  const dy = event.clientY - pan.startY;
+  if (!pan.moved && Math.hypot(dx, dy) < 4) return;
+  pan.moved = true;
+  const current = store.state.document;
+  current.editor.viewport = {
+    x: pan.viewportX + dx,
+    y: pan.viewportY + dy,
+    zoom: current.editor.viewport.zoom,
+  };
+  applyViewport();
+  document.body.classList.add("is-panning");
+});
+
+window.addEventListener("pointerup", () => {
+  if (!pan) return;
+  const moved = pan.moved;
+  pan = null;
+  document.body.classList.remove("is-panning");
+  if (moved) scheduleAutosave();
+});
+
+host.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest(".toolbox, .topbar, .side, .modal, .toasts")) return;
+  const blockEl = target.closest<HTMLElement>(".block");
+  if (blockEl?.dataset.blockId) {
+    store.select(blockEl.dataset.blockId);
+    return;
+  }
+  if (target.closest(".canvas")) store.select(null);
+});
+
+host.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+  const blockEl = target.closest<HTMLElement>(".block");
+  const blockId = blockEl?.dataset.blockId;
+  if (!blockId) return;
+
+  const field = target.dataset.field;
+  const literal = target.dataset.literal;
+  const key = field ?? literal;
+  if (!key) return;
+
+  const block = findBlock(store.state.document.project, blockId);
+  const definition = block ? registry.get(block.type) : undefined;
+
+  let value: string | number | boolean = target.value;
+  if (field) {
+    const fieldDef = definition?.fields.find((candidate) => candidate.name === field);
+    if (fieldDef?.kind === "number") value = target.value === "" ? 0 : Number(target.value);
+    if (fieldDef?.kind === "boolean") value = target.value === "true";
+  } else {
+    const port = definition?.ports.find((candidate) => candidate.name === literal);
+    if (port?.type === "number") value = target.value === "" ? 0 : Number(target.value);
+    if (port?.type === "boolean") value = target.value === "true";
+  }
+
+  if (block?.fields?.[key] === value) return;
+  setBlockValue(blockId, key, value);
+});
+
+host.addEventListener(
+  "wheel",
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof Element) || !target.closest(".canvas")) return;
+    event.preventDefault();
+    const state = store.state;
+    const document = state.document;
+    if (event.ctrlKey || event.metaKey) {
+      const canvasEl = target.closest<HTMLElement>(".canvas");
+      if (!canvasEl) return;
+      const rect = canvasEl.getBoundingClientRect();
+      const oldZoom = state.zoom;
+      const next = Math.min(2, Math.max(0.4, oldZoom * Math.exp(-event.deltaY * 0.0015)));
+      if (Math.abs(next - oldZoom) < 0.001) return;
+      const viewport = document.editor.viewport;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const pointX = (centerX - viewport.x) / oldZoom;
+      const pointY = (centerY - viewport.y) / oldZoom;
+      viewport.x = centerX - pointX * next;
+      viewport.y = centerY - pointY * next;
+      store.setZoom(next);
+    } else {
+      document.editor.viewport.x -= event.deltaX;
+      document.editor.viewport.y -= event.deltaY;
+      applyViewport();
+      scheduleAutosave();
+    }
+  },
+  { passive: false },
+);
+
+window.addEventListener("keydown", (event) => {
+  const target = event.target;
+  const editing =
+    target instanceof HTMLElement &&
+    (target.closest("input, select, textarea") !== null || target.isContentEditable);
+  const modifier = event.ctrlKey || event.metaKey;
+  const key = event.key.toLowerCase();
+
+  if (modifier && key === "s") {
+    event.preventDefault();
+    save();
+    return;
+  }
+  if (editing) return;
+
+  if (modifier && key === "z") {
+    event.preventDefault();
+    if (event.shiftKey) store.redo();
+    else store.undo();
+    return;
+  }
+  if (modifier && key === "y") {
+    event.preventDefault();
+    store.redo();
+    return;
+  }
+  if (event.key === "Delete" || event.key === "Backspace") {
+    if (!store.state.selectedId) return;
+    event.preventDefault();
+    deleteSelected();
+  }
+});
+
+/* -------------------------------------------------------------------- boot */
+
+function boot(): void {
+  renderNow();
+  window.addEventListener("resize", () => {
+    // Layout is CSS driven; nothing to recompute for v1.
+  });
+}
+
+boot();
