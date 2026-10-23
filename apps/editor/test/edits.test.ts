@@ -1,0 +1,152 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { createDocument, createProject, findBlock } from "@nexus/ir";
+import { createStarterDocument, defaultRegistry } from "@nexus/engine";
+import {
+  appendToScript,
+  createScriptWith,
+  insertIntoStack,
+  locateBlock,
+  newBlockInstance,
+  plugIntoPort,
+  removeBlock,
+  unplugPort,
+} from "../src/edits.ts";
+
+function starter() {
+  return createStarterDocument("en");
+}
+
+function instance(type: string, document = starter()) {
+  const result = newBlockInstance(defaultRegistry, document.project, type);
+  assert.equal(result.ok, true, `expected ${type} to instantiate`);
+  if (!result.ok) throw new Error("unreachable");
+  return result.node;
+}
+
+describe("editor edits", () => {
+  it("fills declared fields with defaults", () => {
+    const node = instance("logic.compare");
+    assert.equal(node.type, "logic.compare");
+    assert.equal(node.fields?.op, "==");
+  });
+
+  it("refuses variable blocks when no variable exists", () => {
+    const result = newBlockInstance(defaultRegistry, createProject(), "var.get");
+    assert.deepEqual(result, { ok: false, reason: "variable" });
+  });
+
+  it("binds variable blocks to the first variable", () => {
+    const document = createDocument(createProject());
+    document.project.variables.push({ id: "var_1", name: "score", type: "number", initial: 0 });
+    const result = newBlockInstance(defaultRegistry, document.project, "var.set");
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.node.fields?.variable, "var_1");
+  });
+
+  it("rejects unknown block types", () => {
+    const result = newBlockInstance(defaultRegistry, createProject(), "nope.missing");
+    assert.deepEqual(result, { ok: false, reason: "unknown" });
+  });
+
+  it("inserts a statement into the starter script body", () => {
+    const document = starter();
+    const start = document.project.scripts[0];
+    assert.ok(start);
+    const print = instance("io.print");
+    assert.equal(insertIntoStack(document.project, start.id, "body", 0, print), true);
+
+    const body = findBlock(document.project, start.id)?.inputs?.body;
+    assert.ok(Array.isArray(body));
+    assert.equal(body[0]?.id, print.id);
+  });
+
+  it("indexes sibling statements correctly", () => {
+    const document = starter();
+    const start = document.project.scripts[0]!;
+    const body = start.inputs?.body;
+    assert.ok(Array.isArray(body));
+    const first = body.length;
+
+    const trailing = instance("io.print");
+    insertIntoStack(document.project, start.id, "body", 99, trailing);
+    const second = instance("io.print");
+    insertIntoStack(document.project, start.id, "body", 1, second);
+
+    const updated = findBlock(document.project, start.id)?.inputs?.body;
+    assert.ok(Array.isArray(updated));
+    assert.equal(updated.length, first + 2);
+    assert.equal(updated[1]?.id, second.id);
+  });
+
+  it("plugs an expression into an empty value port and refuses occupied ones", () => {
+    const document = starter();
+    const start = document.project.scripts[0]!;
+    const body = start.inputs?.body;
+    assert.ok(Array.isArray(body));
+    const print = body[0]!;
+
+    const value = instance("text.literal");
+    assert.equal(plugIntoPort(document.project, print.id, "text", value), true);
+    assert.equal(plugIntoPort(document.project, print.id, "text", instance("text.literal")), false);
+
+    const unplugged = unplugPort(document.project, print.id, "text");
+    assert.equal(unplugged?.id, value.id);
+    assert.equal(findBlock(document.project, print.id)?.inputs?.text, undefined);
+  });
+
+  it("locates nested blocks with parent and port", () => {
+    const document = starter();
+    const start = document.project.scripts[0]!;
+    const body = start.inputs?.body;
+    assert.ok(Array.isArray(body));
+    const print = body[0]!;
+
+    const location = locateBlock(document.project, print.id);
+    assert.ok(location);
+    assert.equal(location.parent?.id, start.id);
+    assert.equal(location.port, "body");
+    assert.equal(location.stack[0]?.id, print.id);
+
+    assert.equal(locateBlock(document.project, "missing"), null);
+  });
+
+  it("removes a nested block and keeps the rest of the script", () => {
+    const document = starter();
+    const start = document.project.scripts[0]!;
+    const body = start.inputs?.body;
+    assert.ok(Array.isArray(body));
+    const print = body[0]!;
+
+    assert.equal(removeBlock(document, print.id), true);
+    assert.equal(removeBlock(document, print.id), false);
+    assert.deepEqual(findBlock(document.project, start.id)?.inputs?.body, []);
+  });
+
+  it("removing a top-level hat drops its script and position", () => {
+    const document = starter();
+    const start = document.project.scripts[0]!;
+    assert.equal(removeBlock(document, start.id), true);
+    assert.equal(document.project.scripts.length, 0);
+    assert.equal(document.editor.positions[start.id], undefined);
+  });
+
+  it("creates a new script around a dropped statement", () => {
+    const document = createDocument(createProject());
+    const print = instance("io.print", document);
+    createScriptWith(document, print, { x: 120, y: 70 });
+
+    assert.equal(document.project.scripts.length, 1);
+    const hat = document.project.scripts[0]!;
+    assert.equal(hat.type, "control.start");
+    assert.deepEqual(findBlock(document.project, hat.id)?.inputs?.body, [print]);
+    assert.deepEqual(document.editor.positions[hat.id], { x: 120, y: 70 });
+  });
+
+  it("appends a hat only when it is a start block", () => {
+    const document = createDocument(createProject());
+    const print = instance("io.print", document);
+    assert.equal(appendToScript(document.project, print), false);
+    assert.equal(document.project.scripts.length, 0);
+  });
+});
