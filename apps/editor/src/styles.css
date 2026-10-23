@@ -319,6 +319,28 @@ button {
   padding: 10px 10px 6px;
 }
 
+.toolbox__delete-hint {
+  display: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.is-dragging .toolbox__delete-hint {
+  display: inline-flex;
+  align-items: center;
+}
+
+.toolbox.drop-active {
+  outline: 2px dashed var(--danger);
+  outline-offset: -4px;
+  background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+}
+
+.toolbox.drop-active .toolbox__delete-hint {
+  color: #ffd7dc;
+}
+
 .input {
   width: 100%;
   padding: 7px 10px;
@@ -949,6 +971,21 @@ button {
   font-size: 11px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.variables__rename {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 2px 6px;
+  font-size: 13px;
+}
+
+.variables__error {
+  margin: -2px 8px 4px 24px;
+  color: #ff9daa;
+  font-size: 11.5px;
+  line-height: 1.4;
 }
 
 /* ----------------------------------------------------------------- console */

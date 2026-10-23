@@ -64,6 +64,7 @@ export const en: Catalog = {
   "toolbox.search": "Search blocks",
   "toolbox.noResults": "No blocks match “{query}”",
   "toolbox.dragHint": "Drag a block onto the canvas",
+  "toolbox.deleteHint": "Drop a block here to delete it",
   "toolbox.more": "More blocks are on the way",
 
   "canvas.emptyTitle": "Start building",
@@ -82,6 +83,7 @@ export const en: Catalog = {
   "variables.duplicateName": "A variable with this name already exists.",
   "variables.invalidInitial": "The initial value does not match the chosen type.",
   "variables.confirmDelete": "Delete “{name}”? Blocks that use it will lose their variable.",
+  "variables.renameHint": "Double-click to rename",
 
   "console.empty": "Run the program to see its output here.",
   "console.clear": "Clear console",
@@ -169,6 +171,7 @@ export const en: Catalog = {
   "toast.variableRequired": "Create a variable first",
   "toast.placed": "Block added",
   "toast.deleted": "Block deleted",
+  "toast.variableRenamed": "Variable renamed to “{name}”",
   "toast.noTarget": "Select a block with an empty input, or drop onto a stack",
   "toast.noScript": "Add a “when program starts” block first",
 

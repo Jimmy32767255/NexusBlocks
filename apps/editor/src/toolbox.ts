@@ -70,9 +70,10 @@ export function renderToolbox(options: ToolboxOptions): HTMLElement {
     if (visible === 0) empty.textContent = t("toolbox.noResults", { query: search.value.trim() });
   });
 
-  return el("aside", { class: "toolbox" }, [
+  return el("aside", { class: "toolbox", dataset: { deleteZone: "true" } }, [
     el("header", { class: "panel__head" }, [
       el("h2", { class: "panel__title", text: t("toolbox.title") }),
+      el("span", { class: "toolbox__delete-hint", text: t("toolbox.deleteHint") }),
     ]),
     el("div", { class: "toolbox__search" }, [search]),
     list,

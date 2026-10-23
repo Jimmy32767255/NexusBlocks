@@ -61,6 +61,7 @@ export const zhCN: Catalog = {
   "toolbox.search": "搜索积木",
   "toolbox.noResults": "没有匹配“{query}”的积木",
   "toolbox.dragHint": "把积木拖到画布上",
+  "toolbox.deleteHint": "把积木拖到这里可删除",
   "toolbox.more": "更多积木正在路上",
 
   "canvas.emptyTitle": "开始搭建",
@@ -79,6 +80,7 @@ export const zhCN: Catalog = {
   "variables.duplicateName": "已存在同名变量。",
   "variables.invalidInitial": "初始值与所选类型不匹配。",
   "variables.confirmDelete": "删除“{name}”？使用它的积木会失去该变量。",
+  "variables.renameHint": "双击重命名",
 
   "console.empty": "运行程序后，输出会显示在这里。",
   "console.clear": "清空控制台",
@@ -166,6 +168,7 @@ export const zhCN: Catalog = {
   "toast.variableRequired": "请先创建一个变量",
   "toast.placed": "已添加积木",
   "toast.deleted": "已删除积木",
+  "toast.variableRenamed": "变量已重命名为“{name}”",
   "toast.noTarget": "请选中一个有空白输入的积木，或把积木拖到积木堆里",
   "toast.noScript": "请先添加“当程序开始”积木",
 

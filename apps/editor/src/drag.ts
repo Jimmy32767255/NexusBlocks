@@ -29,7 +29,7 @@ export interface DragDeps {
   createInstance: (type: string) => InstanceResult;
   placeBlockAtCenter: (type: string) => void;
   selectBlock: (id: string | null) => void;
-  toast: (key: string) => void;
+  toast: (key: string, level?: "info" | "error") => void;
   /** Force a synchronous re-render (used so drop targets match the document). */
   flush: () => void;
 }
@@ -44,6 +44,7 @@ interface Payload {
 }
 
 type DropTarget =
+  | { type: "delete"; el: HTMLElement }
   | { type: "slot"; el: HTMLElement; parentId: string; port: string; index: number }
   | { type: "value"; el: HTMLElement; parentId: string; port: string; portType: ValueType }
   | { type: "block"; el: HTMLElement; blockId: string }
@@ -138,7 +139,12 @@ function activate(current: Session): boolean {
     const snapshot = JSON.stringify(document);
 
     if (kind === "hat") {
-      payload = { kind: "hat", blocks: [...location.stack], snapshot };
+      const hat = location.stack[location.index];
+      if (!hat) {
+        cleanup();
+        return false;
+      }
+      payload = { kind: "hat", blocks: [hat], snapshot };
     } else {
       let grabbed: BlockNode | null = null;
       deps.store.update(
@@ -259,6 +265,9 @@ function hitTest(clientX: number, clientY: number, deps: DragDeps): DropTarget |
   const element = document.elementFromPoint(clientX, clientY);
   if (!(element instanceof Element)) return null;
 
+  const zone = element.closest<HTMLElement>("[data-delete-zone]");
+  if (zone) return { type: "delete", el: zone };
+
   const drop = element.closest<HTMLElement>("[data-drop]");
   if (drop) {
     const kind = drop.dataset.drop;
@@ -309,6 +318,25 @@ function applyDrop(payload: Payload, target: DropTarget | null, deps: DragDeps):
   const store = deps.store;
   const snapshot = payload.snapshot ?? JSON.stringify(store.state.document);
   const node = payload.blocks[0];
+
+  if (target?.type === "delete") {
+    // Toolbox drags have nothing to delete: dropping them back is a cancel.
+    if (!payload.snapshot) return true;
+    const ids = new Set(payload.blocks.map((block) => block.id));
+    store.pushHistory(payload.snapshot);
+    store.update(
+      (document) => {
+        if (payload.kind === "hat") {
+          document.project.scripts = document.project.scripts.filter((script) => !ids.has(script.id));
+        }
+        for (const id of ids) delete document.editor.positions[id];
+      },
+      { history: false },
+    );
+    deps.selectBlock(null);
+    deps.toast("toast.deleted", "info");
+    return true;
+  }
 
   if (payload.kind === "hat") {
     if (!target || target.type !== "canvas" || !node) return false;

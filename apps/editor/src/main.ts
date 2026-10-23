@@ -160,6 +160,7 @@ function renderNow(): void {
       onAdd: () => void addVariable(),
       onDelete: (id) => void deleteVariable(id),
       onSelectVariable: (id) => selectVariable(id),
+      onRename: (id, name) => renameVariable(id, name),
     }),
     renderConsole({
       logs: state.logs,
@@ -266,7 +267,7 @@ function dragDeps(): DragDeps {
     createInstance: (type) => newBlockInstance(registry, store.state.document.project, type),
     placeBlockAtCenter: (type) => placeBlockAtCenter(type),
     selectBlock: (id) => store.select(id),
-    toast: (key) => toast(t(key), "error"),
+    toast: (key, level = "error") => toast(t(key), level),
     flush: () => renderNow(),
   };
 }
@@ -484,6 +485,28 @@ function setBlockValue(blockId: string, key: string, value: string | number | bo
     block.fields ??= {};
     block.fields[key] = value;
   });
+}
+
+const VARIABLE_NAME = /^[\p{L}_][\p{L}\p{N}_]*$/u;
+
+function renameVariable(id: string, rawName: string): string | null {
+  const name = rawName.trim();
+  if (!VARIABLE_NAME.test(name)) return t("variables.invalidName");
+
+  const project = store.state.document.project;
+  const variable = project.variables.find((candidate) => candidate.id === id);
+  if (!variable) return null;
+  if (project.variables.some((candidate) => candidate.id !== id && candidate.name === name)) {
+    return t("variables.duplicateName");
+  }
+  if (variable.name === name) return null;
+
+  store.update((document) => {
+    const target = document.project.variables.find((candidate) => candidate.id === id);
+    if (target) target.name = name;
+  });
+  toast(t("toast.variableRenamed", { name }));
+  return null;
 }
 
 function selectVariable(id: string): void {

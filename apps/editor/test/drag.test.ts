@@ -123,6 +123,61 @@ describe("editor drag and drop", () => {
     assert.equal(bodyLength(store, start.id), 1);
   });
 
+  it("deletes a statement dropped on the toolbox delete zone", () => {
+    const { store, deps, toasts } = setup();
+    const start = store.state.document.project.scripts[0]!;
+    const print = (start.inputs?.body as { id: string }[])[0]!;
+
+    const zone = document.createElement("aside");
+    zone.dataset.deleteZone = "true";
+    document.body.append(zone);
+    pointAt(zone);
+
+    drag(startBlockDrag, print.id, deps, [[40, 40]]);
+
+    assert.equal(bodyLength(store, start.id), 0);
+    assert.deepEqual(toasts, ["toast.deleted"]);
+    assert.equal(store.canUndo(), true);
+
+    store.undo();
+    assert.equal(bodyLength(store, start.id), 1);
+  });
+
+  it("deletes a whole script dropped on the toolbox delete zone", () => {
+    const { store, deps } = setup();
+    const hat = store.state.document.project.scripts[0]!;
+
+    const zone = document.createElement("aside");
+    zone.dataset.deleteZone = "true";
+    document.body.append(zone);
+    pointAt(zone);
+
+    drag(startBlockDrag, hat.id, deps, [[40, 40]]);
+
+    assert.equal(store.state.document.project.scripts.length, 0);
+    assert.equal(store.state.document.editor.positions[hat.id], undefined);
+
+    store.undo();
+    assert.equal(store.state.document.project.scripts.length, 1);
+    assert.ok(store.state.document.editor.positions[hat.id]);
+  });
+
+  it("cancels a toolbox drag dropped back on the toolbox", () => {
+    const { store, deps, toasts } = setup();
+    const start = store.state.document.project.scripts[0]!;
+
+    const zone = document.createElement("aside");
+    zone.dataset.deleteZone = "true";
+    document.body.append(zone);
+    pointAt(zone);
+
+    drag(startToolboxDrag, "io.print", deps, [[40, 40]]);
+
+    assert.equal(bodyLength(store, start.id), 1);
+    assert.equal(store.state.document.project.scripts.length, 1);
+    assert.deepEqual(toasts, []);
+  });
+
   it("cancels a statement drag with Escape and restores it", () => {
     const { store, surface, deps } = setup();
     const start = store.state.document.project.scripts[0]!;
