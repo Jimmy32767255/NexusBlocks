@@ -61,6 +61,8 @@ interface Session {
   payload: Payload | null;
   ghost: HTMLElement | null;
   highlighted: HTMLElement | null;
+  /** The in-canvas element being dragged, hidden while the ghost follows the pointer. */
+  sourceEl: HTMLElement | null;
 }
 
 let session: Session | null = null;
@@ -86,6 +88,10 @@ function begin(event: PointerEvent, source: Source, deps: DragDeps): void {
     payload: null,
     ghost: null,
     highlighted: null,
+    sourceEl:
+      source.kind === "block"
+        ? document.querySelector<HTMLElement>(`[data-block-id="${source.blockId}"]`)
+        : null,
   };
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
@@ -111,6 +117,7 @@ function onMove(event: PointerEvent): void {
 
 function activate(current: Session): boolean {
   const { deps, source } = current;
+  current.sourceEl?.classList.add("block--drag-source");
   let payload: Payload | null = null;
 
   if (source.kind === "toolbox") {
@@ -222,6 +229,7 @@ function onUp(): void {
   if (!payload) return;
 
   const placed = applyDrop(payload, target, deps);
+  if (placed) deps.flush();
   if (!placed) {
     if (payload.snapshot) deps.store.restoreSnapshot(payload.snapshot);
     else deps.flush();
@@ -253,6 +261,7 @@ function cleanup(): void {
   session = null;
   if (!current) return;
   current.ghost?.remove();
+  current.sourceEl?.classList.remove("block--drag-source");
   current.highlighted?.classList.remove("drop-active");
   document.body.classList.remove("is-dragging");
   window.removeEventListener("pointermove", onMove);
