@@ -21,7 +21,7 @@ Working today:
 - An interpreter with a step limit, cancellation, event stream (logs, output, status, errors), and variable scopes.
 - English and Chinese UI, runtime messages, and program output in the project locale.
 - **Desktop shell (Tauri 2)**: loads the same editor bundle; `fs.*` maps to a user-chosen workspace folder with real files, while the browser build keeps its localStorage workspace.
-- `pnpm test` covers IR, i18n, engine, and editor logic (71 cases).
+- `pnpm test` covers IR, i18n, engine, and editor logic (72 cases).
 
 Not built yet (interfaces reserved): network/process/clipboard capabilities, advanced list/dict operations such as iteration and removal, code export, and multi-platform packaging pipelines.
 
