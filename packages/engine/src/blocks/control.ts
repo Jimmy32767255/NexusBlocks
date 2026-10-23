@@ -101,6 +101,91 @@ export const controlBlocks: BlockDefinition[] = [
     },
   },
   {
+    type: "control.forever",
+    kind: "statement",
+    category: "control",
+    label: "block.control.forever.label",
+    description: "block.control.forever.description",
+    output: "void",
+    color: CONTROL,
+    fields: [],
+    ports: [{ name: "body", label: "block.control.forever.port.body", kind: "stack" }],
+    async execute(ctx, node) {
+      for (;;) {
+        await ctx.tick();
+        try {
+          await ctx.run(ctx.stack(node, "body"));
+        } catch (error) {
+          if (error instanceof BreakSignal) return;
+          throw error;
+        }
+      }
+    },
+  },
+  {
+    type: "control.while",
+    kind: "statement",
+    category: "control",
+    label: "block.control.while.label",
+    description: "block.control.while.description",
+    output: "void",
+    color: CONTROL,
+    fields: [],
+    ports: [
+      { name: "condition", label: "block.control.while.port.condition", kind: "value", type: "boolean", default: false },
+      { name: "body", label: "block.control.while.port.body", kind: "stack" },
+    ],
+    async execute(ctx, node) {
+      while (await ctx.input(node, "condition")) {
+        await ctx.tick();
+        try {
+          await ctx.run(ctx.stack(node, "body"));
+        } catch (error) {
+          if (error instanceof BreakSignal) break;
+          throw error;
+        }
+      }
+    },
+  },
+  {
+    type: "control.repeatWith",
+    kind: "statement",
+    category: "control",
+    label: "block.control.repeatWith.label",
+    description: "block.control.repeatWith.description",
+    output: "void",
+    color: CONTROL,
+    fields: [
+      {
+        name: "variable",
+        kind: "variable",
+        label: "block.control.repeatWith.field.variable",
+        default: "",
+        required: true,
+      },
+    ],
+    ports: [
+      { name: "times", label: "block.control.repeatWith.port.times", kind: "value", type: "number", default: 10 },
+      { name: "body", label: "block.control.repeatWith.port.body", kind: "stack" },
+    ],
+    async execute(ctx, node) {
+      const raw = await ctx.input(node, "times");
+      const times = Math.max(0, Math.floor(Number(raw) || 0));
+      const variableId = String(node.fields?.variable ?? "");
+      if (!variableId) ctx.fail("runtime.error.missingVariable", { name: "" });
+      for (let count = 1; count <= times; count += 1) {
+        ctx.setVariable(variableId, count);
+        await ctx.tick();
+        try {
+          await ctx.run(ctx.stack(node, "body"));
+        } catch (error) {
+          if (error instanceof BreakSignal) break;
+          throw error;
+        }
+      }
+    },
+  },
+  {
     type: "control.break",
     kind: "statement",
     category: "control",

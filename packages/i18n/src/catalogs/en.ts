@@ -243,6 +243,21 @@ export const en: Catalog = {
   "block.control.repeat.port.times": "times",
   "block.control.repeat.port.body": "do",
 
+  "block.control.forever.label": "forever",
+  "block.control.forever.description": "Repeat the body until a break block leaves the loop or the program is stopped.",
+  "block.control.forever.port.body": "do",
+
+  "block.control.while.label": "repeat while",
+  "block.control.while.description": "Repeat the body while the condition stays true.",
+  "block.control.while.port.condition": "condition",
+  "block.control.while.port.body": "do",
+
+  "block.control.repeatWith.label": "repeat with counter",
+  "block.control.repeatWith.description": "Repeat the body a number of times and store the current round (starting at 1) in a variable.",
+  "block.control.repeatWith.field.variable": "counter",
+  "block.control.repeatWith.port.times": "times",
+  "block.control.repeatWith.port.body": "do",
+
   "block.control.wait.label": "wait",
   "block.control.wait.description": "Pause for the given number of seconds. Stopping the program interrupts the wait.",
   "block.control.wait.port.seconds": "seconds",

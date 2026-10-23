@@ -240,6 +240,21 @@ export const zhCN: Catalog = {
   "block.control.repeat.port.times": "次数",
   "block.control.repeat.port.body": "执行",
 
+  "block.control.forever.label": "无限循环",
+  "block.control.forever.description": "重复执行里面的内容，直到被「跳出循环」跳出或程序停止。",
+  "block.control.forever.port.body": "执行",
+
+  "block.control.while.label": "当……时重复",
+  "block.control.while.description": "只要条件为真就重复执行里面的内容。",
+  "block.control.while.port.condition": "条件",
+  "block.control.while.port.body": "执行",
+
+  "block.control.repeatWith.label": "重复并计数",
+  "block.control.repeatWith.description": "重复执行指定次数，并把当前是第几次（从 1 开始）存入变量。",
+  "block.control.repeatWith.field.variable": "计数变量",
+  "block.control.repeatWith.port.times": "次数",
+  "block.control.repeatWith.port.body": "执行",
+
   "block.control.wait.label": "等待",
   "block.control.wait.description": "暂停指定的秒数。停止程序会立即中断等待。",
   "block.control.wait.port.seconds": "秒",

@@ -500,3 +500,112 @@ test("break outside a loop is a runtime error", async () => {
   assert.equal(result.status, "error");
   assert.equal(result.error?.messageKey, "runtime.error.breakOutsideLoop");
 });
+
+test("forever repeats until a break leaves the loop", async () => {
+  const project = projectWith(
+    start([
+      createBlock("control.forever", {
+        inputs: {
+          body: [createBlock("io.print", { fields: { text: "tick" } }), createBlock("control.break")],
+        },
+      }),
+      createBlock("io.print", { fields: { text: "after" } }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event), stepLimit: 1000 });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["tick", "after"]);
+});
+
+test("while checks the condition before every round", async () => {
+  const project = createProject();
+  const counter = createVariable("i", "number", 0);
+  project.variables.push(counter);
+  project.scripts = [
+    start([
+      createBlock("control.while", {
+        inputs: {
+          condition: createBlock("logic.compare", {
+            fields: { op: "<" },
+            inputs: {
+              a: createBlock("var.get", { fields: { variable: counter.id } }),
+              b: createBlock("math.number", { fields: { value: 3 } }),
+            },
+          }),
+          body: [
+            createBlock("io.print", {
+              inputs: { text: createBlock("var.get", { fields: { variable: counter.id } }) },
+            }),
+            createBlock("var.set", {
+              fields: { variable: counter.id },
+              inputs: {
+                value: createBlock("math.arithmetic", {
+                  fields: { op: "+" },
+                  inputs: {
+                    a: createBlock("var.get", { fields: { variable: counter.id } }),
+                    b: createBlock("math.number", { fields: { value: 1 } }),
+                  },
+                }),
+              },
+            }),
+          ],
+        },
+      }),
+    ]),
+  ];
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event), stepLimit: 1000 });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["0", "1", "2"]);
+});
+
+test("repeat with counter stores 1..n in the chosen variable", async () => {
+  const project = createProject();
+  const round = createVariable("round", "number", 0);
+  project.variables.push(round);
+  project.scripts = [
+    start([
+      createBlock("control.repeatWith", {
+        fields: { variable: round.id },
+        inputs: {
+          times: createBlock("math.number", { fields: { value: 3 } }),
+          body: [
+            createBlock("io.print", {
+              inputs: { text: createBlock("var.get", { fields: { variable: round.id } }) },
+            }),
+          ],
+        },
+      }),
+      createBlock("io.print", {
+        inputs: { text: createBlock("var.get", { fields: { variable: round.id } }) },
+      }),
+    ]),
+  ];
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["1", "2", "3", "3"]);
+});
+
+test("break leaves a repeat with counter loop", async () => {
+  const project = createProject();
+  const round = createVariable("round", "number", 0);
+  project.variables.push(round);
+  project.scripts = [
+    start([
+      createBlock("control.repeatWith", {
+        fields: { variable: round.id },
+        inputs: {
+          times: createBlock("math.number", { fields: { value: 5 } }),
+          body: [createBlock("io.print", { fields: { text: "once" } }), createBlock("control.break")],
+        },
+      }),
+      createBlock("io.print", { fields: { text: "after" } }),
+    ]),
+  ];
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["once", "after"]);
+});
