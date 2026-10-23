@@ -45,3 +45,14 @@ export class BreakSignal extends Error {
     this.name = "BreakSignal";
   }
 }
+
+/** Raised by `sys.exit`; ends the whole run with an exit code. */
+export class ExitSignal extends Error {
+  readonly code: number;
+
+  constructor(code: number) {
+    super(`exit ${code}`);
+    this.name = "ExitSignal";
+    this.code = code;
+  }
+}

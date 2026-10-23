@@ -138,6 +138,7 @@ export const en: Catalog = {
   "runtime.error.statementAsValue": "“{type}” does not return a value",
   "runtime.error.divisionByZero": "Division by zero",
   "runtime.error.stepLimit": "Step limit exceeded ({limit} steps). Is a loop missing an exit condition?",
+  "runtime.error.exitCode": "Program exited with status {code}.",
   "runtime.error.capability": "Capability “{capability}” is not available in this host",
   "runtime.error.internal": "Internal error: {detail}",
 
@@ -194,6 +195,7 @@ export const en: Catalog = {
   "category.functions": "Functions",
   "category.files": "Files",
   "category.modules": "Modules",
+  "category.system": "System",
 
   "block.control.start.label": "when program starts",
   "block.control.start.description": "Entry point. Everything under this block runs once when you press Run.",
@@ -261,6 +263,8 @@ export const en: Catalog = {
   "block.control.wait.label": "wait",
   "block.control.wait.description": "Pause for the given number of seconds. Stopping the program interrupts the wait.",
   "block.control.wait.port.seconds": "seconds",
+  "block.control.pass.label": "pass",
+  "block.control.pass.description": "Do nothing; a placeholder for an empty branch.",
   "block.control.break.label": "break",
   "block.control.break.description": "Leave the innermost loop immediately.",
 
@@ -352,6 +356,9 @@ export const en: Catalog = {
   "block.import.field.alias": "as",
 
 
+  "block.sys.exit.label": "exit with status",
+  "block.sys.exit.description": "End the whole program: a non-zero status ends the run with an error, 0 ends it normally. Real exit codes come with compilation.",
+  "block.sys.exit.port.code": "status",
   "block.control.throw.label": "throw [value]",
   "block.control.throw.description": "Raise the value as an exception that a matching catch can handle.",
   "block.control.throw.port.value": "value",

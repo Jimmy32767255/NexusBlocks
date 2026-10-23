@@ -135,6 +135,7 @@ export const zhCN: Catalog = {
   "runtime.error.statementAsValue": "“{type}”不返回值",
   "runtime.error.divisionByZero": "除数不能为零",
   "runtime.error.stepLimit": "超出步数上限（{limit} 步）。是不是有循环缺少退出条件？",
+  "runtime.error.exitCode": "程序以状态码 {code} 结束。",
   "runtime.error.capability": "当前宿主不支持能力“{capability}”",
   "runtime.error.internal": "内部错误：{detail}",
 
@@ -191,6 +192,7 @@ export const zhCN: Catalog = {
   "category.functions": "函数",
   "category.files": "文件",
   "category.modules": "模块",
+  "category.system": "系统",
 
   "block.control.start.label": "当程序启动时",
   "block.control.start.description": "程序的入口。按下“运行”后，这块积木下面的内容会执行一次。",
@@ -258,6 +260,8 @@ export const zhCN: Catalog = {
   "block.control.wait.label": "等待",
   "block.control.wait.description": "暂停指定的秒数。停止程序会立即中断等待。",
   "block.control.wait.port.seconds": "秒",
+  "block.control.pass.label": "空语句",
+  "block.control.pass.description": "什么也不做，用作占位。",
   "block.control.break.label": "跳出循环",
   "block.control.break.description": "立即结束当前所在的循环。",
 
@@ -349,6 +353,9 @@ export const zhCN: Catalog = {
   "block.import.field.alias": "作为",
 
 
+  "block.sys.exit.label": "以状态退出",
+  "block.sys.exit.description": "立即结束整个程序：状态码非 0 时以出错状态结束，0 表示正常结束。支持编译后会对应真实的退出码。",
+  "block.sys.exit.port.code": "状态码",
   "block.control.throw.label": "抛出[异常]",
   "block.control.throw.description": "抛出一个值作为异常，交给匹配的捕获分支处理。",
   "block.control.throw.port.value": "异常",

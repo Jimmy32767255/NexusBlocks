@@ -609,3 +609,65 @@ test("break leaves a repeat with counter loop", async () => {
   assert.equal(result.status, "finished");
   assert.deepEqual(loggedTexts(events), ["once", "after"]);
 });
+
+test("pass does nothing and execution continues", async () => {
+  const project = projectWith(start([createBlock("control.pass"), createBlock("io.print", { fields: { text: "ok" } })]));
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["ok"]);
+});
+
+test("exit with status 0 finishes the run immediately", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", { fields: { text: "before" } }),
+      createBlock("sys.exit", { inputs: { code: createBlock("math.number", { fields: { value: 0 } }) } }),
+      createBlock("io.print", { fields: { text: "after" } }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["before"]);
+});
+
+test("exit with a non-zero status ends the run with that code", async () => {
+  const project = projectWith(
+    start([
+      createBlock("sys.exit", { inputs: { code: createBlock("math.number", { fields: { value: 3 } }) } }),
+      createBlock("io.print", { fields: { text: "after" } }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.exitCode");
+  assert.deepEqual(result.error?.params, { code: 3 });
+  assert.deepEqual(loggedTexts(events), []);
+});
+
+test("exit is not swallowed by try/catch", async () => {
+  const project = createProject();
+  const errorText = createVariable("message", "text", "");
+  project.variables.push(errorText);
+  project.scripts = [
+    start([
+      createBlock("control.try", {
+        inputs: {
+          body: [createBlock("sys.exit", { inputs: { code: createBlock("math.number", { fields: { value: 0 } }) } })],
+          catches: [
+            createBlock("control.catchAssign", {
+              fields: { exception: "any", target: errorText.id },
+              inputs: { body: [createBlock("io.print", { fields: { text: "caught" } })] },
+            }),
+          ],
+        },
+      }),
+    ]),
+  ];
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), []);
+});

@@ -1,7 +1,7 @@
 import { validateProject, type Project } from "@nexus/ir";
 import { CapabilityUnavailableError, createLocalHost } from "./host.ts";
 import { Interpreter } from "./interpreter.ts";
-import { BreakSignal, RuntimeFailure, StopSignal } from "./errors.ts";
+import { BreakSignal, ExitSignal, RuntimeFailure, StopSignal } from "./errors.ts";
 import { resolveImports } from "./modules.ts";
 import { createProjectRegistry } from "./registry.ts";
 import type { RunOptions, RunResult, RuntimeEvent } from "./types.ts";
@@ -96,6 +96,17 @@ export async function runProject(project: Project, options: RunOptions = {}): Pr
     if (error instanceof StopSignal) {
       emit({ kind: "status", status: "stopped", durationMs });
       return { status: "stopped", durationMs, steps: interpreter.stepCount };
+    }
+    if (error instanceof ExitSignal) {
+      if (error.code === 0) {
+        emit({ kind: "status", status: "finished", durationMs });
+        return { status: "finished", durationMs, steps: interpreter.stepCount };
+      }
+      const messageKey = "runtime.error.exitCode";
+      const params = { code: error.code };
+      emit({ kind: "error", messageKey, params, time: Date.now() });
+      emit({ kind: "status", status: "error", durationMs });
+      return { status: "error", durationMs, steps: interpreter.stepCount, error: { messageKey, params } };
     }
     if (error instanceof BreakSignal) {
       emit({

@@ -57,6 +57,7 @@ export interface ExecutionContext {
   sleep(ms: number): Promise<void>;
   /** Throw a translatable runtime failure attributed to the current block. */
   fail(messageKey: string, params?: Record<string, string | number>): never;
+  exit(code: number): never;
   /** Human-readable text for a runtime failure, using the caller's locale. */
   describeFailure(failure: RuntimeFailure): string;
 }

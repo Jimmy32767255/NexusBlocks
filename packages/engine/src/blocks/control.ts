@@ -14,6 +14,7 @@ export const CATEGORY_COLORS = {
   functions: "#9b6bff",
   files: "#6a8caf",
   modules: "#c47f42",
+  system: "#7d8794",
 } as const;
 
 const CONTROL = CATEGORY_COLORS.control;
@@ -198,6 +199,18 @@ export const controlBlocks: BlockDefinition[] = [
     execute() {
       throw new BreakSignal();
     },
+  },
+  {
+    type: "control.pass",
+    kind: "statement",
+    category: "control",
+    label: "block.control.pass.label",
+    description: "block.control.pass.description",
+    output: "void",
+    color: CONTROL,
+    fields: [],
+    ports: [],
+    execute() {},
   },
   {
     type: "control.throw",

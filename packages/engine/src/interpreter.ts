@@ -12,7 +12,7 @@ import {
   type ValueType,
 } from "@nexus/ir";
 import { ReturnSignal } from "./blocks/functions.ts";
-import { RuntimeFailure, StopSignal } from "./errors.ts";
+import { ExitSignal, RuntimeFailure, StopSignal } from "./errors.ts";
 import type { BlockRegistry } from "./registry.ts";
 import type { BlockDefinition, ExecutionContext, HostBridge, RuntimeEvent } from "./types.ts";
 
@@ -237,6 +237,10 @@ export class Interpreter implements ExecutionContext {
     if (this.steps % this.yieldEvery === 0) {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
+  }
+
+  exit(code: number): never {
+    throw new ExitSignal(code);
   }
 
   fail(messageKey: string, params: Record<string, string | number> = {}): never {
