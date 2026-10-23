@@ -18,6 +18,7 @@ import {
   isCatchType,
   walkProject,
   type BlockNode,
+  serializeDocument,
   type Diagnostic,
   type Value,
   type ValueType,
@@ -32,13 +33,21 @@ import { createScriptWith, newBlockInstance, removeBlock, unplugPort } from "./e
 import { currentLocale, hasKey, setUiLocale, t } from "./i18n.ts";
 import { icon } from "./icons.ts";
 import { renderInspector } from "./inspector.ts";
-import { downloadDocument, loadAutosave, pickDocument, saveAutosave } from "./persist.ts";
+import {
+  downloadDocument,
+  loadAutosave,
+  pickDocument,
+  projectFileName,
+  readDocument,
+  saveAutosave,
+  type OpenResult,
+} from "./persist.ts";
 import { Store, type RunStatus } from "./store.ts";
 import { toast } from "./toast.ts";
 import { renderToolbar } from "./toolbar.ts";
 import { renderToolbox } from "./toolbox.ts";
 import { renderVariables } from "./variables.ts";
-import { createDesktopHost, isDesktopShell } from "./desktop.ts";
+import { createDesktopFiles, createDesktopHost, isDesktopShell } from "./desktop.ts";
 
 import "./styles.css";
 
@@ -47,6 +56,7 @@ if (!mount) throw new Error("Editor root element #app is missing");
 const host: HTMLElement = mount;
 // Real file system in the Tauri shell; the browser keeps the localStorage host.
 const desktopHost = isDesktopShell() ? createDesktopHost(handleEvent) : null;
+const desktopFiles = desktopHost ? createDesktopFiles() : null;
 
 setUiLocale(currentLocale());
 
@@ -184,7 +194,7 @@ function renderNow(): void {
     onStop: () => stop(),
     onNew: () => void newProject(),
     onOpen: () => void openProject(),
-    onSave: () => save(),
+    onSave: () => void save(),
     onUndo: () => store.undo(),
     onRedo: () => store.redo(),
     onZoomIn: () => store.setZoom(store.state.zoom * 1.2),
@@ -355,6 +365,12 @@ function stop(): void {
   controller?.abort();
 }
 
+/** Best-effort message for anything thrown across the desktop bridge. */
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 /** Localised text for a caught runtime failure, falling back to its key. */
 function translateFailure(failure: RuntimeFailure): string {
   try {
@@ -413,7 +429,7 @@ async function openProject(): Promise<void> {
     const proceed = await confirmDialog(t("dialog.open.body"), t("dialog.open.title"));
     if (!proceed) return;
   }
-  const result = await pickDocument();
+  const result = desktopFiles ? await openDesktopProject() : await pickDocument();
   if (!result) return;
   if (!result.ok) {
     toast(t("toast.invalidFile", { detail: result.error }), "error");
@@ -432,9 +448,39 @@ async function openProject(): Promise<void> {
   }
 }
 
-function save(): void {
-  downloadDocument(store.state.document);
+async function openDesktopProject(): Promise<OpenResult | null> {
+  let file: { content: string } | null = null;
+  try {
+    file = await desktopFiles!.open();
+  } catch (error) {
+    toast(t("toast.openFailed", { detail: errorMessage(error) }), "error");
+    return null;
+  }
+  if (!file) return null;
+  return readDocument(file.content);
+}
+
+/** Save to a real file: native dialog on desktop, download in the browser. */
+async function save(): Promise<void> {
+  const document = store.state.document;
+  if (desktopFiles) {
+    let saved: { path: string } | null = null;
+    try {
+      saved = await desktopFiles.save(serializeDocument(document), projectFileName(document));
+    } catch (error) {
+      toast(t("toast.saveFailed", { detail: errorMessage(error) }), "error");
+      return;
+    }
+    // Cancelling the dialog must not claim a save happened.
+    if (!saved) return;
+    store.markSaved();
+    saveAutosave(document);
+    toast(t("toast.savedTo", { path: saved.path }));
+    return;
+  }
+  downloadDocument(document);
   store.markSaved();
+  saveAutosave(document);
   toast(t("toast.saved"));
 }
 
@@ -798,7 +844,7 @@ window.addEventListener("keydown", (event) => {
 
   if (modifier && key === "s") {
     event.preventDefault();
-    save();
+    void save();
     return;
   }
   if (editing) return;

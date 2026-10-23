@@ -21,6 +21,46 @@ export function isDesktopShell(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+export interface SavedFile {
+  path: string;
+}
+
+export interface OpenedFile {
+  path: string;
+  content: string;
+}
+
+function unwrap<T>(response: unknown): T | null {
+  const value = response as DesktopResponse | null;
+  if (value?.ok) return (value.value ?? null) as T | null;
+  throw new HostError(
+    value?.error?.messageKey ?? "runtime.error.capability",
+    value?.error?.params ?? {},
+  );
+}
+
+/**
+ * Project files go through native dialogs: a WebView cannot open a system
+ * file picker, and WebKitGTK ignores `<a download>`, so the browser helpers
+ * in `persist.ts` would report success while writing nothing.
+ */
+export function createDesktopFiles(invoke: Invoke | null = defaultInvoke) {
+  return {
+    /** `null` when the user cancels the save dialog. */
+    async save(content: string, suggestedName: string): Promise<SavedFile | null> {
+      if (!invoke) return null;
+      return unwrap<SavedFile>(await invoke("project_save", { content, suggestedName }));
+    },
+    /** `null` when the user cancels the open dialog. */
+    async open(): Promise<OpenedFile | null> {
+      if (!invoke) return null;
+      return unwrap<OpenedFile>(await invoke("project_open"));
+    },
+  };
+}
+
+export type DesktopFiles = ReturnType<typeof createDesktopFiles>;
+
 function display(value: Value): string {
   if (value === null) return "null";
   if (typeof value === "string") return value;

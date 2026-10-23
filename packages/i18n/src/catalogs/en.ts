@@ -163,6 +163,9 @@ export const en: Catalog = {
   "common.false": "false",
 
   "toast.saved": "Project downloaded",
+  "toast.savedTo": "Saved to {path}",
+  "toast.saveFailed": "Could not save the project: {detail}",
+  "toast.openFailed": "Could not open the project: {detail}",
   "toast.opened": "Project opened",
   "toast.invalidFile": "Could not read this file: {detail}",
   "toast.newProject": "Started a new project",

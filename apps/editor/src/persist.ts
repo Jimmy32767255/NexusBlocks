@@ -25,39 +25,70 @@ export function saveAutosave(doc: NexusDocument): void {
   }
 }
 
+/** Suggested file name for a project, without directories. */
+export function projectFileName(doc: NexusDocument): string {
+  const name = doc.project.name.trim().replace(/[\\/:*?"<>|]/g, "-") || "nexus-blocks";
+  return `${name}.nexusblocks.json`;
+}
+
+/**
+ * Browser download. The anchor has to be in the document for Firefox and
+ * WebKit, and the object URL must outlive the navigation the click starts.
+ */
 export function downloadDocument(doc: NexusDocument): void {
   const blob = new Blob([serializeDocument(doc)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const anchor = globalThis.document.createElement("a");
-  const name = doc.project.name.trim() || "nexus-blocks";
   anchor.href = url;
-  anchor.download = `${name}.nexusblocks.json`;
+  anchor.download = projectFileName(doc);
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  globalThis.document.body.append(anchor);
   anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-/** Ask the user for a `.nexusblocks.json` file; `null` when cancelled. */
-export function pickDocument(): Promise<OpenResult | null> {
+/**
+ * Ask for a `.nexusblocks.json` file; `null` when cancelled.
+ * `accept` is a file-input attribute; native dialogs filter by extension.
+ */
+export function pickDocument(accept = ".json,application/json"): Promise<OpenResult | null> {
   return new Promise((resolve) => {
     const input = globalThis.document.createElement("input");
     input.type = "file";
-    input.accept = ".json,application/json";
+    input.accept = accept;
+    input.style.display = "none";
+    globalThis.document.body.append(input);
+    const done = (result: OpenResult | null): void => {
+      input.remove();
+      resolve(result);
+    };
     input.addEventListener("change", () => {
       const file = input.files?.[0];
       if (!file) {
-        resolve(null);
+        done(null);
         return;
       }
       file
         .text()
         .then((text) => {
           const parsed = parseDocument(text);
-          resolve(parsed.ok ? { ok: true, document: parsed.document, warnings: parsed.warnings } : parsed);
+          done(parsed.ok ? { ok: true, document: parsed.document, warnings: parsed.warnings } : parsed);
         })
         .catch((error: unknown) => {
-          resolve({ ok: false, error: error instanceof Error ? error.message : String(error) });
+          done({ ok: false, error: error instanceof Error ? error.message : String(error) });
         });
     });
+    // A cancelled picker fires no event in most browsers; drop the node when
+    // the window regains focus so it cannot pile up.
+    globalThis.addEventListener("focus", () => setTimeout(() => input.remove(), 1000), { once: true });
     input.click();
   });
+}
+
+/** Read a document from raw text, used by the desktop file dialog. */
+export function readDocument(text: string): OpenResult {
+  const parsed = parseDocument(text);
+  return parsed.ok ? { ok: true, document: parsed.document, warnings: parsed.warnings } : parsed;
 }

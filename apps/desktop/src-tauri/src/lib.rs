@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 
 /// Mirrors `MAX_FILE_CHARS` in `@nexus/engine`.
 const MAX_FILE_CHARS: usize = 1_000_000;
@@ -162,10 +163,102 @@ fn capability_invoke(app: tauri::AppHandle, request: HostRequest) -> Value {
     }
 }
 
+/// Extension used for project files written by the desktop shell.
+const PROJECT_EXTENSION: &str = "nexusblocks.json";
+
+/// Strip path separators and control characters so a project name cannot
+/// escape the directory the user picks.
+fn file_stem(raw: &str) -> String {
+    let cleaned: String = raw
+        .trim()
+        .chars()
+        .map(|ch| match ch {
+            '/' | '\\' | ':' => '-',
+            ch if ch.is_control() => '-',
+            ch => ch,
+        })
+        .collect();
+    let trimmed = cleaned.trim_matches(['.', ' ']).to_string();
+    if trimmed.is_empty() {
+        "nexus-blocks".to_string()
+    } else {
+        trimmed
+    }
+}
+
+fn write_text(path: &Path, text: &str) -> Result<(), &'static str> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).map_err(|error| map_io(&error))?;
+        }
+    }
+    fs::write(path, text).map_err(|error| map_io(&error))
+}
+
+/// Ask for a destination and write the serialized document there.
+///
+/// Returns `Ok(None)` when the user cancels the native dialog. The WebView
+/// cannot open a system save dialog, and WebKitGTK ignores `<a download>`, so
+/// this is the only way "save" can actually produce a file.
+#[tauri::command]
+async fn project_save(app: tauri::AppHandle, content: String, suggested_name: String) -> Value {
+    if content.chars().count() > MAX_FILE_CHARS {
+        return fail("runtime.error.fileTooLarge");
+    }
+    let name = format!("{}.{}", file_stem(&suggested_name), PROJECT_EXTENSION);
+    let picked = app
+        .dialog()
+        .file()
+        .set_file_name(name)
+        .add_filter("Nexus Blocks project", &["json"])
+        .blocking_save_file();
+    let Some(picked) = picked else {
+        return ok(Value::Null);
+    };
+    let path = match picked.into_path() {
+        Ok(path) => path,
+        Err(_) => return fail("runtime.error.filePath"),
+    };
+    match write_text(&path, &content) {
+        Ok(()) => ok(json!({ "path": path.to_string_lossy() })),
+        Err(key) => fail(key),
+    }
+}
+
+/// Ask for a project file and return its text; `None` when cancelled.
+#[tauri::command]
+async fn project_open(app: tauri::AppHandle) -> Value {
+    let picked = app
+        .dialog()
+        .file()
+        .add_filter("Nexus Blocks project", &["json"])
+        .blocking_pick_file();
+    let Some(picked) = picked else {
+        return ok(Value::Null);
+    };
+    let path = match picked.into_path() {
+        Ok(path) => path,
+        Err(_) => return fail("runtime.error.filePath"),
+    };
+    match fs::read_to_string(&path) {
+        Ok(text) if text.chars().count() > MAX_FILE_CHARS => fail("runtime.error.fileTooLarge"),
+        Ok(text) => ok(json!({ "path": path.to_string_lossy(), "content": text })),
+        Err(error) => fail(map_io(&error)),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![capability_invoke])
+        // Native file dialogs for project save/open: a WebView cannot show a
+        // system file picker, and `<a download>` is ignored by WebKitGTK, so
+        // "save" would silently do nothing without this plugin.
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            capability_invoke,
+            project_save,
+            project_open
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -192,6 +285,24 @@ mod tests {
             resolve_path("projects/demo.txt", &home()),
             Ok(PathBuf::from("/home/tester/projects/demo.txt"))
         );
+    }
+
+    #[test]
+    fn sanitizes_project_names_into_file_stems() {
+        assert_eq!(file_stem("  My project  "), "My project");
+        assert_eq!(file_stem("a/b:c"), "a-b-c");
+        assert_eq!(file_stem("..."), "nexus-blocks");
+        assert_eq!(file_stem(""), "nexus-blocks");
+        assert_eq!(file_stem("..hidden"), "hidden");
+    }
+
+    #[test]
+    fn writes_the_project_file_into_a_missing_directory() {
+        let dir = std::env::temp_dir().join(format!("nexus-save-{}", std::process::id()));
+        let file = dir.join("nested").join("demo.nexusblocks.json");
+        assert_eq!(write_text(&file, "{}"), Ok(()));
+        assert_eq!(fs::read_to_string(&file).unwrap(), "{}");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

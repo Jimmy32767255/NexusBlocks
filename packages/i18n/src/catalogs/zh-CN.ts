@@ -160,6 +160,9 @@ export const zhCN: Catalog = {
   "common.false": "假",
 
   "toast.saved": "项目已下载",
+  "toast.savedTo": "已保存到 {path}",
+  "toast.saveFailed": "保存项目失败：{detail}",
+  "toast.openFailed": "打开项目失败：{detail}",
   "toast.opened": "项目已打开",
   "toast.invalidFile": "无法读取该文件：{detail}",
   "toast.newProject": "已新建项目",
