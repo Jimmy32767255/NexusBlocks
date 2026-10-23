@@ -186,6 +186,16 @@ fn file_stem(raw: &str) -> String {
     }
 }
 
+/// Append the project extension unless the suggestion already carries it.
+fn file_name(raw: &str) -> String {
+    let stem = file_stem(raw);
+    if stem.ends_with(PROJECT_EXTENSION) {
+        stem
+    } else {
+        format!("{stem}.{PROJECT_EXTENSION}")
+    }
+}
+
 fn write_text(path: &Path, text: &str) -> Result<(), &'static str> {
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
@@ -205,7 +215,7 @@ async fn project_save(app: tauri::AppHandle, content: String, suggested_name: St
     if content.chars().count() > MAX_FILE_CHARS {
         return fail("runtime.error.fileTooLarge");
     }
-    let name = format!("{}.{}", file_stem(&suggested_name), PROJECT_EXTENSION);
+    let name = file_name(&suggested_name);
     let picked = app
         .dialog()
         .file()
@@ -294,6 +304,11 @@ mod tests {
         assert_eq!(file_stem("..."), "nexus-blocks");
         assert_eq!(file_stem(""), "nexus-blocks");
         assert_eq!(file_stem("..hidden"), "hidden");
+        assert_eq!(file_name("demo"), "demo.nexusblocks.json");
+        assert_eq!(
+            file_name("demo.nexusblocks.json"),
+            "demo.nexusblocks.json"
+        );
     }
 
     #[test]
