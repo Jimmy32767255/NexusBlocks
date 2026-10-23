@@ -736,7 +736,9 @@ host.addEventListener("pointerdown", (event) => {
   if (target.closest("input, select, textarea")) return;
 
   const blockEl = target.closest<HTMLElement>(".block");
-  if (blockEl?.dataset.blockId && event.button === 0) {
+  // Blocks are only picked up by their head; blank mouth/foot space pans like canvas.
+  const onHead = target.closest(".block__head") !== null;
+  if (blockEl?.dataset.blockId && onHead && event.button === 0) {
     const node = findBlock(store.state.document.project, blockEl.dataset.blockId);
     // Hats are ordered by the document array; they cannot be repositioned.
     if (node && registry.get(node.type)?.kind === "hat") {
@@ -782,7 +784,7 @@ host.addEventListener("click", (event) => {
   if (!(target instanceof Element)) return;
   if (target.closest(".toolbox, .topbar, .side, .modal, .toasts")) return;
   const blockEl = target.closest<HTMLElement>(".block");
-  if (blockEl?.dataset.blockId) {
+  if (blockEl?.dataset.blockId && target.closest(".block__head")) {
     store.select(blockEl.dataset.blockId);
     return;
   }
