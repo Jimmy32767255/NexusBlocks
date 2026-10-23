@@ -7,7 +7,7 @@
 ```json
 {
   "format": "nexus-blocks/document",
-  "version": 1,
+  "version": 2,
   "project": {
     "format": "nexus-blocks/ir",
     "version": 1,
@@ -36,18 +36,14 @@
       }
     ],
     "metadata": {}
-  },
-  "editor": {
-    "positions": { "start_x9": { "x": 80, "y": 96 } },
-    "viewport": { "x": 0, "y": 0, "zoom": 1 }
   }
 }
 ```
 
 要点：
 
-- `project` 只描述语义（含变量、函数、脚本），`editor` 只描述画布状态（位置、视口）。运行时永远不读 `editor`。
-- `scripts` 是**顶层 hat 块数组**，不是嵌套数组；脚本体在 hat 的 `inputs.body` 里。
+- 文档只描述语义（变量、函数、脚本），**不存任何画布坐标**：编辑器按 `scripts` 数组顺序左对齐、从上到下自动排版，平移/缩放是临时视图状态。
+- `scripts` 是**顶层 hat 块数组**，不是嵌套数组；脚本体在 hat 的 `inputs.body` 里。数组顺序就是画布上的显示顺序。
 - 属性（下拉选项、数字、文本）放在 `fields`；插槽（栈端口、值端口）放在 `inputs`。值端口未插块时，用同名的 `fields[port]` 存内联字面量。
 - 未知字段会被序列化保留（`metadata`），未知块类型在校验时报错而不是静默丢弃。
 
@@ -66,8 +62,8 @@
 
 ## 序列化
 
-- `serializeDocument(doc)`：2 空格缩进、键排序、末尾换行、`viewport` 必有值。
-- `parseDocument(input)`：接受字符串或对象，返回 `{ ok: true, document, warnings }` 或 `{ ok: false, error }`；缺省字段按 schema 补默认值，`warnings` 记录被修正的内容。
+- `serializeDocument(doc)`：2 空格缩进、键排序、末尾换行；只写 `format/version/project`，没有布局字段。
+- `parseDocument(input)`：接受字符串或对象，返回 `{ ok: true, document, warnings }` 或 `{ ok: false, error }`；缺省字段按 schema 补默认值，`warnings` 记录被修正的内容。版本 1 文档里的 `editor` 布局会被丢弃并给出一条 warning，其余内容照常加载。
 - `serializeProject` 供只需要语言部分的场景（CLI、测试）使用。
 
 ## 校验
@@ -97,6 +93,6 @@ interface Diagnostic {
 
 ## 版本策略
 
-- 文档 `version: 1`、项目 `version: 1`，读取更高版本会拒绝。
+- 文档 `version: 2`（v1 的 `editor` 布局在读入时丢弃）、项目 `version: 1`，读取更高版本会拒绝。
 - 新字段一律可选，缺省补默认值；删除字段前先在 `parseDocument` 里迁移。
 - `metadata` 是扩展位，扩展方自担命名空间（例如 `metadata["com.example.plugin"]`）。
