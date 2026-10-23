@@ -20,7 +20,7 @@ Working today:
 - 26 built-in blocks across control/IO/logic/math/text/variables, plus waiting, lists and dictionaries, and function definitions/parameters. Every function definition also yields a dynamic call block.
 - An interpreter with a step limit, cancellation, event stream (logs, output, status, errors), and variable scopes.
 - English and Chinese UI, runtime messages, and program output in the project locale.
-- `pnpm test` covers IR, i18n, engine, and editor logic (60 cases).
+- `pnpm test` covers IR, i18n, engine, and editor logic (61 cases).
 
 Not built yet (interfaces reserved): the desktop shell (Tauri), file/network/process capabilities, advanced list/dict operations such as iteration and removal, and code export.
 
