@@ -1,3 +1,4 @@
+import { BreakSignal } from "../errors.ts";
 import type { BlockDefinition } from "../types.ts";
 
 /** Category colours are shared by the toolbox and the canvas. */
@@ -10,6 +11,7 @@ export const CATEGORY_COLORS = {
   variables: "#e88432",
   data: "#2aa6a6",
   functions: "#9b6bff",
+  files: "#6a8caf",
 } as const;
 
 const CONTROL = CATEGORY_COLORS.control;
@@ -70,8 +72,27 @@ export const controlBlocks: BlockDefinition[] = [
       const times = Math.max(0, Math.floor(Number(raw) || 0));
       for (let index = 0; index < times; index += 1) {
         await ctx.tick();
-        await ctx.run(ctx.stack(node, "body"));
+        try {
+          await ctx.run(ctx.stack(node, "body"));
+        } catch (error) {
+          if (error instanceof BreakSignal) break;
+          throw error;
+        }
       }
+    },
+  },
+  {
+    type: "control.break",
+    kind: "statement",
+    category: "control",
+    label: "block.control.break.label",
+    description: "block.control.break.description",
+    output: "void",
+    color: CONTROL,
+    fields: [],
+    ports: [],
+    execute() {
+      throw new BreakSignal();
     },
   },
   {

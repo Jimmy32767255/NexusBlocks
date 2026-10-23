@@ -1,7 +1,7 @@
 import { validateProject, type Project } from "@nexus/ir";
 import { CapabilityUnavailableError, createLocalHost } from "./host.ts";
 import { Interpreter } from "./interpreter.ts";
-import { RuntimeFailure, StopSignal } from "./errors.ts";
+import { BreakSignal, RuntimeFailure, StopSignal } from "./errors.ts";
 import { createProjectRegistry } from "./registry.ts";
 import type { RunOptions, RunResult, RuntimeEvent } from "./types.ts";
 
@@ -52,7 +52,7 @@ export async function runProject(project: Project, options: RunOptions = {}): Pr
     else options.signal.addEventListener("abort", () => controller.abort(), { once: true });
   }
 
-  const host = options.host ?? createLocalHost(emit);
+  const host = options.host ?? createLocalHost(emit, options.storage);
   const interpreter = new Interpreter(project, registry, {
     host,
     emit,
@@ -69,6 +69,21 @@ export async function runProject(project: Project, options: RunOptions = {}): Pr
     if (error instanceof StopSignal) {
       emit({ kind: "status", status: "stopped", durationMs });
       return { status: "stopped", durationMs, steps: interpreter.stepCount };
+    }
+    if (error instanceof BreakSignal) {
+      emit({
+        kind: "error",
+        messageKey: "runtime.error.breakOutsideLoop",
+        params: {},
+        time: Date.now(),
+      });
+      emit({ kind: "status", status: "error", durationMs });
+      return {
+        status: "error",
+        durationMs,
+        steps: interpreter.stepCount,
+        error: { messageKey: "runtime.error.breakOutsideLoop", params: {} },
+      };
     }
     if (error instanceof RuntimeFailure) {
       const blockId = error.blockId;

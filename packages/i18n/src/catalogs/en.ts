@@ -116,6 +116,11 @@ export const en: Catalog = {
   "runtime.error.badNumber": "Cannot convert “{value}” to a number",
   "runtime.error.badJson": "“{value}” is not valid JSON in the expected shape",
   "runtime.error.badIndex": "Index {index} is outside the list (length {length})",
+  "runtime.error.filePath": "Invalid file path: {path}",
+  "runtime.error.fileNotFound": "File not found: {path}",
+  "runtime.error.fileTooLarge": "File is larger than {limit} characters",
+  "runtime.error.fileStorage": "Could not save the workspace files",
+  "runtime.error.breakOutsideLoop": "“break” can only be used inside a loop",
   "runtime.error.paramScope": "Parameter “{name}” is not available outside its function",
   "runtime.error.unknownFunction": "Function not found: {name}",
   "runtime.error.callDepth": "Too many nested calls (limit {limit})",
@@ -128,6 +133,11 @@ export const en: Catalog = {
   "runtime.error.internal": "Internal error: {detail}",
 
   "capability.console.print": "Write a line to the output console",
+  "capability.fs.read": "Read a text file from the workspace",
+  "capability.fs.write": "Create or overwrite a workspace text file",
+  "capability.fs.exists": "Check whether a workspace file exists",
+  "capability.fs.delete": "Remove a workspace file",
+  "capability.fs.list": "List workspace file names",
 
   "common.cancel": "Cancel",
   "common.confirm": "Confirm",
@@ -171,6 +181,7 @@ export const en: Catalog = {
   "category.variables": "Variables",
   "category.data": "Lists & dictionaries",
   "category.functions": "Functions",
+  "category.files": "Files",
 
   "block.control.start.label": "when program starts",
   "block.control.start.description": "Entry point. Everything under this block runs once when you press Run.",
@@ -223,6 +234,9 @@ export const en: Catalog = {
   "block.control.wait.label": "wait",
   "block.control.wait.description": "Pause for the given number of seconds. Stopping the program interrupts the wait.",
   "block.control.wait.port.seconds": "seconds",
+  "block.control.break.label": "break",
+  "block.control.break.description": "Leave the innermost loop immediately.",
+
 
   "block.var.set.label": "set variable",
   "block.var.set.description": "Store a value in a variable.",
@@ -284,4 +298,20 @@ export const en: Catalog = {
   "block.func.return.label": "return",
   "block.func.return.description": "Leave the function immediately, with an optional result.",
   "block.func.return.port.value": "value",
+  "block.file.read.label": "read file",
+  "block.file.read.description": "Read a text file from the workspace (up to 1 MB).",
+  "block.file.read.port.path": "path",
+  "block.file.write.label": "write file",
+  "block.file.write.description": "Create or overwrite a workspace text file.",
+  "block.file.write.port.path": "path",
+  "block.file.write.port.content": "content",
+  "block.file.exists.label": "file exists?",
+  "block.file.exists.description": "Check whether a workspace file exists.",
+  "block.file.exists.port.path": "path",
+  "block.file.delete.label": "delete file",
+  "block.file.delete.description": "Remove a file from the workspace.",
+  "block.file.delete.port.path": "path",
+  "block.file.list.label": "list files",
+  "block.file.list.description": "Return the names of all files in the workspace.",
+
 };

@@ -472,3 +472,31 @@ test("runaway recursion reports the call depth limit", async () => {
   assert.equal(result.status, "error");
   assert.equal(result.error?.messageKey, "runtime.error.callDepth");
 });
+
+test("break leaves the innermost loop", async () => {
+  const project = projectWith(
+    start([
+      createBlock("control.repeat", {
+        inputs: {
+          times: createBlock("math.number", { fields: { value: 10 } }),
+          body: [
+            createBlock("io.print", { fields: { text: "once" } }),
+            createBlock("control.break"),
+          ],
+        },
+      }),
+      createBlock("io.print", { fields: { text: "after" } }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["once", "after"]);
+});
+
+test("break outside a loop is a runtime error", async () => {
+  const project = projectWith(start([createBlock("control.break")]));
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.breakOutsideLoop");
+});

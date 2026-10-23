@@ -113,6 +113,11 @@ export const zhCN: Catalog = {
   "runtime.error.badNumber": "无法把“{value}”转换成数字",
   "runtime.error.badJson": "“{value}”不是符合要求的 JSON",
   "runtime.error.badIndex": "下标 {index} 超出列表范围（长度 {length}）",
+  "runtime.error.filePath": "文件路径无效：{path}",
+  "runtime.error.fileNotFound": "找不到文件：{path}",
+  "runtime.error.fileTooLarge": "文件超过 {limit} 个字符",
+  "runtime.error.fileStorage": "无法保存工作区文件",
+  "runtime.error.breakOutsideLoop": "「跳出循环」只能用在循环里",
   "runtime.error.paramScope": "参数“{name}”只能在其函数内部使用",
   "runtime.error.unknownFunction": "找不到函数：{name}",
   "runtime.error.callDepth": "嵌套调用太深（上限 {limit}）",
@@ -125,6 +130,11 @@ export const zhCN: Catalog = {
   "runtime.error.internal": "内部错误：{detail}",
 
   "capability.console.print": "向输出控制台写入一行文字",
+  "capability.fs.read": "读取工作区里的文本文件",
+  "capability.fs.write": "创建或覆盖工作区文本文件",
+  "capability.fs.exists": "判断工作区文件是否存在",
+  "capability.fs.delete": "删除工作区文件",
+  "capability.fs.list": "列出工作区文件名",
 
   "common.cancel": "取消",
   "common.confirm": "确定",
@@ -168,6 +178,7 @@ export const zhCN: Catalog = {
   "category.variables": "变量",
   "category.data": "列表与字典",
   "category.functions": "函数",
+  "category.files": "文件",
 
   "block.control.start.label": "当程序启动时",
   "block.control.start.description": "程序的入口。按下“运行”后，这块积木下面的内容会执行一次。",
@@ -220,6 +231,9 @@ export const zhCN: Catalog = {
   "block.control.wait.label": "等待",
   "block.control.wait.description": "暂停指定的秒数。停止程序会立即中断等待。",
   "block.control.wait.port.seconds": "秒",
+  "block.control.break.label": "跳出循环",
+  "block.control.break.description": "立即结束当前所在的循环。",
+
 
   "block.var.set.label": "设置变量",
   "block.var.set.description": "把一个值存进变量。",
@@ -281,4 +295,20 @@ export const zhCN: Catalog = {
   "block.func.return.label": "返回",
   "block.func.return.description": "立即结束函数，并可选地带回结果。",
   "block.func.return.port.value": "值",
+  "block.file.read.label": "读取文件",
+  "block.file.read.description": "读取工作区里的文本文件（最大 1 MB）。",
+  "block.file.read.port.path": "路径",
+  "block.file.write.label": "写入文件",
+  "block.file.write.description": "创建或覆盖工作区里的文本文件。",
+  "block.file.write.port.path": "路径",
+  "block.file.write.port.content": "内容",
+  "block.file.exists.label": "文件存在？",
+  "block.file.exists.description": "判断工作区里是否有这个文件。",
+  "block.file.exists.port.path": "路径",
+  "block.file.delete.label": "删除文件",
+  "block.file.delete.description": "从工作区删除一个文件。",
+  "block.file.delete.port.path": "路径",
+  "block.file.list.label": "列出文件",
+  "block.file.list.description": "返回工作区里的所有文件名。",
+
 };

@@ -24,3 +24,11 @@ export class StopSignal extends Error {
     this.name = "StopSignal";
   }
 }
+
+/** Internal control-flow signal: leaves the innermost loop. */
+export class BreakSignal extends Error {
+  constructor() {
+    super("break");
+    this.name = "BreakSignal";
+  }
+}
