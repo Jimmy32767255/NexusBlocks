@@ -20,7 +20,7 @@ Nexus Blocks 是一个**可扩展的图形化编程环境**：用积木搭程序
 - 12 种基础积木：`control.start` / `control.if` / `control.repeat` / `io.print` / `logic.boolean` / `logic.compare` / `math.number` / `math.arithmetic` / `text.literal` / `text.join` / `var.set` / `var.get`。
 - 解释器：步数上限、可中止、事件流（日志/输出/状态/错误）、变量作用域。
 - 中英文界面与消息，运行输出也按项目语言显示。
-- `pnpm test` 覆盖 IR、i18n、engine 与编辑器核心逻辑（40 个用例）。
+- `pnpm test` 覆盖 IR、i18n、engine 与编辑器核心逻辑（46 个用例）。
 
 尚未实现（已为它们预留接口）：桌面壳（Tauri）、文件/网络/进程等系统能力、函数块、列表与集合类型、代码导出。
 
