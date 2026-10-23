@@ -46,6 +46,11 @@ interface BlockDefinition extends BlockSchema {
 | `func.param` | 函数 | 读取当前函数的一个参数 | 属性 `name` |
 | `func.return` | 函数 | 立即返回，可带结果 | `value` 值 |
 | `func.call:<函数块 id>` | 函数 | 动态生成的调用块（无返回值时为语句，否则为表达式） | 每个参数一个值端口 |
+| `file.read` | 文件 | 读取工作区文本文件 | `path` |
+| `file.write` | 文件 | 写入（覆盖）工作区文件 | `path`、`content` |
+| `file.exists` | 文件 | 文件是否存在 | `path` |
+| `file.delete` | 文件 | 删除文件 | `path` |
+| `file.list` | 文件 | 列出工作区文件名（列表） | — |
 
 类别颜色在 `packages/engine/src/blocks/control.ts` 的 `CATEGORY_COLORS` 中定义（其他积木文件从这里导入）；工具箱顺序由 `packages/engine/src/registry.ts` 的 `CATEGORY_ORDER` 决定。
 
@@ -123,3 +128,17 @@ registry.grouped();         // 按类别分组，供工具箱
 ## 快照与不可变性
 
 注册表在构造后视为不可变；积木定义里的数组（`fields`、`ports`）不应被运行时修改。文档树本身是可变的（编辑器就地修改以节省内存），但引擎在运行期间只读。
+
+## 跳出循环
+
+`control.break` 抛出内部 `BreakSignal`，只由循环积木捕获（目前是 `control.repeat`）。如果在循环外执行，整次运行以 `runtime.error.breakOutsideLoop` 报错。`func.return` 用同一套控制流信号，两者都会安全穿过 `control.if` 等普通语句。
+
+## 文件操作
+
+文件积木不直接碰磁盘，而是调用宿主能力 `fs.read` / `fs.write` / `fs.exists` / `fs.delete` / `fs.list`：
+
+- **浏览器/编辑器**：宿主把文件存在 `localStorage` 的 `nexus-blocks:workspace-files` 里（注入 `storage` 才启用这组能力），刷新页面后文件仍在；路径是工作区内的扁平名字。
+- **路径规则**：统一用 `/`，禁止绝对路径、空段、`.`、`..` 和控制字符（`normalizePath`），违规报 `runtime.error.filePath`；单个文件上限 100 万字符。
+- **桌面壳**：未来的 Tauri 宿主实现同名能力，把工作区映射到项目目录（并加权限面板）；语言层不用改。
+
+读取不存在的文件报 `runtime.error.fileNotFound`，删除同样。
