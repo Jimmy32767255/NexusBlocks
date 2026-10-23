@@ -28,7 +28,7 @@ import { confirmDialog, helpBody, openDialog, variableDialog } from "./dialogs.t
 import { el } from "./dom.ts";
 import { startBlockDrag, startToolboxDrag, type DragDeps } from "./drag.ts";
 import { autoSizeControl } from "./block-view.ts";
-import { createScriptWith, defaultScriptPosition, newBlockInstance, removeBlock, unplugPort } from "./edits.ts";
+import { createScriptWith, newBlockInstance, removeBlock, unplugPort } from "./edits.ts";
 import { currentLocale, hasKey, setUiLocale, t } from "./i18n.ts";
 import { icon } from "./icons.ts";
 import { renderInspector } from "./inspector.ts";
@@ -60,6 +60,8 @@ const editorHost = desktopHost ?? createLocalHost(handleEvent, window.localStora
 let controller: AbortController | null = null;
 let surface: HTMLElement | null = null;
 let frame: number | null = null;
+/** Pan offset of the automatic layout. Never stored in the document. */
+let viewport = { x: 0, y: 0 };
 let autosaveTimer: number | null = null;
 
 const STATUS_KEYS: Record<RunStatus, string> = {
@@ -108,6 +110,7 @@ function renderNow(): void {
     selectedId: state.selectedId,
     variables: document.project.variables,
     zoom: state.zoom,
+    viewport,
     interactive: !running,
   });
   surface = canvas.surface;
@@ -295,11 +298,9 @@ function placeBlockAtCenter(type: string): void {
     return;
   }
 
-  const point = centerPoint() ?? defaultScriptPosition(state.document.project.scripts.length);
   store.update((document) => {
     if (definition.kind === "hat") {
       document.project.scripts.push(node);
-      document.editor.positions[node.id] = point;
       return;
     }
     if (definition.kind === "expression") {
@@ -313,7 +314,7 @@ function placeBlockAtCenter(type: string): void {
     }
     const last = document.project.scripts[document.project.scripts.length - 1];
     if (!last) {
-      createScriptWith(document, node, point);
+      createScriptWith(document, node);
       return;
     }
     const inputs = (last.inputs ??= {});
@@ -402,6 +403,7 @@ async function newProject(): Promise<void> {
     createProject({ name: t("app.untitled"), locale: currentLocale() }),
   );
   store.replaceDocument(document);
+  viewport = { x: 0, y: 0 };
   saveAutosave(document);
   toast(t("toast.newProject"));
 }
@@ -418,6 +420,7 @@ async function openProject(): Promise<void> {
     return;
   }
   store.replaceDocument(result.document);
+  viewport = { x: 0, y: 0 };
   saveAutosave(result.document);
   toast(t("toast.opened"));
   if (result.warnings.length > 0) {
@@ -442,13 +445,9 @@ function renameProject(name: string): void {
 }
 
 function resetView(): void {
-  store.update(
-    (document) => {
-      document.editor.viewport = { x: 0, y: 0, zoom: 1 };
-    },
-    { history: false, dirty: false },
-  );
+  viewport = { x: 0, y: 0 };
   store.setZoom(1);
+  applyViewport();
 }
 
 function changeLocale(locale: string): void {
@@ -628,21 +627,13 @@ async function showDocs(): Promise<void> {
 
 /* --------------------------------------------------------------- view maths */
 
-function centerPoint(): { x: number; y: number } | null {
-  const canvasEl = host.querySelector<HTMLElement>(".canvas");
-  if (!canvasEl) return null;
-  const rect = canvasEl.getBoundingClientRect();
-  const viewport = store.state.document.editor.viewport;
-  const zoom = store.state.zoom || 1;
-  return {
-    x: Math.round((rect.width / 2 - viewport.x) / zoom - 60),
-    y: Math.round((rect.height / 2 - viewport.y) / zoom - 20),
-  };
+/** Content starts at the origin: panning left/up stops at 0,0. */
+function clampViewport(next: { x: number; y: number }): { x: number; y: number } {
+  return { x: Math.min(0, next.x), y: Math.min(0, next.y) };
 }
 
 function applyViewport(): void {
   if (!surface) return;
-  const viewport = store.state.document.editor.viewport;
   surface.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${store.state.zoom})`;
 }
 
@@ -673,12 +664,17 @@ host.addEventListener("pointerdown", (event) => {
 
   const blockEl = target.closest<HTMLElement>(".block");
   if (blockEl?.dataset.blockId && event.button === 0) {
+    const node = findBlock(store.state.document.project, blockEl.dataset.blockId);
+    // Hats are ordered by the document array; they cannot be repositioned.
+    if (node && registry.get(node.type)?.kind === "hat") {
+      store.select(blockEl.dataset.blockId);
+      return;
+    }
     startBlockDrag(event, blockEl.dataset.blockId, dragDeps());
     return;
   }
 
   if (target.closest(".canvas") && (event.button === 0 || event.button === 1)) {
-    const viewport = store.state.document.editor.viewport;
     pan = {
       startX: event.clientX,
       startY: event.clientY,
@@ -695,12 +691,7 @@ window.addEventListener("pointermove", (event) => {
   const dy = event.clientY - pan.startY;
   if (!pan.moved && Math.hypot(dx, dy) < 4) return;
   pan.moved = true;
-  const current = store.state.document;
-  current.editor.viewport = {
-    x: pan.viewportX + dx,
-    y: pan.viewportY + dy,
-    zoom: current.editor.viewport.zoom,
-  };
+  viewport = clampViewport({ x: pan.viewportX + dx, y: pan.viewportY + dy });
   applyViewport();
   document.body.classList.add("is-panning");
 });
@@ -769,7 +760,6 @@ host.addEventListener(
     if (!(target instanceof Element) || !target.closest(".canvas")) return;
     event.preventDefault();
     const state = store.state;
-    const document = state.document;
     if (event.ctrlKey || event.metaKey) {
       const canvasEl = target.closest<HTMLElement>(".canvas");
       if (!canvasEl) return;
@@ -777,19 +767,22 @@ host.addEventListener(
       const oldZoom = state.zoom;
       const next = Math.min(2, Math.max(0.4, oldZoom * Math.exp(-event.deltaY * 0.0015)));
       if (Math.abs(next - oldZoom) < 0.001) return;
-      const viewport = document.editor.viewport;
       const anchorX = event.clientX - rect.left;
       const anchorY = event.clientY - rect.top;
       const pointX = (anchorX - viewport.x) / oldZoom;
       const pointY = (anchorY - viewport.y) / oldZoom;
-      viewport.x = anchorX - pointX * next;
-      viewport.y = anchorY - pointY * next;
+      viewport = clampViewport({
+        x: anchorX - pointX * next,
+        y: anchorY - pointY * next,
+      });
       store.setZoom(next);
-    } else {
-      document.editor.viewport.x -= event.deltaX;
-      document.editor.viewport.y -= event.deltaY;
       applyViewport();
-      scheduleAutosave();
+    } else {
+      viewport = clampViewport({
+        x: viewport.x - event.deltaX,
+        y: viewport.y - event.deltaY,
+      });
+      applyViewport();
     }
   },
   { passive: false },

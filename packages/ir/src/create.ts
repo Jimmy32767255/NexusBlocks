@@ -40,7 +40,6 @@ export function createDocument(project: Project): NexusDocument {
     format: DOCUMENT_FORMAT,
     version: DOCUMENT_VERSION,
     project,
-    editor: { positions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
   };
 }
 

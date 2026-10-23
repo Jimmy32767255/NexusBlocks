@@ -32,10 +32,6 @@ function toOrderedDocument(document: NexusDocument): unknown {
     format: document.format,
     version: document.version,
     project: orderedProject(document.project),
-    editor: {
-      positions: sortRecord(document.editor.positions ?? {}),
-      viewport: document.editor.viewport,
-    },
   };
 }
 
@@ -141,22 +137,13 @@ export function parseDocument(input: string | unknown): ParseResult {
 
 function normalizeDocument(raw: Record<string, unknown>, warnings: string[]): NexusDocument {
   const projectRaw = raw.project as Record<string, unknown>;
-  const editorRaw = isRecord(raw.editor) ? raw.editor : {};
+  // Version 1 stored canvas positions and viewport; layout is automatic now.
+  if (isRecord(raw.editor)) warnings.push("Dropped legacy canvas layout");
   const project = normalizeProject(projectRaw, warnings);
-  const positions = isRecord(editorRaw.positions) ? editorRaw.positions : {};
-  const viewport = isRecord(editorRaw.viewport) ? editorRaw.viewport : {};
   return {
     format: DOCUMENT_FORMAT,
     version: DOCUMENT_VERSION,
     project,
-    editor: {
-      positions: positions as NexusDocument["editor"]["positions"],
-      viewport: {
-        x: numberOr(viewport.x, 0),
-        y: numberOr(viewport.y, 0),
-        zoom: numberOr(viewport.zoom, 1),
-      },
-    },
   };
 }
 
@@ -248,6 +235,3 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function numberOr(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}

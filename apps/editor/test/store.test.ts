@@ -37,7 +37,7 @@ describe("editor store", () => {
     store.markSaved();
     store.update(
       (document) => {
-        document.editor.viewport = { x: 10, y: 10, zoom: 1 };
+        document.project.metadata.view = "ignored";
       },
       { history: false, dirty: false },
     );
@@ -76,7 +76,6 @@ describe("editor store", () => {
         fields: {},
         inputs: { body: [] },
       });
-      document.editor.positions["start-1"] = { x: 0, y: 0 };
     });
     store.select("start-1");
     assert.equal(store.state.selectedId, "start-1");

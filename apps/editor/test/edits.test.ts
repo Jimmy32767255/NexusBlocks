@@ -123,24 +123,22 @@ describe("editor edits", () => {
     assert.deepEqual(findBlock(document.project, start.id)?.inputs?.body, []);
   });
 
-  it("removing a top-level hat drops its script and position", () => {
+  it("removing a top-level hat drops its script", () => {
     const document = starter();
     const start = document.project.scripts[0]!;
     assert.equal(removeBlock(document, start.id), true);
     assert.equal(document.project.scripts.length, 0);
-    assert.equal(document.editor.positions[start.id], undefined);
   });
 
   it("creates a new script around a dropped statement", () => {
     const document = createDocument(createProject());
     const print = instance("io.print", document);
-    createScriptWith(document, print, { x: 120, y: 70 });
+    createScriptWith(document, print);
 
     assert.equal(document.project.scripts.length, 1);
     const hat = document.project.scripts[0]!;
     assert.equal(hat.type, "control.start");
     assert.deepEqual(findBlock(document.project, hat.id)?.inputs?.body, [print]);
-    assert.deepEqual(document.editor.positions[hat.id], { x: 120, y: 70 });
   });
 
   it("appends a hat only when it is a start block", () => {

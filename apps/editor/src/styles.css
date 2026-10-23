@@ -471,6 +471,11 @@ button {
 .canvas__surface {
   position: absolute;
   inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 28px;
+  padding: 24px 64px 64px 16px;
   transform-origin: 0 0;
   will-change: transform;
 }
@@ -501,8 +506,8 @@ button {
 }
 
 .script {
-  position: absolute;
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: 2px;
 }

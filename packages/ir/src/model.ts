@@ -111,23 +111,15 @@ export interface Project {
   metadata: Record<string, unknown>;
 }
 
-/** Canvas-only state. Never consulted when a program runs. */
-export interface EditorLayout {
-  /** Top-left corner of each top-level (hat) block, in canvas coordinates. */
-  positions: Record<BlockId, { x: number; y: number }>;
-  viewport: { x: number; y: number; zoom: number };
-}
-
-/** The on-disk document: language plus presentation state. */
+/** The on-disk document: the program plus its format marker. */
 export interface NexusDocument {
   format: "nexus-blocks/document";
-  version: 1;
+  version: 2;
   project: Project;
-  editor: EditorLayout;
 }
 
 export const DOCUMENT_FORMAT = "nexus-blocks/document" as const;
-export const DOCUMENT_VERSION = 1;
+export const DOCUMENT_VERSION = 2;
 
 /** One block connected to a port, as declared by a block definition. */
 export type PortKind = "value" | "stack";

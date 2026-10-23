@@ -9,6 +9,7 @@ export interface CanvasOptions {
   selectedId: string | null;
   variables: readonly { id: string; name: string }[];
   zoom: number;
+  viewport: { x: number; y: number };
   interactive: boolean;
 }
 
@@ -17,13 +18,12 @@ export interface CanvasView {
   surface: HTMLElement;
 }
 
-/** Render all top-level scripts at their stored positions. */
+/** Render top-level scripts in document order, left aligned and stacked downwards. */
 export function renderCanvas(document: NexusDocument, options: CanvasOptions): CanvasView {
-  const viewport = document.editor.viewport;
   const surface = el("div", {
     class: "canvas__surface",
     style: {
-      transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${options.zoom})`,
+      transform: `translate(${options.viewport.x}px, ${options.viewport.y}px) scale(${options.zoom})`,
     },
   });
 
@@ -35,12 +35,7 @@ export function renderCanvas(document: NexusDocument, options: CanvasOptions): C
   };
 
   for (const hat of document.project.scripts) {
-    const position = document.editor.positions[hat.id] ?? { x: 64, y: 64 };
-    const wrapper = el("div", {
-      class: "script",
-      dataset: { script: hat.id },
-      style: { left: `${position.x}px`, top: `${position.y}px` },
-    });
+    const wrapper = el("div", { class: "script", dataset: { script: hat.id } });
     wrapper.append(renderBlock(hat, context));
     surface.append(wrapper);
   }

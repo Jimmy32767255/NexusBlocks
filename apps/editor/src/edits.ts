@@ -118,7 +118,6 @@ export function removeBlock(document: NexusDocument, id: string): boolean {
     }
   }
   if (removed) {
-    delete document.editor.positions[id];
     // Deleting a definition must not leave dangling calls behind.
     if (callType) removeCalls(project, callType);
   }
@@ -181,22 +180,13 @@ export function appendToScript(project: Project, node: BlockNode): boolean {
   return true;
 }
 
-export function defaultScriptPosition(index: number): { x: number; y: number } {
-  return { x: 72, y: 64 + index * 48 };
-}
-
 /**
  * Create a new top-level script headed by “when program starts”. When `node`
  * is given it becomes the first statement of the script body.
  */
-export function createScriptWith(
-  document: NexusDocument,
-  node: BlockNode | null,
-  point: { x: number; y: number },
-): BlockNode {
+export function createScriptWith(document: NexusDocument, node: BlockNode | null): BlockNode {
   const hat = createBlock("control.start");
   if (node) hat.inputs = { body: [node] };
   document.project.scripts.push(hat);
-  document.editor.positions[hat.id] = point;
   return hat;
 }

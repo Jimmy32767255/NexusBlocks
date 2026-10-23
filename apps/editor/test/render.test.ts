@@ -80,6 +80,7 @@ describe("editor rendering", () => {
       selectedId: null,
       variables: doc.project.variables,
       zoom: 1,
+      viewport: { x: 0, y: 0 },
       interactive: true,
     });
 
@@ -96,12 +97,32 @@ describe("editor rendering", () => {
     assert.equal(statement.querySelectorAll(":scope > .block__foot").length, 0);
   });
 
+  it("renders scripts in document order without stored coordinates", () => {
+    const doc = createDocument(createProject());
+    const hats = [0, 1, 2].map(() => createBlock("control.start", { inputs: { body: [] } }));
+    doc.project.scripts = hats;
+
+    const view = renderCanvas(doc, {
+      registry: defaultRegistry,
+      selectedId: null,
+      variables: [],
+      zoom: 1,
+      viewport: { x: 0, y: 0 },
+      interactive: true,
+    });
+
+    const wrappers = [...view.root.querySelectorAll<HTMLElement>(".script")];
+    assert.deepEqual(wrappers.map((wrapper) => wrapper.dataset.script), hats.map((hat) => hat.id));
+    for (const wrapper of wrappers) assert.equal(wrapper.getAttribute("style"), null);
+  });
+
   it("renders the empty canvas state", () => {
     const view = renderCanvas(createDocument(createProject()), {
       registry: defaultRegistry,
       selectedId: null,
       variables: [],
       zoom: 1,
+      viewport: { x: 0, y: 0 },
       interactive: true,
     });
     assert.ok(view.root.querySelector(".canvas__empty"));
@@ -177,6 +198,7 @@ describe("editor rendering", () => {
       selectedId: null,
       variables: document.project.variables,
       zoom: 1,
+      viewport: { x: 0, y: 0 },
       interactive: false,
     });
     assert.match(canvas.root.textContent ?? "", /twice/);

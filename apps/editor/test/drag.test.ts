@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { JSDOM } from "jsdom";
 import { createStarterDocument, defaultRegistry } from "@nexus/engine";
-import { findBlock } from "@nexus/ir";
+import { createBlock, findBlock } from "@nexus/ir";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
 Object.assign(globalThis, {
@@ -74,14 +74,38 @@ function drag(
 }
 
 describe("editor drag and drop", () => {
-  it("moves a hat to the drop point", () => {
+  it("moves a dropped hat to the end of the script order", () => {
     const { store, surface, deps } = setup();
-    const hatId = store.state.document.project.scripts[0]!.id;
+    const first = store.state.document.project.scripts[0]!;
+    const second = createBlock("control.start", { inputs: { body: [] } });
+    store.update((document) => {
+      document.project.scripts.push(second);
+    });
     pointAt(surface);
 
-    drag(startBlockDrag, hatId, deps, [[100, 150]]);
+    drag(startBlockDrag, first.id, deps, [[100, 150]]);
 
-    assert.deepEqual(store.state.document.editor.positions[hatId], { x: 100, y: 150 });
+    assert.deepEqual(
+      store.state.document.project.scripts.map((script) => script.id),
+      [second.id, first.id],
+    );
+    assert.equal(store.canUndo(), true);
+  });
+
+  it("appends a new script when a toolbox statement lands on the canvas", () => {
+    const { store, surface, deps } = setup();
+    const before = store.state.document.project.scripts.length;
+    pointAt(surface);
+
+    drag(startToolboxDrag, "io.print", deps, [[200, 200]]);
+
+    const scripts = store.state.document.project.scripts;
+    assert.equal(scripts.length, before + 1);
+    assert.equal(scripts.at(-1)?.type, "control.start");
+    const body = scripts.at(-1)?.inputs?.body;
+    assert.ok(Array.isArray(body));
+    assert.equal(body.length, 1);
+    assert.equal(body[0]!.type, "io.print");
     assert.equal(store.canUndo(), true);
   });
 
@@ -155,11 +179,9 @@ describe("editor drag and drop", () => {
     drag(startBlockDrag, hat.id, deps, [[40, 40]]);
 
     assert.equal(store.state.document.project.scripts.length, 0);
-    assert.equal(store.state.document.editor.positions[hat.id], undefined);
 
     store.undo();
     assert.equal(store.state.document.project.scripts.length, 1);
-    assert.ok(store.state.document.editor.positions[hat.id]);
   });
 
   it("cancels a toolbox drag dropped back on the toolbox", () => {

@@ -48,7 +48,7 @@ type DropTarget =
   | { type: "slot"; el: HTMLElement; parentId: string; port: string; index: number }
   | { type: "value"; el: HTMLElement; parentId: string; port: string; portType: ValueType }
   | { type: "block"; el: HTMLElement; blockId: string }
-  | { type: "canvas"; el: HTMLElement; point: { x: number; y: number } };
+  | { type: "canvas"; el: HTMLElement };
 
 interface Session {
   source: Source;
@@ -306,19 +306,7 @@ function hitTest(clientX: number, clientY: number, deps: DragDeps): DropTarget |
   }
 
   const canvas = element.closest<HTMLElement>(".canvas");
-  const surface = deps.surface();
-  if (canvas && surface) {
-    const rect = surface.getBoundingClientRect();
-    const zoom = deps.zoom() || 1;
-    return {
-      type: "canvas",
-      el: canvas,
-      point: {
-        x: Math.round((clientX - rect.left) / zoom),
-        y: Math.round((clientY - rect.top) / zoom),
-      },
-    };
-  }
+  if (canvas) return { type: "canvas", el: canvas };
 
   return null;
 }
@@ -338,7 +326,6 @@ function applyDrop(payload: Payload, target: DropTarget | null, deps: DragDeps):
         if (payload.kind === "hat") {
           document.project.scripts = document.project.scripts.filter((script) => !ids.has(script.id));
         }
-        for (const id of ids) delete document.editor.positions[id];
       },
       { history: false },
     );
@@ -352,7 +339,12 @@ function applyDrop(payload: Payload, target: DropTarget | null, deps: DragDeps):
     store.pushHistory(snapshot);
     store.update(
       (document) => {
-        document.editor.positions[node.id] = target.point;
+        // Scripts are ordered by the array; a hat dropped on the canvas moves
+        // to the end (toolbox hats are new and simply join the end).
+        document.project.scripts = document.project.scripts.filter(
+          (script) => script.id !== node.id,
+        );
+        document.project.scripts.push(node);
       },
       { history: false },
     );
@@ -397,7 +389,7 @@ function applyDrop(payload: Payload, target: DropTarget | null, deps: DragDeps):
     store.pushHistory(snapshot);
     store.update(
       (document) => {
-        createScriptWith(document, node, target.point);
+        createScriptWith(document, node);
       },
       { history: false },
     );
