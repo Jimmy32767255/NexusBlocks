@@ -240,6 +240,8 @@ export const zhCN: Catalog = {
   "block.text.contains.description": "判断第一段文本是否包含第二段文本。",
   "block.text.contains.port.text": "文本",
   "block.text.contains.port.needle": "查找",
+  "block.time.getOsTime.label": "获取操作系统时间",
+  "block.time.getOsTime.description": "当前的本地日期时间，格式为 YYYY-MM-DD HH:mm:ss。",
 
   "block.math.number.label": "数字",
   "block.math.number.description": "一个数字字面量。",

@@ -884,3 +884,22 @@ test("text.splitAt rejects empty separators and missing pieces", async () => {
   assert.equal(second.error?.messageKey, "runtime.error.splitIndex");
   assert.deepEqual(second.error?.params, { index: 9, length: 2 });
 });
+
+test("time.get_os_time reports a formatted local timestamp", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("text.join", {
+            fields: { count: 2 },
+            inputs: { a: createBlock("time.get_os_time"), b: createBlock("text.literal", { fields: { value: "" } }) },
+          }),
+        },
+      }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.match(loggedTexts(events)[0] ?? "", /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+});

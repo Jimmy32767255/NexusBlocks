@@ -243,6 +243,8 @@ export const en: Catalog = {
   "block.text.contains.description": "Report whether the first text contains the second one.",
   "block.text.contains.port.text": "text",
   "block.text.contains.port.needle": "search",
+  "block.time.getOsTime.label": "operating system time",
+  "block.time.getOsTime.description": "Current local date and time formatted as YYYY-MM-DD HH:mm:ss.",
 
   "block.math.number.label": "number",
   "block.math.number.description": "A number literal.",
