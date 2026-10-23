@@ -7,6 +7,7 @@ import {
   createScriptWith,
   insertIntoStack,
   locateBlock,
+  moveScript,
   newBlockInstance,
   plugIntoPort,
   removeBlock,
@@ -128,6 +129,23 @@ describe("editor edits", () => {
     const start = document.project.scripts[0]!;
     assert.equal(removeBlock(document, start.id), true);
     assert.equal(document.project.scripts.length, 0);
+  });
+
+  it("moves top-level scripts up and down, refusing to cross the edges", () => {
+    const doc = starter();
+    const first = doc.project.scripts[0]!;
+    const second = createBlock("control.start", { inputs: { body: [] } });
+    const third = createBlock("control.start", { inputs: { body: [] } });
+    doc.project.scripts.push(second, third);
+
+    assert.equal(moveScript(doc.project, second.id, -1), true);
+    assert.deepEqual(doc.project.scripts.map((node) => node.id), [second.id, first.id, third.id]);
+
+    assert.equal(moveScript(doc.project, second.id, -1), false);
+    assert.equal(moveScript(doc.project, third.id, 1), false);
+    assert.equal(moveScript(doc.project, third.id, -1), true);
+    assert.deepEqual(doc.project.scripts.map((node) => node.id), [second.id, third.id, first.id]);
+    assert.equal(moveScript(doc.project, "missing", 1), false);
   });
 
   it("creates a new script around a dropped statement", () => {

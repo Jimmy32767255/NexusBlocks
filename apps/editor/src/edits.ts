@@ -168,6 +168,19 @@ function removeFromInputs(node: BlockNode, id: string): boolean {
   return false;
 }
 
+/** Move a top-level script one slot up or down; false when it is already at the edge. */
+export function moveScript(project: Project, id: string, delta: -1 | 1): boolean {
+  const scripts = project.scripts;
+  const index = scripts.findIndex((node) => node.id === id);
+  if (index < 0) return false;
+  const target = index + delta;
+  if (target < 0 || target >= scripts.length) return false;
+  const [node] = scripts.splice(index, 1);
+  if (!node) return false;
+  scripts.splice(target, 0, node);
+  return true;
+}
+
 /** Append a statement to the last script's body (toolbox click shortcut). */
 export function appendToScript(project: Project, node: BlockNode): boolean {
   const script = project.scripts[project.scripts.length - 1];

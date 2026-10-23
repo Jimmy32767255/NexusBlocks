@@ -21,6 +21,10 @@ const PATHS = {
   warning: '<path d="M12 4 3 20h18z"/><path d="M12 10v4M12 17h.01"/>',
   book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M6 3v18"/>',
   refresh: '<path d="M20 11a8 8 0 1 0-2.4 6"/><path d="M20 4v7h-7"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
+  chevronRight: '<path d="m9 6 6 6-6 6"/>',
+  arrowUp: '<path d="M12 20V4M5 11l7-7 7 7"/>',
+  arrowDown: '<path d="M12 4v16M5 13l7 7 7-7"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;

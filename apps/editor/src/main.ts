@@ -29,7 +29,13 @@ import { confirmDialog, helpBody, openDialog, variableDialog } from "./dialogs.t
 import { el } from "./dom.ts";
 import { startBlockDrag, startToolboxDrag, type DragDeps } from "./drag.ts";
 import { autoSizeControl } from "./block-view.ts";
-import { createScriptWith, newBlockInstance, removeBlock, unplugPort } from "./edits.ts";
+import {
+  createScriptWith,
+  moveScript,
+  newBlockInstance,
+  removeBlock,
+  unplugPort,
+} from "./edits.ts";
 import { currentLocale, hasKey, setUiLocale, t } from "./i18n.ts";
 import { icon } from "./icons.ts";
 import { renderInspector } from "./inspector.ts";
@@ -157,6 +163,9 @@ function renderNow(): void {
   ]);
 
   const selected = state.selectedId ? findBlock(document.project, state.selectedId) : null;
+  const scriptIndex = selected
+    ? document.project.scripts.findIndex((script) => script.id === selected.id)
+    : -1;
 
   const side = el("aside", { class: "side" }, [
     renderInspector({
@@ -167,6 +176,11 @@ function renderNow(): void {
       onLiteralChange: setBlockValue,
       onUnplug: (blockId, port) => unplug(blockId, port),
       onDelete: (blockId) => deleteBlock(blockId),
+      scriptPosition:
+        selected && scriptIndex >= 0
+          ? { index: scriptIndex, total: document.project.scripts.length }
+          : null,
+      onMoveScript: (delta) => moveSelectedScript(delta),
     }),
     renderVariables({
       variables: document.project.variables,
@@ -516,6 +530,18 @@ function deleteBlock(blockId: string): void {
   });
   store.select(null);
   toast(t("toast.deleted"));
+}
+
+function moveSelectedScript(delta: -1 | 1): void {
+  const id = store.state.selectedId;
+  if (!id) return;
+  const scripts = store.state.document.project.scripts;
+  const index = scripts.findIndex((script) => script.id === id);
+  const target = index + delta;
+  if (index < 0 || target < 0 || target >= scripts.length) return;
+  store.update((document) => {
+    moveScript(document.project, id, delta);
+  });
 }
 
 function unplug(blockId: string, port: string): void {

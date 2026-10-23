@@ -12,6 +12,9 @@ export interface InspectorOptions {
   onLiteralChange: (blockId: string, port: string, value: string | number | boolean) => void;
   onUnplug: (blockId: string, port: string) => void;
   onDelete: (blockId: string) => void;
+  /** Position in `project.scripts` when the block is a top-level hat. */
+  scriptPosition?: { index: number; total: number } | null;
+  onMoveScript?: (delta: -1 | 1) => void;
 }
 
 export function renderInspector(options: InspectorOptions): HTMLElement {
@@ -41,6 +44,43 @@ export function renderInspector(options: InspectorOptions): HTMLElement {
     body.append(el("p", { class: "inspector__description", text: t(definition.description) }));
   }
   body.append(el("code", { class: "inspector__type", text: definition.type }));
+
+  if (options.scriptPosition && options.onMoveScript) {
+    const { index, total } = options.scriptPosition;
+    const up = index > 0;
+    const down = index < total - 1;
+    const moveButton = (delta: -1 | 1, enabled: boolean, labelKey: string, iconName: "arrowUp" | "arrowDown") =>
+      el(
+        "button",
+        {
+          class: "button button--small button--order",
+          attrs: {
+            type: "button",
+            disabled: !enabled,
+            title: t(labelKey),
+            "aria-label": t(labelKey),
+          },
+          on: { click: () => options.onMoveScript?.(delta) },
+        },
+        [icon(iconName, 15)],
+      );
+    body.append(
+      el("div", { class: "inspector__section" }, [
+        el("h4", { class: "inspector__section-title", text: t("inspector.order") }),
+        el("div", { class: "inspector__order" }, [
+          el("span", {
+            class: "inspector__order-position",
+            text: t("inspector.orderPosition", { index: index + 1, total }),
+          }),
+          el("div", { class: "inspector__order-buttons" }, [
+            moveButton(-1, up, "inspector.moveUp", "arrowUp"),
+            moveButton(1, down, "inspector.moveDown", "arrowDown"),
+          ]),
+        ]),
+        el("p", { class: "inspector__hint", text: t("inspector.orderHint") }),
+      ]),
+    );
+  }
 
   const fields = el("div", { class: "inspector__section" });
   fields.append(el("h4", { class: "inspector__section-title", text: t("inspector.fields") }));

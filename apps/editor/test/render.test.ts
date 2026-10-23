@@ -56,6 +56,84 @@ describe("editor rendering", () => {
     assert.equal(visible[0]?.dataset.toolbox, "io.print");
   });
 
+  it("collapses and expands toolbox groups, and a search reveals matches", () => {
+    window.localStorage.removeItem("nexus-blocks:toolbox-collapsed");
+    const toolbox = renderToolbox({
+      registry: defaultRegistry,
+      onInsert: () => {},
+      onDragStart: () => {},
+    });
+    const group = toolbox.querySelector<HTMLElement>(".toolbox__group")!;
+    const toggle = group.querySelector<HTMLButtonElement>(".toolbox__group-title")!;
+    const body = group.querySelector<HTMLElement>(".toolbox__group-body")!;
+
+    assert.equal(toggle.getAttribute("aria-expanded"), "true");
+    assert.equal(body.hidden, false);
+
+    toggle.click();
+    assert.equal(toggle.getAttribute("aria-expanded"), "false");
+    assert.equal(body.hidden, true);
+    assert.ok(group.classList.contains("toolbox__group--collapsed"));
+
+    // Collapsed state survives a re-render (it is persisted in localStorage).
+    const again = renderToolbox({ registry: defaultRegistry, onInsert: () => {}, onDragStart: () => {} });
+    const second = again.querySelector<HTMLElement>(".toolbox__group")!;
+    assert.equal(second.querySelector<HTMLElement>(".toolbox__group-body")?.hidden, true);
+
+    // Searching still surfaces matches from the collapsed group.
+    const search = again.querySelector<HTMLInputElement>("input[type=search]")!;
+    search.value = "当程序启动";
+    search.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    assert.equal(second.querySelector<HTMLElement>(".toolbox__group-body")?.hidden, false);
+
+    window.localStorage.removeItem("nexus-blocks:toolbox-collapsed");
+  });
+
+  it("shows script order arrows for a selected hat", () => {
+    const { document: doc } = starterPrint();
+    const start = doc.project.scripts[0]!;
+    const second = createBlock("control.start", { inputs: { body: [] } });
+    doc.project.scripts.push(second);
+
+    const moves: number[] = [];
+    const panel = renderInspector({
+      registry: defaultRegistry,
+      selected: findBlock(doc.project, second.id) ?? null,
+      variables: doc.project.variables,
+      onFieldChange: () => {},
+      onLiteralChange: () => {},
+      onUnplug: () => {},
+      onDelete: () => {},
+      scriptPosition: { index: 1, total: 2 },
+      onMoveScript: (delta) => moves.push(delta),
+    });
+
+    const position = panel.querySelector(".inspector__order-position")?.textContent ?? "";
+    assert.match(position, /2/);
+    const buttons = [...panel.querySelectorAll<HTMLButtonElement>(".button--order")];
+    assert.equal(buttons.length, 2);
+    assert.equal(buttons[0]?.disabled, false);
+    assert.equal(buttons[1]?.disabled, true);
+
+    buttons[0]!.click();
+    assert.deepEqual(moves, [-1]);
+
+    const first = renderInspector({
+      registry: defaultRegistry,
+      selected: findBlock(doc.project, start.id) ?? null,
+      variables: doc.project.variables,
+      onFieldChange: () => {},
+      onLiteralChange: () => {},
+      onUnplug: () => {},
+      onDelete: () => {},
+      scriptPosition: { index: 0, total: 2 },
+      onMoveScript: () => {},
+    });
+    const firstButtons = [...first.querySelectorAll<HTMLButtonElement>(".button--order")];
+    assert.equal(firstButtons[0]?.disabled, true);
+    assert.equal(firstButtons[1]?.disabled, false);
+  });
+
   it("shows an empty state for a query that matches nothing", () => {
     const toolbox = renderToolbox({
       registry: defaultRegistry,
