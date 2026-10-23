@@ -14,6 +14,7 @@ import { ioBlocks } from "./blocks/io.ts";
 import { logicBlocks } from "./blocks/logic.ts";
 import { mathBlocks } from "./blocks/math.ts";
 import { textBlocks } from "./blocks/text.ts";
+import { osBlocks } from "./blocks/os.ts";
 import { timeBlocks } from "./blocks/time.ts";
 import { variableBlocks } from "./blocks/variables.ts";
 
@@ -105,6 +106,7 @@ export const coreBlocks: readonly BlockDefinition[] = [
   ...ioBlocks,
   ...textBlocks,
   ...timeBlocks,
+  ...osBlocks,
   ...mathBlocks,
   ...convertBlocks,
   ...logicBlocks,

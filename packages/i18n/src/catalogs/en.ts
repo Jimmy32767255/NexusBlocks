@@ -149,6 +149,8 @@ export const en: Catalog = {
   "runtime.error.toNumber": "Cannot convert “{value}” to a number.",
   "runtime.error.splitSeparator": "The separator cannot be empty",
   "runtime.error.splitIndex": "Item {index} does not exist (the text has {length} items)",
+  "runtime.error.emptyCommand": "The command is empty",
+  "runtime.error.commandFailed": "Command exited with code {code}",
   "runtime.error.capability": "Capability “{capability}” is not available in this host",
   "runtime.error.internal": "Internal error: {detail}",
 
@@ -245,6 +247,9 @@ export const en: Catalog = {
   "block.text.contains.port.needle": "search",
   "block.time.getOsTime.label": "operating system time",
   "block.time.getOsTime.description": "Current local date and time formatted as YYYY-MM-DD HH:mm:ss.",
+  "block.os.exec.label": "run system command [command]",
+  "block.os.exec.description": "Execute the command with the system shell, print its output, and stop with an error when it exits non-zero.",
+  "block.os.exec.port.command": "command",
 
   "block.math.number.label": "number",
   "block.math.number.description": "A number literal.",

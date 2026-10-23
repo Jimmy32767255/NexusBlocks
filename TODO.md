@@ -18,7 +18,7 @@
 
 time.get_os_time
 
-- [ ] 语句：执行操作系统命令
+- [x] 语句：执行操作系统命令
 
 os.exec_command
 

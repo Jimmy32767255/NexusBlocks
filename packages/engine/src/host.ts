@@ -30,6 +30,13 @@ export const CONSOLE_PRINT: CapabilityDescriptor = {
   risk: "none",
 };
 
+/** Shell command execution; only the desktop host can provide it. */
+export const OS_EXEC_CAPABILITY = "os.exec" as const;
+
+export const OS_CAPABILITIES: CapabilityDescriptor[] = [
+  { id: OS_EXEC_CAPABILITY, descriptionKey: "capability.os.exec", risk: "high" },
+];
+
 export const FS_CAPABILITIES: CapabilityDescriptor[] = [
   { id: "fs.read", descriptionKey: "capability.fs.read", risk: "medium" },
   { id: "fs.write", descriptionKey: "capability.fs.write", risk: "medium" },

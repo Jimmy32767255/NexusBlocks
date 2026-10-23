@@ -146,6 +146,8 @@ export const zhCN: Catalog = {
   "runtime.error.toNumber": "无法把“{value}”转换为数值。",
   "runtime.error.splitSeparator": "分隔符不能为空",
   "runtime.error.splitIndex": "第 {index} 段不存在（文本共有 {length} 段）",
+  "runtime.error.emptyCommand": "命令不能为空",
+  "runtime.error.commandFailed": "命令以退出码 {code} 结束",
   "runtime.error.capability": "当前宿主不支持能力“{capability}”",
   "runtime.error.internal": "内部错误：{detail}",
 
@@ -242,6 +244,9 @@ export const zhCN: Catalog = {
   "block.text.contains.port.needle": "查找",
   "block.time.getOsTime.label": "获取操作系统时间",
   "block.time.getOsTime.description": "当前的本地日期时间，格式为 YYYY-MM-DD HH:mm:ss。",
+  "block.os.exec.label": "执行系统命令 [命令]",
+  "block.os.exec.description": "用系统 shell 执行命令并打印输出；退出码非 0 时报错停止。",
+  "block.os.exec.port.command": "命令",
 
   "block.math.number.label": "数字",
   "block.math.number.description": "一个数字字面量。",

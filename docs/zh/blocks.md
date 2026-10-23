@@ -50,6 +50,7 @@ interface BlockDefinition extends BlockSchema {
 | `text.splitAt` | 文本 | 以分隔符拆分后取第 n 段（1 起）；空分隔符报错 | `text`、`separator`、`index` 值 |
 | `text.contains` | 文本 | 判断包含关系 | `text`、`needle` 值 |
 | `time.get_os_time` | 系统 | 当前本地时间（`YYYY-MM-DD HH:mm:ss`） | 无 |
+| `os.exec_command` | 系统 | 用系统 shell 执行命令，打印输出；退出码非 0 报错。需要宿主提供 `os.exec` 能力（桌面版支持，浏览器不支持） | `command` 值 |
 | `var.set` | 变量 | 给变量赋值 | 属性 `variable`，`value` 值 |
 | `var.get` | 变量 | 读取变量 | 属性 `variable` |
 | `list.literal` | 列表与字典 | JSON 列表字面量 | 属性 `items`，如 `[1, 2, 3]` |

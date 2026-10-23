@@ -1,6 +1,7 @@
 import {
   CONSOLE_PRINT,
   FS_CAPABILITIES,
+  OS_CAPABILITIES,
   HostError,
   type HostBridge,
   type HostRequest,
@@ -85,7 +86,7 @@ export function createDesktopHost(
   return {
     name: "desktop",
     capabilities() {
-      return [CONSOLE_PRINT, ...FS_CAPABILITIES];
+      return [CONSOLE_PRINT, ...FS_CAPABILITIES, ...OS_CAPABILITIES];
     },
     async invoke(request: HostRequest): Promise<Value> {
       if (request.capability === "console.print") {

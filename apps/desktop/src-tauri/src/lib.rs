@@ -15,6 +15,8 @@ use tauri_plugin_dialog::DialogExt;
 /// Mirrors `MAX_FILE_CHARS` in `@nexus/engine`.
 const MAX_FILE_CHARS: usize = 1_000_000;
 const MAX_PATH_CHARS: usize = 1024;
+/// Output kept from a shell command per stream (UTF-8 bytes).
+const MAX_COMMAND_OUTPUT: usize = 200_000;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,7 +161,34 @@ fn capability_invoke(app: tauri::AppHandle, request: HostRequest) -> Value {
                 Err(error) => fail(map_io(&error)),
             }
         }
+        "os.exec" => {
+            let command = string_arg(&request.args, 0);
+            if command.trim().is_empty() {
+                return fail("runtime.error.emptyCommand");
+            }
+            run_shell(&command)
+        }
         _ => fail("runtime.error.capability"),
+    }
+}
+
+/// Run `command` through the platform shell and capture both streams.
+fn run_shell(command: &str) -> Value {
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .output();
+    match output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout[..output.stdout.len().min(MAX_COMMAND_OUTPUT)]);
+            let stderr = String::from_utf8_lossy(&output.stderr[..output.stderr.len().min(MAX_COMMAND_OUTPUT)]);
+            ok(json!({
+                "stdout": stdout,
+                "stderr": stderr,
+                "code": output.status.code().unwrap_or(-1),
+            }))
+        }
+        Err(_) => fail("runtime.error.commandFailed"),
     }
 }
 
@@ -279,6 +308,18 @@ mod tests {
 
     fn home() -> PathBuf {
         PathBuf::from("/home/tester")
+    }
+
+    #[test]
+    fn shell_commands_capture_stdout_and_status() {
+        let value = run_shell("printf 'hi'");
+        assert_eq!(value["ok"], true);
+        assert_eq!(value["value"]["stdout"], "hi");
+        assert_eq!(value["value"]["code"], 0);
+
+        let failed = run_shell("sh -c 'echo boom >&2; exit 3'");
+        assert_eq!(failed["value"]["code"], 3);
+        assert_eq!(failed["value"]["stderr"], "boom\n");
     }
 
     #[test]

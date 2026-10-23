@@ -14,7 +14,9 @@ import {
   createHelloWorldProject,
   defaultRegistry,
   runProject,
+  OS_CAPABILITIES,
   type BlockDefinition,
+  type HostBridge,
   type RuntimeEvent,
 } from "../src/index.ts";
 import { en, zhCN } from "@nexus/i18n";
@@ -902,4 +904,33 @@ test("time.get_os_time reports a formatted local timestamp", async () => {
   const result = await runProject(project, { onEvent: (event) => events.push(event) });
   assert.equal(result.status, "finished");
   assert.match(loggedTexts(events)[0] ?? "", /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+});
+
+test("os.exec_command prints stdout and fails on non-zero exits", async () => {
+  const host: HostBridge = {
+    name: "fake",
+    capabilities: () => [OS_CAPABILITIES[0]!],
+    async invoke() {
+      return { stdout: "hello from shell\n", stderr: "", code: 0 };
+    },
+  };
+  const project = projectWith(
+    start([createBlock("os.exec_command", { fields: { command: "echo hi" } })]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { host, onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["hello from shell"]);
+
+  const failing: HostBridge = {
+    name: "fake",
+    capabilities: () => [OS_CAPABILITIES[0]!],
+    async invoke() {
+      return { stdout: "", stderr: "boom\n", code: 7 };
+    },
+  };
+  const failingResult = await runProject(project, { host: failing });
+  assert.equal(failingResult.status, "error");
+  assert.equal(failingResult.error?.messageKey, "runtime.error.commandFailed");
+  assert.deepEqual(failingResult.error?.params, { code: 7 });
 });

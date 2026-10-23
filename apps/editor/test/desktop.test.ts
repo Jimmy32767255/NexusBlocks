@@ -29,6 +29,7 @@ test("exposes console and file capabilities in the desktop shell", () => {
     "fs.exists",
     "fs.delete",
     "fs.list",
+    "os.exec",
   ]);
 });
 
