@@ -9,6 +9,7 @@ Nexus Blocks 的文档目前以简体中文为主，英文版 README 覆盖项�
 - [积木系统](zh/blocks.md) — 定义 schema、内置积木、如何新增积木
 - [编辑器使用指南](zh/editor.md) — 界面、拖拽规则、快捷键
 - [国际化](zh/i18n.md) — 语言包、message key、新增语言
+- [桌面外壳](zh/desktop.md) — Tauri 2、工作区目录、能力桥、打包
 - [路线图](zh/roadmap.md) — v0.1 到 v1.0 的计划
 
 ## English

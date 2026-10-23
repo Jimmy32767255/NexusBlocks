@@ -34,10 +34,11 @@
 
 ## v0.5 — 桌面壳与系统能力
 
-- Tauri 2 + Rust 壳，加载 `apps/editor/dist`
-- `HostBridge` 的 Rust 实现：`fs.read/write`、`net.fetch`、`proc.spawn`、`clipboard`、`dialog`
-- 能力权限面板：按项目授权、作用域限制（仅项目目录）、审计日志
-- 桌面端构建流水线（Linux/macOS/Windows）
+- ✅ Tauri 2 + Rust 壳，加载 `apps/editor/dist`
+- ✅ `HostBridge` 的 Rust 实现：`fs.read/write/exists/delete/list`，工作区目录选择与持久化
+- ⬜ 更多能力：`net.fetch`、`proc.spawn`、`clipboard`
+- ⬜ 能力权限面板：按项目授权、审计日志（当前 v0.5 只有「工作区目录」这一层作用域限制，所有 `fs.*` 默认授权）
+- ⬜ 桌面端构建流水线（Linux/macOS/Windows），当前只配置 deb
 
 ## v0.6 — 插件体系
 

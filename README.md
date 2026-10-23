@@ -20,9 +20,10 @@ Nexus Blocks 是一个**可扩展的图形化编程环境**：用积木搭程序
 - 32 种基础积木：控制/输出/逻辑/数学/文本/变量之外，还有等待、跳出循环、列表与字典、函数定义与参数、工作区文件读写；每个函数定义还会动态生成一个调用块。
 - 解释器：步数上限、可中止、事件流（日志/输出/状态/错误）、变量作用域。
 - 中英文界面与消息，运行输出也按项目语言显示。
-- `pnpm test` 覆盖 IR、i18n、engine 与编辑器核心逻辑（66 个用例）。
+- **桌面外壳（Tauri 2）**：加载同一份编辑器 bundle，`fs.*` 落到用户选定的工作区目录，真实的文件读写与目录选择；浏览器版仍保留 localStorage 工作区。
+- `pnpm test` 覆盖 IR、i18n、engine 与编辑器核心逻辑（71 个用例）。
 
-尚未实现（已为它们预留接口）：桌面壳（Tauri）、文件/网络/进程等系统能力、列表/字典的遍历与删除等进阶操作、代码导出。
+尚未实现（已为它们预留接口）：网络/进程/剪贴板等更多系统能力、列表/字典的遍历与删除等进阶操作、代码导出、多平台安装包流水线。
 
 ## 目录结构
 
@@ -31,7 +32,8 @@ packages/ir      语言 IR：数据模型、JSON 序列化、校验、遍历、�
 packages/engine  积木定义与注册表、解释器、能力请求与运行时事件
 packages/i18n    语言包与翻译函数
 apps/editor      Web 编辑器（Vite + 原生 TypeScript）
-docs/zh          架构、IR、积木、i18n、路线图
+apps/desktop     Tauri 2 桌面外壳（Rust 宿主、Tauri 配置）
+docs/zh          架构、IR、积木、i18n、桌面壳、路线图
 ```
 
 ## 快速开始
@@ -44,7 +46,11 @@ pnpm dev        # 编辑器 http://localhost:5173
 pnpm build      # 产出 apps/editor/dist 静态站点
 pnpm test       # 全部单元测试
 pnpm typecheck  # 严格类型检查
+pnpm desktop        # 桌面版开发模式（需要 Rust 与 webkit2gtk-4.1）
+pnpm desktop:build  # 构建桌面安装包（deb）
 ```
+
+桌面版需要 Rust 1.77+；Linux 另需 `webkit2gtk-4.1`、`gtk+-3.0`、`libsoup-3.0` 开发包，Debian/Ubuntu 上为 `libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev`。
 
 打开编辑器后，从左侧工具箱把「当程序启动时」拖到画布，再拖入「打印」，点顶部「运行」即可在控制台看到 `Hello, world!`。
 
@@ -56,6 +62,7 @@ pnpm typecheck  # 严格类型检查
 - [积木系统](docs/zh/blocks.md)
 - [编辑器使用指南](docs/zh/editor.md)
 - [国际化](docs/zh/i18n.md)
+- [桌面外壳](docs/zh/desktop.md)
 - [路线图](docs/zh/roadmap.md)
 
 ## 提交约定
