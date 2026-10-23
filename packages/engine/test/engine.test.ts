@@ -249,3 +249,140 @@ test("every block string is translated in English and Chinese", () => {
     }
   }
 });
+
+test("wait pauses the program for the requested duration", async () => {
+  const events: RuntimeEvent[] = [];
+  const project = projectWith(
+    start([
+      createBlock("control.wait", { inputs: { seconds: createBlock("math.number", { fields: { value: 0.03 } }) } }),
+      createBlock("io.print", { fields: { text: "done" } }),
+    ]),
+  );
+  const started = Date.now();
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.ok(Date.now() - started >= 25);
+  assert.deepEqual(loggedTexts(events), ["done"]);
+});
+
+test("stopping the program interrupts a wait immediately", async () => {
+  const controller = new AbortController();
+  const project = projectWith(
+    start([
+      createBlock("control.wait", { inputs: { seconds: createBlock("math.number", { fields: { value: 5 } }) } }),
+    ]),
+  );
+  setTimeout(() => controller.abort(), 20);
+  const started = Date.now();
+  const result = await runProject(project, { signal: controller.signal });
+  assert.equal(result.status, "stopped");
+  assert.ok(Date.now() - started < 1000);
+});
+
+test("lists can be read, extended and measured", async () => {
+  const list = createVariable("items", "list", [1, 2]);
+  const project = createProject();
+  project.variables.push(list);
+  project.scripts = [
+    start([
+      createBlock("list.add", {
+        inputs: {
+          items: createBlock("var.get", { fields: { variable: list.id } }),
+          value: createBlock("math.number", { fields: { value: 3 } }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("list.get", {
+            inputs: {
+              items: createBlock("var.get", { fields: { variable: list.id } }),
+              index: createBlock("math.number", { fields: { value: 1 } }),
+            },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("list.length", {
+            inputs: { items: createBlock("var.get", { fields: { variable: list.id } }) },
+          }),
+        },
+      }),
+    ]),
+  ];
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["2", "3"]);
+});
+
+test("list access reports an out-of-range index", async () => {
+  const list = createVariable("items", "list", [1]);
+  const project = createProject();
+  project.variables.push(list);
+  project.scripts = [
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("list.get", {
+            inputs: {
+              items: createBlock("var.get", { fields: { variable: list.id } }),
+              index: createBlock("math.number", { fields: { value: 4 } }),
+            },
+          }),
+        },
+      }),
+    ]),
+  ];
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.badIndex");
+});
+
+test("dictionaries support get, has, keys and set", async () => {
+  const dict = createVariable("person", "dict", { name: "Ada" });
+  const project = createProject();
+  project.variables.push(dict);
+  project.scripts = [
+    start([
+      createBlock("dict.set", {
+        inputs: {
+          dict: createBlock("var.get", { fields: { variable: dict.id } }),
+          key: createBlock("text.literal", { fields: { value: "age" } }),
+          value: createBlock("math.number", { fields: { value: 42 } }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("dict.get", {
+            inputs: {
+              dict: createBlock("var.get", { fields: { variable: dict.id } }),
+              key: createBlock("text.literal", { fields: { value: "name" } }),
+            },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("dict.has", {
+            inputs: {
+              dict: createBlock("var.get", { fields: { variable: dict.id } }),
+              key: createBlock("text.literal", { fields: { value: "age" } }),
+            },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("text.join", {
+            inputs: { a: createBlock("dict.keys", { inputs: { dict: createBlock("var.get", { fields: { variable: dict.id } }) } }) },
+          }),
+        },
+      }),
+    ]),
+  ];
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["Ada", "true", "[name, age]"]);
+});

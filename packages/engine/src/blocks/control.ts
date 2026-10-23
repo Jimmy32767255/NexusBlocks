@@ -8,6 +8,7 @@ export const CATEGORY_COLORS = {
   math: "#3fae6a",
   logic: "#e2607f",
   variables: "#e88432",
+  data: "#2aa6a6",
 } as const;
 
 const CONTROL = CATEGORY_COLORS.control;
@@ -70,6 +71,24 @@ export const controlBlocks: BlockDefinition[] = [
         await ctx.tick();
         await ctx.run(ctx.stack(node, "body"));
       }
+    },
+  },
+  {
+    type: "control.wait",
+    kind: "statement",
+    category: "control",
+    label: "block.control.wait.label",
+    description: "block.control.wait.description",
+    output: "void",
+    color: CONTROL,
+    fields: [],
+    ports: [
+      { name: "seconds", label: "block.control.wait.port.seconds", kind: "value", type: "number", default: 1 },
+    ],
+    async execute(ctx, node) {
+      const raw = await ctx.input(node, "seconds");
+      const seconds = Math.max(0, Number(raw) || 0);
+      await ctx.sleep(seconds * 1000);
     },
   },
 ];

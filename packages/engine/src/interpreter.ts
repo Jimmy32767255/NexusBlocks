@@ -156,6 +156,22 @@ export class Interpreter implements ExecutionContext {
     });
   }
 
+  async sleep(ms: number): Promise<void> {
+    if (this.signal.aborted) throw new StopSignal();
+    if (ms <= 0) return;
+    await new Promise<void>((resolve, reject) => {
+      const onAbort = (): void => {
+        clearTimeout(timer);
+        reject(new StopSignal());
+      };
+      const timer = setTimeout(() => {
+        this.signal.removeEventListener("abort", onAbort);
+        resolve();
+      }, ms);
+      this.signal.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+
   async tick(): Promise<void> {
     this.steps += 1;
     if (this.steps > this.stepLimit) {

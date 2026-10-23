@@ -47,6 +47,8 @@ export interface ExecutionContext {
   print(value: Value, blockId?: string): void;
   /** Cooperative checkpoint: lets the UI paint and honours stop requests. */
   tick(): Promise<void>;
+  /** Wait for a duration, aborting as soon as the run is stopped. */
+  sleep(ms: number): Promise<void>;
   /** Throw a translatable runtime failure attributed to the current block. */
   fail(messageKey: string, params?: Record<string, string | number>): never;
 }

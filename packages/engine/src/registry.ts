@@ -1,5 +1,7 @@
 import type { BlockDefinition } from "./types.ts";
 import { controlBlocks } from "./blocks/control.ts";
+import { dictBlocks } from "./blocks/dicts.ts";
+import { listBlocks } from "./blocks/lists.ts";
 import { ioBlocks } from "./blocks/io.ts";
 import { logicBlocks } from "./blocks/logic.ts";
 import { mathBlocks } from "./blocks/math.ts";
@@ -14,6 +16,7 @@ export const CATEGORY_ORDER: readonly string[] = [
   "math",
   "logic",
   "variables",
+  "data",
 ];
 
 export class BlockRegistry {
@@ -89,6 +92,8 @@ export const coreBlocks: readonly BlockDefinition[] = [
   ...mathBlocks,
   ...logicBlocks,
   ...variableBlocks,
+  ...listBlocks,
+  ...dictBlocks,
 ];
 
 export const defaultRegistry = new BlockRegistry(coreBlocks);
