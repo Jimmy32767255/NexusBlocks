@@ -65,7 +65,6 @@ pnpm package:all    # 打包 Linux .deb 与 Windows setup.exe（见打包文档�
 ## 文档
 
 - [跨平台打包](docs/zh/packaging.md)：在 Linux/Windows 上构建两种安装包
-
 - [文档索引](docs/README.md)
 - [架构总览](docs/zh/architecture.md)
 - [语言与 IR](docs/zh/ir.md)
