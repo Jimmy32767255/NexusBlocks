@@ -50,7 +50,8 @@ pnpm build      # 产出 apps/editor/dist 静态站点
 pnpm test       # 全部单元测试
 pnpm typecheck  # 严格类型检查
 pnpm desktop        # 桌面版开发模式（需要 Rust 与 webkit2gtk-4.1）
-pnpm desktop:build  # 构建桌面安装包（deb）
+pnpm desktop:build  # 构建当前平台桌面安装包
+pnpm package:all    # 打包 Linux .deb 与 Windows setup.exe（见打包文档）
 ```
 
 桌面版需要 Rust 1.77+；Linux 另需 `webkit2gtk-4.1`、`gtk+-3.0`、`libsoup-3.0` 开发包，Debian/Ubuntu 上为 `libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev`。
@@ -60,6 +61,8 @@ pnpm desktop:build  # 构建桌面安装包（deb）
 打开编辑器后，从左侧工具箱把「当程序启动时」拖到画布，再拖入「打印」，点顶部「运行」即可在控制台看到 `Hello, world!`。
 
 ## 文档
+
+- [跨平台打包](docs/zh/packaging.md)：在 Linux/Windows 上构建两种安装包
 
 - [文档索引](docs/README.md)
 - [架构总览](docs/zh/architecture.md)
