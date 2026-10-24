@@ -273,3 +273,22 @@ describe("editor debug metadata", () => {
     assert.deepEqual(reloaded.document.debug?.breakpoints, document.document.debug.breakpoints);
   });
 });
+
+test("parses and prints label / goto names", () => {
+  const document = parseOk(
+    `project "Jumps"\n\nstart:\n  label outer\n  goto outer\n  label "with space"\n  goto "with space"\n`,
+  );
+  const items = body(document);
+  assert.equal(items[0]!.type, "control.label");
+  assert.equal(items[0]!.fields?.name, "outer");
+  assert.equal(items[1]!.type, "control.goto");
+  assert.equal(items[2]!.fields?.name, "with space");
+
+  const text = printNblk(document);
+  assert.match(text, /^  label outer$/m);
+  assert.match(text, /^  goto outer$/m);
+  assert.match(text, /^  label "with space"$/m);
+
+  const again = parseOk(text);
+  assert.deepEqual(body(again).map((node) => node.fields?.name), ["outer", "outer", "with space", "with space"]);
+});
