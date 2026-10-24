@@ -15,16 +15,20 @@ IR 仍是唯一的事实来源：`.nblk` 只是 IR（`project.scripts`）的一�
 ## 基本结构
 
 1. 文件头：`project "项目名"`，可选一行 `locale zh-CN` 或 `locale en`。
-2. 变量区（可选）：
-   ```text
-   variables:
-     score: number = 0
-     names: list = ["a", "b"]
-     info: dict = {"k": 1}
-   ```
-   类型支持 `any`、`text`、`number`、`boolean`、`list`、`dict`；初始值必须是 JSON 字面量（列表中可嵌套对象/数组）。
-3. 顶层积木：`start:`、`define`、`import`，按书写顺序决定脚本顺序。
-4. 缩进表示嵌套，两个空格；空行与 `#` 开头的行会被忽略。
+2. 顶层积木：`start:`、`define`、`import`，按书写顺序决定脚本顺序。
+3. 缩进表示嵌套，两个空格；空行与 `#` 开头的行会被忽略。
+
+变量没有声明区，用 `create` 语句在运行时创建：
+
+```text
+start:
+  create score: number as 0
+  create names: list as ["a", "b"]
+  create info: dict as {"k": 1}
+  create flag as true
+```
+
+类型支持 `any`、`text`、`number`、`boolean`、`list`、`dict`（省略类型即 `any`）；初始值可以是任意表达式，字面量按类型校验。`set` 与读取变量都要求变量已经存在，否则报 `runtime.error.missingVariable`；循环计数器与 `catch ... as` 的目标变量在缺失时会自动创建。
 
 ## 语句
 
@@ -44,6 +48,8 @@ start:
 | --- | --- |
 | 等待 | `wait 0.5` |
 | 输出 | `print expr` |
+| 创建变量 | `create 变量: 类型 as expr` / `create 变量 as expr` |
+| 删除变量 | `delete 变量` |
 | 变量赋值 | `set 变量 to expr` |
 | 抛出 | `throw expr` |
 | 退出程序 | `exit expr` |
@@ -89,7 +95,7 @@ start:
     print message
 ```
 
-`catch` 可跟类型（`error`/`text`/`number`/`boolean`/`list`/`dict`/`any`）；`as 变量名` 会把错误信息写入该变量，变量不存在时会自动声明为 `text`。
+`catch` 可跟类型（`error`/`text`/`number`/`boolean`/`list`/`dict`/`any`）；`as 变量名` 会把错误信息写成文本写入该变量，变量不存在时会自动创建为 `text`。
 
 ## 函数
 
@@ -135,4 +141,5 @@ from "lib.nblk" import greet as hi
 
 - 打开旧 `.nexusblocks.json` 仍可用。
 - 自动保存（浏览器 `localStorage`）内部仍使用 JSON，属于实现细节；导出/保存文件是 `.nblk`。
-- 每个 `.nblk` 解析后都经过与图形编辑相同的校验（变量存在、端口类型、函数定义合法等），错误信息带行号，例如 `Line 4: Unknown variable: nope`。
+- 每个 `.nblk` 解析后都经过与图形编辑相同的校验（端口类型、函数定义合法等），错误信息带行号；变量是否已创建属于运行时检查，运行到缺失变量的语句时会报 `runtime.error.missingVariable`。
+- 旧版本的 `variables:` 声明区会被忽略并给出警告，按上面的 `create` 写法改写即可。

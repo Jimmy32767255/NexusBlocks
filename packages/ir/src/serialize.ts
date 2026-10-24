@@ -8,8 +8,6 @@ import {
   type FunctionDef,
   type NexusDocument,
   type Project,
-  type Value,
-  type VariableDef,
 } from "./model.ts";
 
 export type ParseResult =
@@ -45,19 +43,9 @@ function orderedProject(project: Project): unknown {
     locale: project.locale,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
-    variables: project.variables.map(orderedVariable),
     functions: project.functions.map(orderedFunction),
     scripts: project.scripts.map(orderedBlock),
     metadata: sortRecord(project.metadata),
-  };
-}
-
-function orderedVariable(variable: VariableDef): unknown {
-  return {
-    id: variable.id,
-    name: variable.name,
-    type: variable.type,
-    initial: variable.initial,
   };
 }
 
@@ -166,19 +154,8 @@ function normalizeDebug(raw: unknown, warnings: string[]): DebugState | undefine
 
 function normalizeProject(raw: Record<string, unknown>, warnings: string[]): Project {
   const now = new Date().toISOString();
-  const variablesRaw = Array.isArray(raw.variables) ? raw.variables : [];
-  const variables: VariableDef[] = [];
-  for (const item of variablesRaw) {
-    if (!isRecord(item) || typeof item.id !== "string" || typeof item.name !== "string") {
-      warnings.push("Dropped a malformed variable definition");
-      continue;
-    }
-    variables.push({
-      id: item.id,
-      name: item.name,
-      type: (item.type as VariableDef["type"]) ?? "any",
-      initial: (item.initial as Value | null) ?? null,
-    });
+  if (raw.variables !== undefined) {
+    warnings.push("Dropped legacy variable declarations; variables are declared at run time now");
   }
 
   const functionsRaw = Array.isArray(raw.functions) ? raw.functions : [];
@@ -205,7 +182,6 @@ function normalizeProject(raw: Record<string, unknown>, warnings: string[]): Pro
     locale: typeof raw.locale === "string" ? raw.locale : "zh-CN",
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : now,
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : now,
-    variables,
     functions,
     scripts: normalizeStack(raw.scripts, warnings),
     metadata: isRecord(raw.metadata) ? raw.metadata : {},

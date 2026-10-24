@@ -1,3 +1,4 @@
+import type { ValueType } from "@nexus/ir";
 import type { BlockDefinition } from "../types.ts";
 import { CATEGORY_COLORS } from "./control.ts";
 
@@ -23,10 +24,53 @@ export const variableBlocks: BlockDefinition[] = [
     ],
     ports: [{ name: "value", label: "block.var.set.port.value", kind: "value", type: "any", default: "" }],
     async execute(ctx, node) {
-      const variableId = String(node.fields?.variable ?? "");
-      if (!variableId) ctx.fail("runtime.error.missingVariable", { name: "" });
+      const name = String(node.fields?.variable ?? "").trim();
+      if (!name) ctx.fail("runtime.error.missingVariable", { name: "" });
       const value = await ctx.input(node, "value");
-      ctx.setVariable(variableId, value);
+      ctx.setVariable(name, value);
+    },
+  },
+  {
+    type: "var.create",
+    kind: "statement",
+    category: "variables",
+    label: "block.var.create.label",
+    description: "block.var.create.description",
+    output: "void",
+    color: VARIABLES,
+    fields: [
+      { name: "name", kind: "text", label: "block.var.create.field.name", default: "", required: true },
+      {
+        name: "type",
+        kind: "select",
+        label: "block.var.create.field.type",
+        default: "any",
+        options: ["any", "text", "number", "boolean", "list", "dict"].map((value) => ({ value, label: value })),
+      },
+    ],
+    ports: [{ name: "value", label: "block.var.create.port.value", kind: "value", type: "any", default: "" }],
+    async execute(ctx, node) {
+      const name = String(node.fields?.name ?? "").trim();
+      if (!name) ctx.fail("runtime.error.invalidVariableName", { name: "" });
+      const type = String(node.fields?.type ?? "any") as ValueType;
+      const value = ctx.coerce(await ctx.input(node, "value"), type, node.id);
+      ctx.createVariable(name, value);
+    },
+  },
+  {
+    type: "var.delete",
+    kind: "statement",
+    category: "variables",
+    label: "block.var.delete.label",
+    description: "block.var.delete.description",
+    output: "void",
+    color: VARIABLES,
+    fields: [{ name: "name", kind: "text", label: "block.var.delete.field.name", default: "", required: true }],
+    ports: [],
+    execute(ctx, node) {
+      const name = String(node.fields?.name ?? "").trim();
+      if (!name) ctx.fail("runtime.error.invalidVariableName", { name: "" });
+      ctx.deleteVariable(name);
     },
   },
   {
@@ -48,9 +92,9 @@ export const variableBlocks: BlockDefinition[] = [
     ],
     ports: [],
     evaluate(ctx, node) {
-      const variableId = String(node.fields?.variable ?? "");
-      if (!variableId) ctx.fail("runtime.error.missingVariable", { name: "" });
-      return ctx.getVariable(variableId);
+      const name = String(node.fields?.variable ?? "").trim();
+      if (!name) ctx.fail("runtime.error.missingVariable", { name: "" });
+      return ctx.getVariable(name);
     },
   },
 ];

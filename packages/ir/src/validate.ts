@@ -73,32 +73,6 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
   }
 
   const seenIds = new Set<string>();
-  const variableNames = new Map<string, string>();
-
-  project.variables.forEach((variable, index) => {
-    const path = `variables[${index}]`;
-    if (!VARIABLE_NAME.test(variable.name)) {
-      diagnostics.push({
-        severity: "error",
-        code: "variable.invalidName",
-        message: `Invalid variable name: ${variable.name}`,
-        path,
-        params: { name: variable.name },
-      });
-    }
-    const previous = variableNames.get(variable.name);
-    if (previous) {
-      diagnostics.push({
-        severity: "error",
-        code: "variable.duplicateName",
-        message: `Duplicate variable name: ${variable.name}`,
-        path,
-        params: { name: variable.name },
-      });
-    } else {
-      variableNames.set(variable.name, variable.id);
-    }
-  });
 
   if (project.scripts.length === 0) {
     diagnostics.push({
@@ -109,7 +83,6 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
     });
   }
 
-  const variableIds = new Set(project.variables.map((variable) => variable.id));
   const functionScan = scanFunctions(project.scripts);
   const owners = functionOwners(functionScan.decls);
   const lookup = (type: string): BlockSchema | undefined =>
@@ -156,7 +129,7 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
       checkFunctionScope(node, owners, ctx.path, diagnostics);
       checkCatchPlacement(node, ctx.parent, ctx.port, ctx.path, diagnostics);
       checkKind(node, schema, ctx.parent === null, ctx.path, diagnostics);
-      checkFields(node, schema, variableIds, ctx.path, diagnostics);
+      checkFields(node, schema, ctx.path, diagnostics);
       checkInputs(node, schema, schemas, ctx.path, diagnostics);
     },
     null,
@@ -192,7 +165,7 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
         }
         checkCatchPlacement(node, ctx.parent, ctx.port, ctx.path, diagnostics);
         checkKind(node, schema, false, ctx.path, diagnostics);
-        checkFields(node, schema, variableIds, ctx.path, diagnostics);
+        checkFields(node, schema, ctx.path, diagnostics);
         checkInputs(node, schema, schemas, ctx.path, diagnostics);
       },
       null,
@@ -318,7 +291,6 @@ function checkKind(
 function checkFields(
   node: BlockNode,
   schema: BlockSchema,
-  variableIds: Set<string>,
   path: string,
   diagnostics: Diagnostic[],
 ): void {
@@ -410,11 +382,11 @@ function checkFields(
         }
         break;
       case "variable":
-        if (typeof value !== "string" || !variableIds.has(value)) {
+        if (typeof value !== "string" || !VARIABLE_NAME.test(value)) {
           diagnostics.push({
             severity: "error",
             code: "block.invalidVariable",
-            message: `Field "${def.name}" references a missing variable`,
+            message: `Field "${def.name}" must be a variable name`,
             path: fieldPath,
             blockId: node.id,
             params: { field: def.name },

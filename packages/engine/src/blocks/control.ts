@@ -200,10 +200,11 @@ export const controlBlocks: BlockDefinition[] = [
     async execute(ctx, node) {
       const raw = await ctx.input(node, "times");
       const times = Math.max(0, Math.floor(Number(raw) || 0));
-      const variableId = String(node.fields?.variable ?? "");
-      if (!variableId) ctx.fail("runtime.error.missingVariable", { name: "" });
+      const name = String(node.fields?.variable ?? "").trim();
+      if (!name) ctx.fail("runtime.error.missingVariable", { name: "" });
       for (let count = 1; count <= times; count += 1) {
-        ctx.setVariable(variableId, count);
+        if (ctx.hasVariable(name)) ctx.setVariable(name, count);
+        else ctx.createVariable(name, count);
         await ctx.tick();
         try {
           await ctx.run(ctx.stack(node, "body"));
@@ -316,13 +317,14 @@ export const controlBlocks: BlockDefinition[] = [
       for (const branch of ctx.stack(node, "catches")) {
         const filter = String(branch.fields?.exception ?? "any");
         if (!matchesException(filter, caught)) continue;
-        const target = branch.fields?.target;
-        if (typeof target === "string" && target) {
+        const target = String(branch.fields?.target ?? "").trim();
+        if (target) {
           const text =
             caught instanceof RuntimeFailure
               ? ctx.describeFailure(caught)
               : toDisplayText(caught.value);
-          ctx.setVariable(target, text);
+          if (ctx.hasVariable(target)) ctx.setVariable(target, text);
+          else ctx.createVariable(target, text);
         }
         await ctx.run(ctx.stack(branch, "body"));
         return;

@@ -70,14 +70,6 @@ export interface BlockNode {
   inputs?: Record<string, BlockNode | BlockNode[]>;
 }
 
-export interface VariableDef {
-  id: string;
-  name: string;
-  type: ValueType;
-  /** Literal initial value; `null` means "type default". */
-  initial: Value | null;
-}
-
 /**
  * Function definitions are part of the model from day one, but the v0.1
  * editor does not create them yet. Keeping the field reserved avoids a file
@@ -102,9 +94,9 @@ export interface Project {
   name: string;
   /** BCP 47 tag used by generated output and as the editor's default locale. */
   locale: string;
+
   createdAt: string;
   updatedAt: string;
-  variables: VariableDef[];
   functions: FunctionDef[];
   scripts: BlockNode[];
   /** Extension bag; unknown keys are preserved across save/load. */

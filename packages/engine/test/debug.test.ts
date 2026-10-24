@@ -4,7 +4,6 @@ import {
   createBlock,
   createDocument,
   createProject,
-  createVariable,
   type Project,
 } from "@nexus/ir";
 import {
@@ -23,7 +22,6 @@ function twoPrints(): { project: Project; first: string; second: string } {
   });
   const project = createProject({ name: "debug", locale: "en" });
   project.scripts = [start];
-  project.variables = [createVariable("score", "number", 0)];
   return { project, first: first.id, second: second.id };
 }
 

@@ -8,8 +8,6 @@ import {
   type NexusDocument,
   type Project,
   type Value,
-  type ValueType,
-  type VariableDef,
 } from "./model.ts";
 
 export interface ProjectOptions {
@@ -28,7 +26,6 @@ export function createProject(options: ProjectOptions = {}): Project {
     locale: options.locale ?? "zh-CN",
     createdAt: now,
     updatedAt: now,
-    variables: [],
     functions: [],
     scripts: [],
     metadata: {},
@@ -56,10 +53,6 @@ export function createBlock(type: string, init: BlockInit = {}): BlockNode {
   return node;
 }
 
-export function createVariable(name: string, type: ValueType = "any", initial: Value | null = null): VariableDef {
-  return { id: createId("v"), name, type, initial };
-}
-
 /** Refresh `updatedAt` without touching anything else. */
 export function touchProject(project: Project): Project {
   return { ...project, updatedAt: new Date().toISOString() };
@@ -74,7 +67,9 @@ export function createHelloWorldScript(): BlockNode {
     inputs: {
       body: [
         createBlock("io.print", {
-          fields: { text: "Hello, world!" },
+          inputs: {
+            text: createBlock("text.literal", { fields: { value: "Hello, world!" } }),
+          },
         }),
       ],
     },

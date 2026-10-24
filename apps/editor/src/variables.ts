@@ -1,149 +1,41 @@
 import { toDisplayText, type Value } from "@nexus/ir";
 import { el } from "./dom.ts";
-import { icon } from "./icons.ts";
 import { t } from "./i18n.ts";
 
 export interface VariablesOptions {
-  /** Live values keyed by variable id; shown while paused or tracing. */
-  values?: Record<string, Value> | null;
-  variables: readonly { id: string; name: string }[];
-  usage: ReadonlyMap<string, number>;
-  onAdd: () => void;
-  onDelete: (id: string) => void;
-  onSelectVariable: (id: string) => void;
-  /** Commits a new name; returns an error message to keep editing, or null. */
-  onRename: (id: string, name: string) => string | null;
+  /** Live values keyed by variable name; empty until the program declares one. */
+  values: Record<string, Value> | null;
 }
 
+/**
+ * Read-only panel listing the variables that exist at run time. Variables are
+ * created and deleted by blocks, so the panel mirrors the interpreter instead
+ * of editing the document.
+ */
 export function renderVariables(options: VariablesOptions): HTMLElement {
+  const entries = Object.entries(options.values ?? {});
   const list = el("div", { class: "variables__list" });
 
-  if (options.variables.length === 0) {
+  if (entries.length === 0) {
     list.append(el("p", { class: "variables__empty", text: t("variables.empty") }));
   }
 
-  for (const variable of options.variables) {
-    const used = options.usage.get(variable.id) ?? 0;
-    const name = el("button", {
-      class: "variables__name",
-      text: variable.name,
-      attrs: {
-        type: "button",
-        title: `${t("variables.usedBy", { count: used })}\n${t("variables.renameHint")}`,
-      },
-      on: { click: () => options.onSelectVariable(variable.id) },
-    });
-    const row = el("div", { class: "variables__item" }, [
-      el("span", { class: "variables__dot" }),
-      name,
-      el("span", { class: "variables__usage", text: String(used) }),
-      options.values
-        ? el("code", {
-            class: "variables__value",
-            text: formatValue(options.values[variable.id]),
-          })
-        : null,
-      el("button", {
-        class: "icon-button icon-button--danger",
-        attrs: { type: "button", title: t("variables.delete") },
-        on: { click: () => options.onDelete(variable.id) },
-      }, [icon("trash", 14)]),
-    ]);
-    list.append(row);
-
-    name.addEventListener("dblclick", (event) => {
-      event.preventDefault();
-      beginRename(variable.id, variable.name, name, row, options);
-    });
+  for (const [name, value] of entries) {
+    list.append(
+      el("div", { class: "variables__item" }, [
+        el("span", { class: "variables__dot" }),
+        el("span", { class: "variables__name", text: name }),
+        el("code", { class: "variables__value", text: formatValue(value) }),
+      ]),
+    );
   }
 
   return el("section", { class: "variables" }, [
     el("header", { class: "panel__head" }, [
       el("h2", { class: "panel__title", text: t("panel.variables") }),
-      el("button", {
-        class: "button button--small",
-        attrs: { type: "button" },
-        on: { click: options.onAdd },
-      }, [icon("plus", 14), el("span", { text: t("variables.add") })]),
     ]),
     list,
   ]);
-}
-
-function beginRename(
-  id: string,
-  current: string,
-  name: HTMLElement,
-  row: HTMLElement,
-  options: VariablesOptions,
-): void {
-  const input = el("input", {
-    class: "input variables__rename",
-    attrs: {
-      type: "text",
-      value: current,
-      "aria-label": t("variables.promptName"),
-      spellcheck: "false",
-    },
-  });
-  let settled = false;
-  const error = el("p", { class: "variables__error" });
-  error.hidden = true;
-
-  const cancel = (): void => {
-    if (settled) return;
-    settled = true;
-    error.remove();
-    input.replaceWith(name);
-  };
-
-  name.replaceWith(input);
-  row.after(error);
-  input.focus();
-  input.select();
-
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const next = input.value.trim();
-      if (next === current) {
-        cancel();
-        return;
-      }
-      const message = options.onRename(id, next);
-      if (message) {
-        error.textContent = message;
-        error.hidden = false;
-        input.focus();
-        return;
-      }
-      settled = true;
-      error.remove();
-      input.replaceWith(name);
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      cancel();
-    }
-  });
-
-  input.addEventListener("blur", () => {
-    if (settled) return;
-    const next = input.value.trim();
-    if (next === current) {
-      cancel();
-      return;
-    }
-    const message = options.onRename(id, next);
-    if (message) {
-      error.textContent = message;
-      error.hidden = false;
-      // Keep the failed value visible; the user can fix it or press Escape.
-      return;
-    }
-    settled = true;
-    error.remove();
-    input.replaceWith(name);
-  });
 }
 
 function formatValue(value: Value | undefined): string {

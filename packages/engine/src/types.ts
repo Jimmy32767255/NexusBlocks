@@ -39,15 +39,18 @@ export interface ExecutionContext {
   /** Run a stack in the current scope. */
   run(blocks: BlockNode[]): Promise<void>;
 
-  getVariable(id: string): Value;
-  setVariable(id: string, value: Value): void;
+  getVariable(name: string): Value;
+  /** Whether a variable currently exists in the global table. */
+  hasVariable(name: string): boolean;
+  setVariable(name: string, value: Value): void;
+  createVariable(name: string, value: Value): void;
+  deleteVariable(name: string): void;
   /** Read a parameter of the function currently running. */
   getParam(name: string): Value;
   /** Invoke a function defined on the canvas and return its result. */
   callFunction(id: string, args: Value[]): Promise<Value>;
   /** Convert a value to the port type, failing with a user-facing error. */
   coerce(value: Value, type: ValueType, blockId: string): Value;
-  variableName(id: string): string;
 
   /** Emit a console line. */
   print(value: Value, blockId?: string): void;

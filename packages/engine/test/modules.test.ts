@@ -4,7 +4,6 @@ import {
   createBlock,
   createDocument,
   createProject,
-  createVariable,
   serializeDocument,
   type Project,
 } from "@nexus/ir";
@@ -15,7 +14,6 @@ import { runProject } from "../src/run.ts";
 
 function moduleProject(): Project {
   const project = createProject({ name: "lib" });
-  project.variables.push(createVariable("answer", "number", 42));
   project.scripts.push(
     createBlock("func.define", {
       id: "f-answer",
@@ -57,7 +55,7 @@ function mainProject(imports: ReturnType<typeof createBlock>[]): Project {
   return project;
 }
 
-test("imports every function and its variables", async () => {
+test("imports every function from a file", async () => {
   const module = createDocument(moduleProject());
   const host = await hostWith({ "lib.json": serializeDocument(module) });
   const project = mainProject([createBlock("import.all", { fields: { file: "lib.json" } })]);
@@ -67,7 +65,6 @@ test("imports every function and its variables", async () => {
   assert.deepEqual(resolved.errors, []);
   assert.deepEqual(resolved.files, ["lib.json"]);
   assert.equal(resolved.functionIds.length, 2);
-  assert.ok(resolved.project.variables.some((variable) => variable.name === "answer"));
   assert.equal(resolved.project.scripts.filter((node) => node.type === "func.define").length, 2);
 });
 

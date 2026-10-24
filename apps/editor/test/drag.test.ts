@@ -34,11 +34,10 @@ function setup() {
   const deps = {
     store,
     registry: defaultRegistry,
-    variables: () => store.state.document.project.variables,
     zoom: () => 1,
     surface: () => surface,
     createInstance: (type: string) =>
-      newBlockInstance(defaultRegistry, store.state.document.project, type),
+      newBlockInstance(defaultRegistry, type),
     placeBlockAtCenter: () => {},
     selectBlock: (id: string | null) => store.select(id),
     toast: (key: string) => toasts.push(key),
@@ -112,7 +111,8 @@ describe("editor drag and drop", () => {
   it("drops a toolbox expression into a compatible value port", () => {
     const { store, canvas, deps, toasts } = setup();
     const start = store.state.document.project.scripts[0]!;
-    const print = (start.inputs?.body as { id: string }[])[0]!;
+    const print = (start.inputs?.body as { id: string; inputs?: Record<string, unknown> }[])[0]!;
+    if (print.inputs && "text" in print.inputs) delete print.inputs.text;
 
     const slot = document.createElement("div");
     slot.dataset.drop = "value";

@@ -16,14 +16,15 @@ Nexus Blocks is an **extensible visual programming environment**: you build prog
 
 Working today:
 
-- A complete visual editor: toolbox, drag & drop with snapping, nested blocks, canvas pan/zoom, inspector, variables panel, console, problems panel, undo/redo, and local autosave.
+- A complete visual editor: toolbox, drag & drop with snapping, nested blocks, canvas pan/zoom, inspector, a read-only variables panel, console, problems panel, undo/redo, and local autosave.
 - **Debugging**: pause/resume, single-step execution, per-statement breakpoints, and trace mode with live variable values. Debug state lives in the editor and is never written to `.nblk` files.
 - 56 built-in blocks across control/IO/comments/logic/math/text/variables, plus waiting, breaking out of loops, error handling (throw/try/catch), lists and dictionaries, function definitions/parameters, and local file I/O. Every function definition also yields a dynamic call block.
-- An interpreter with a step limit, cancellation, event stream (logs, output, status, errors), and variable scopes.
+- Variables are declared at run time with the create/delete blocks; there is no predefined variable list, so `.nblk` files need no declarations either.
+- An interpreter with a step limit, cancellation, event stream (logs, output, status, errors), and a global variable table.
 - English and Chinese UI, runtime messages, and program output in the project locale.
 - **Desktop shell (Tauri 2)**: loads the same editor bundle; `fs.*` reaches the real file system (absolute paths, `~/…`, or home-relative), while the browser build keeps its localStorage file area.
 - **`.nblk` text format**: projects are stored as a readable, Python-like text file instead of JSON, while the IR stays the single source of truth; legacy `.nexusblocks.json` files still open. See [`docs/zh/nblk.md`](docs/zh/nblk.md) (Chinese).
-- `pnpm test` covers IR, i18n, engine, and editor logic (158 cases).
+- `pnpm test` covers IR, i18n, engine, and editor logic (177 cases).
 
 Not built yet (interfaces reserved): network/process/clipboard capabilities, advanced list/dict operations such as iteration and removal, code export, and multi-platform packaging pipelines.
 

@@ -3,7 +3,6 @@ import { test } from "node:test";
 import {
   createBlock,
   createProject,
-  createVariable,
   functionCallType,
   type BlockNode,
   type Project,
@@ -25,6 +24,15 @@ function start(body: BlockNode[]): BlockNode {
   return createBlock("control.start", { inputs: { body } });
 }
 
+/** `create variable` statement used to declare a variable at run time. */
+function declare(name: string, type: string, value: BlockNode): BlockNode {
+  return createBlock("var.create", { fields: { name, type }, inputs: { value } });
+}
+
+function text(value: string): BlockNode {
+  return createBlock("text.literal", { fields: { value } });
+}
+
 function projectWith(...scripts: BlockNode[]): Project {
   const project = createProject();
   project.scripts = scripts;
@@ -44,12 +52,11 @@ test("hello world prints exactly one line", async () => {
 
 test("variables and arithmetic feed text.join", async () => {
   const project = createProject();
-  const total = createVariable("total", "number", 0);
-  project.variables.push(total);
   project.scripts = [
     start([
+      declare("total", "number", createBlock("math.number", { fields: { value: 0 } })),
       createBlock("var.set", {
-        fields: { variable: total.id },
+        fields: { variable: "total" },
         inputs: {
           value: createBlock("math.arithmetic", {
             fields: { op: "+" },
@@ -65,7 +72,7 @@ test("variables and arithmetic feed text.join", async () => {
           text: createBlock("text.join", {
             inputs: {
               a: createBlock("text.literal", { fields: { value: "total=" } }),
-              b: createBlock("var.get", { fields: { variable: total.id } }),
+              b: createBlock("var.get", { fields: { variable: "total" } }),
             },
           }),
         },
@@ -283,14 +290,13 @@ test("stopping the program interrupts a wait immediately", async () => {
 });
 
 test("lists can be read, extended and measured", async () => {
-  const list = createVariable("items", "list", [1, 2]);
   const project = createProject();
-  project.variables.push(list);
   project.scripts = [
     start([
+      declare("items", "list", createBlock("list.literal", { fields: { items: "[1,2]" } })),
       createBlock("list.add", {
         inputs: {
-          items: createBlock("var.get", { fields: { variable: list.id } }),
+          items: createBlock("var.get", { fields: { variable: "items" } }),
           value: createBlock("math.number", { fields: { value: 3 } }),
         },
       }),
@@ -298,7 +304,7 @@ test("lists can be read, extended and measured", async () => {
         inputs: {
           text: createBlock("list.get", {
             inputs: {
-              items: createBlock("var.get", { fields: { variable: list.id } }),
+              items: createBlock("var.get", { fields: { variable: "items" } }),
               index: createBlock("math.number", { fields: { value: 1 } }),
             },
           }),
@@ -307,7 +313,7 @@ test("lists can be read, extended and measured", async () => {
       createBlock("io.print", {
         inputs: {
           text: createBlock("list.length", {
-            inputs: { items: createBlock("var.get", { fields: { variable: list.id } }) },
+            inputs: { items: createBlock("var.get", { fields: { variable: "items" } }) },
           }),
         },
       }),
@@ -320,16 +326,15 @@ test("lists can be read, extended and measured", async () => {
 });
 
 test("list access reports an out-of-range index", async () => {
-  const list = createVariable("items", "list", [1]);
   const project = createProject();
-  project.variables.push(list);
   project.scripts = [
     start([
+      declare("items", "list", createBlock("list.literal", { fields: { items: "[1]" } })),
       createBlock("io.print", {
         inputs: {
           text: createBlock("list.get", {
             inputs: {
-              items: createBlock("var.get", { fields: { variable: list.id } }),
+              items: createBlock("var.get", { fields: { variable: "items" } }),
               index: createBlock("math.number", { fields: { value: 4 } }),
             },
           }),
@@ -343,14 +348,13 @@ test("list access reports an out-of-range index", async () => {
 });
 
 test("dictionaries support get, has, keys and set", async () => {
-  const dict = createVariable("person", "dict", { name: "Ada" });
   const project = createProject();
-  project.variables.push(dict);
   project.scripts = [
     start([
+      declare("person", "dict", createBlock("dict.literal", { fields: { items: '{"name":"Ada"}' } })),
       createBlock("dict.set", {
         inputs: {
-          dict: createBlock("var.get", { fields: { variable: dict.id } }),
+          dict: createBlock("var.get", { fields: { variable: "person" } }),
           key: createBlock("text.literal", { fields: { value: "age" } }),
           value: createBlock("math.number", { fields: { value: 42 } }),
         },
@@ -359,7 +363,7 @@ test("dictionaries support get, has, keys and set", async () => {
         inputs: {
           text: createBlock("dict.get", {
             inputs: {
-              dict: createBlock("var.get", { fields: { variable: dict.id } }),
+              dict: createBlock("var.get", { fields: { variable: "person" } }),
               key: createBlock("text.literal", { fields: { value: "name" } }),
             },
           }),
@@ -369,7 +373,7 @@ test("dictionaries support get, has, keys and set", async () => {
         inputs: {
           text: createBlock("dict.has", {
             inputs: {
-              dict: createBlock("var.get", { fields: { variable: dict.id } }),
+              dict: createBlock("var.get", { fields: { variable: "person" } }),
               key: createBlock("text.literal", { fields: { value: "age" } }),
             },
           }),
@@ -378,7 +382,7 @@ test("dictionaries support get, has, keys and set", async () => {
       createBlock("io.print", {
         inputs: {
           text: createBlock("text.join", {
-            inputs: { a: createBlock("dict.keys", { inputs: { dict: createBlock("var.get", { fields: { variable: dict.id } }) } }) },
+            inputs: { a: createBlock("dict.keys", { inputs: { dict: createBlock("var.get", { fields: { variable: "person" } }) } }) },
           }),
         },
       }),
@@ -522,30 +526,29 @@ test("forever repeats until a break leaves the loop", async () => {
 
 test("while checks the condition before every round", async () => {
   const project = createProject();
-  const counter = createVariable("i", "number", 0);
-  project.variables.push(counter);
   project.scripts = [
     start([
+      declare("i", "number", createBlock("math.number", { fields: { value: 0 } })),
       createBlock("control.while", {
         inputs: {
           condition: createBlock("logic.compare", {
             fields: { op: "<" },
             inputs: {
-              a: createBlock("var.get", { fields: { variable: counter.id } }),
+              a: createBlock("var.get", { fields: { variable: "i" } }),
               b: createBlock("math.number", { fields: { value: 3 } }),
             },
           }),
           body: [
             createBlock("io.print", {
-              inputs: { text: createBlock("var.get", { fields: { variable: counter.id } }) },
+              inputs: { text: createBlock("var.get", { fields: { variable: "i" } }) },
             }),
             createBlock("var.set", {
-              fields: { variable: counter.id },
+              fields: { variable: "i" },
               inputs: {
                 value: createBlock("math.arithmetic", {
                   fields: { op: "+" },
                   inputs: {
-                    a: createBlock("var.get", { fields: { variable: counter.id } }),
+                    a: createBlock("var.get", { fields: { variable: "i" } }),
                     b: createBlock("math.number", { fields: { value: 1 } }),
                   },
                 }),
@@ -564,23 +567,22 @@ test("while checks the condition before every round", async () => {
 
 test("repeat with counter stores 1..n in the chosen variable", async () => {
   const project = createProject();
-  const round = createVariable("round", "number", 0);
-  project.variables.push(round);
   project.scripts = [
     start([
+      declare("round", "number", createBlock("math.number", { fields: { value: 0 } })),
       createBlock("control.repeatWith", {
-        fields: { variable: round.id },
+        fields: { variable: "round" },
         inputs: {
           times: createBlock("math.number", { fields: { value: 3 } }),
           body: [
             createBlock("io.print", {
-              inputs: { text: createBlock("var.get", { fields: { variable: round.id } }) },
+              inputs: { text: createBlock("var.get", { fields: { variable: "round" } }) },
             }),
           ],
         },
       }),
       createBlock("io.print", {
-        inputs: { text: createBlock("var.get", { fields: { variable: round.id } }) },
+        inputs: { text: createBlock("var.get", { fields: { variable: "round" } }) },
       }),
     ]),
   ];
@@ -592,12 +594,11 @@ test("repeat with counter stores 1..n in the chosen variable", async () => {
 
 test("break leaves a repeat with counter loop", async () => {
   const project = createProject();
-  const round = createVariable("round", "number", 0);
-  project.variables.push(round);
   project.scripts = [
     start([
+      declare("round", "number", createBlock("math.number", { fields: { value: 0 } })),
       createBlock("control.repeatWith", {
-        fields: { variable: round.id },
+        fields: { variable: "round" },
         inputs: {
           times: createBlock("math.number", { fields: { value: 5 } }),
           body: [createBlock("io.print", { fields: { text: "once" } }), createBlock("control.break")],
@@ -683,16 +684,15 @@ test("exit with a non-zero status ends the run with that code", async () => {
 
 test("exit is not swallowed by try/catch", async () => {
   const project = createProject();
-  const errorText = createVariable("message", "text", "");
-  project.variables.push(errorText);
   project.scripts = [
     start([
+      declare("message", "text", text("")),
       createBlock("control.try", {
         inputs: {
           body: [createBlock("sys.exit", { inputs: { code: createBlock("math.number", { fields: { value: 0 } }) } })],
           catches: [
             createBlock("control.catchAssign", {
-              fields: { exception: "any", target: errorText.id },
+              fields: { exception: "any", target: "message" },
               inputs: { body: [createBlock("io.print", { fields: { text: "caught" } })] },
             }),
           ],
@@ -933,4 +933,153 @@ test("os.exec_command prints stdout and fails on non-zero exits", async () => {
   assert.equal(failingResult.status, "error");
   assert.equal(failingResult.error?.messageKey, "runtime.error.commandFailed");
   assert.deepEqual(failingResult.error?.params, { code: 7 });
+});
+
+test("boolean conversions cover numbers, text and booleans", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: {
+              value: createBlock("convert.toNumber", {
+                inputs: { text: createBlock("logic.boolean", { fields: { value: true } }) },
+              }),
+            },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: { value: createBlock("logic.boolean", { fields: { value: false } }) },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: {
+              value: createBlock("convert.toBoolean", {
+                inputs: { value: createBlock("math.number", { fields: { value: 0 } }) },
+              }),
+            },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: {
+              value: createBlock("convert.toBoolean", {
+                inputs: { value: createBlock("text.literal", { fields: { value: "false" } }) },
+              }),
+            },
+          }),
+        },
+      }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["1", "false", "false", "false"]);
+});
+
+test("convert to boolean rejects other text", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: {
+              value: createBlock("convert.toBoolean", {
+                inputs: { value: createBlock("text.literal", { fields: { value: "yes" } }) },
+              }),
+            },
+          }),
+        },
+      }),
+    ]),
+  );
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.toBoolean");
+});
+
+test("variables exist only after the create block runs", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: { text: createBlock("var.get", { fields: { variable: "score" } }) },
+      }),
+    ]),
+  );
+
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.missingVariable");
+  assert.deepEqual(result.error?.params, { name: "score" });
+});
+
+test("create, assign, read and delete a variable at run time", async () => {
+  const events: RuntimeEvent[] = [];
+  const project = projectWith(
+    start([
+      declare("score", "number", createBlock("math.number", { fields: { value: 1 } })),
+      createBlock("var.set", {
+        fields: { variable: "score" },
+        inputs: { value: createBlock("math.number", { fields: { value: 42 } }) },
+      }),
+      createBlock("io.print", {
+        inputs: { text: createBlock("var.get", { fields: { variable: "score" } }) },
+      }),
+      createBlock("var.delete", { fields: { name: "score" } }),
+      createBlock("io.print", {
+        inputs: { text: createBlock("var.get", { fields: { variable: "score" } }) },
+      }),
+    ]),
+  );
+
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.deepEqual(loggedTexts(events), ["42"]);
+  assert.equal(result.error?.messageKey, "runtime.error.missingVariable");
+});
+
+test("creating the same variable twice is an error", async () => {
+  const project = projectWith(
+    start([
+      declare("n", "number", createBlock("math.number", { fields: { value: 0 } })),
+      declare("n", "number", createBlock("math.number", { fields: { value: 1 } })),
+    ]),
+  );
+
+  const result = await runProject(project);
+  assert.equal(result.error?.messageKey, "runtime.error.variableExists");
+});
+
+test("the repeat counter and catch target declare variables on demand", async () => {
+  const events: RuntimeEvent[] = [];
+  const project = projectWith(
+    start([
+      createBlock("control.repeatWith", {
+        fields: { variable: "i" },
+        inputs: {
+          times: createBlock("math.number", { fields: { value: 2 } }),
+          body: [
+            createBlock("io.print", {
+              inputs: { text: createBlock("var.get", { fields: { variable: "i" } }) },
+            }),
+          ],
+        },
+      }),
+      createBlock("io.print", {
+        inputs: { text: createBlock("var.get", { fields: { variable: "i" } }) },
+      }),
+    ]),
+  );
+
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["1", "2", "2"]);
 });

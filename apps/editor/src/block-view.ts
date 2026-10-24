@@ -113,7 +113,6 @@ export function applyBlockWidths(root: ParentNode): void {
 export interface BlockRenderContext {
   registry: BlockRegistry;
   selectedId: string | null;
-  variables: readonly { id: string; name: string }[];
   interactive: boolean;
   breakpoints?: ReadonlySet<string>;
   debugCurrentId?: string | null;
@@ -340,24 +339,22 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
       return select;
     }
     case "variable": {
-      if (context.variables.length === 0) {
-        return el("span", { class: "block__input block__input--empty", text: "—", attrs: { title } });
-      }
-      const select = el("select", {
-        class: "block__input block__select",
-        attrs: { title, "aria-label": title, disabled: !context.interactive },
+      const name = String(raw ?? "");
+      const input = el("input", {
+        class: "block__input block__input--text block__input--variable",
+        attrs: {
+          type: "text",
+          value: name,
+          size: Math.max(4, Math.min(20, name.length + 1)),
+          title,
+          "aria-label": title,
+          spellcheck: "false",
+          disabled: !context.interactive,
+        },
         dataset: { field: field.name },
       });
-      for (const variable of context.variables) {
-        select.append(
-          el("option", {
-            text: variable.name,
-            attrs: { value: variable.id, selected: variable.id === raw },
-          }),
-        );
-      }
-      autoSizeControl(select);
-      return select;
+      autoSizeControl(input);
+      return input;
     }
     case "text":
     default: {
@@ -394,7 +391,9 @@ function renderValuePort(node: BlockNode, port: PortDef, context: BlockRenderCon
   } else {
     const raw = node.fields?.[port.name];
     const value = raw === undefined ? port.default ?? "" : raw;
-    if (type === "boolean") {
+    if (type === "any") {
+      chip.append(el("span", { class: "port__hint", text: t("block.port.dropValue") }));
+    } else if (type === "boolean") {
       const select = el("select", {
         class: "port__input port__select",
         attrs: { disabled: !context.interactive },

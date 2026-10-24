@@ -14,7 +14,6 @@ import {
   countBlocks,
   createDocument,
   createProject,
-  createVariable,
   findBlock,
   isCatchType,
   walkProject,
@@ -31,7 +30,7 @@ import {
 import { applyBlockWidths } from "./block-view.ts";
 import { renderCanvas } from "./canvas.ts";
 import { renderConsole } from "./console.ts";
-import { confirmDialog, helpBody, openDialog, variableDialog } from "./dialogs.ts";
+import { confirmDialog, helpBody, openDialog } from "./dialogs.ts";
 import { el } from "./dom.ts";
 import { startBlockDrag, startToolboxDrag, type DragDeps } from "./drag.ts";
 import { autoSizeControl } from "./block-view.ts";
@@ -141,7 +140,6 @@ function renderNow(): void {
   const canvas = renderCanvas(document, {
     registry,
     selectedId: state.selectedId,
-    variables: document.project.variables,
     zoom: state.zoom,
     viewport,
     interactive: !running && state.status !== "paused",
@@ -190,7 +188,6 @@ function renderNow(): void {
     renderInspector({
       registry,
       selected,
-      variables: document.project.variables,
       onFieldChange: setBlockValue,
       onLiteralChange: setBlockValue,
       onUnplug: (blockId, port) => unplug(blockId, port),
@@ -209,15 +206,7 @@ function renderNow(): void {
         }
       },
     }),
-    renderVariables({
-      variables: document.project.variables,
-      values: debugValues,
-      usage: variableUsage(),
-      onAdd: () => void addVariable(),
-      onDelete: (id) => void deleteVariable(id),
-      onSelectVariable: (id) => selectVariable(id),
-      onRename: (id, name) => renameVariable(id, name),
-    }),
+    renderVariables({ values: debugValues }),
     renderConsole({
       logs: state.logs,
       onClear: () => store.clearLogs(),
@@ -306,26 +295,13 @@ function validateQuietly(): Diagnostic[] {
   }
 }
 
-function variableUsage(): Map<string, number> {
-  const usage = new Map<string, number>();
-  walkProject(store.state.document.project, (node) => {
-    const definition = registry.get(node.type);
-    const field = definition?.fields.find((candidate) => candidate.kind === "variable");
-    if (!field) return;
-    const id = String(node.fields?.[field.name] ?? "");
-    if (id) usage.set(id, (usage.get(id) ?? 0) + 1);
-  });
-  return usage;
-}
-
 function dragDeps(): DragDeps {
   return {
     store,
     registry,
-    variables: () => store.state.document.project.variables,
     zoom: () => store.state.zoom,
     surface: () => surface,
-    createInstance: (type) => newBlockInstance(registry, store.state.document.project, type),
+    createInstance: (type) => newBlockInstance(registry, type),
     placeBlockAtCenter: (type) => placeBlockAtCenter(type),
     selectBlock: (id) => store.select(id),
     toast: (key, level = "error") => toast(t(key), level),
@@ -340,9 +316,9 @@ function placeBlockAtCenter(type: string): void {
     toast(t("toast.catchNeedsTry"), "error");
     return;
   }
-  const result = newBlockInstance(registry, store.state.document.project, type);
+  const result = newBlockInstance(registry, type);
   if (!result.ok) {
-    toast(t(result.reason === "variable" ? "toast.variableRequired" : "toast.dropInvalid"), "error");
+    toast(t("toast.dropInvalid"), "error");
     return;
   }
 
@@ -737,91 +713,6 @@ function adjustParams(blockId: string, fieldName: string, delta: number): void {
     (block.fields ??= {})[fieldName] = formatParams(params);
   });
   store.select(blockId);
-}
-
-const VARIABLE_NAME = /^[\p{L}_][\p{L}\p{N}_]*$/u;
-
-function renameVariable(id: string, rawName: string): string | null {
-  const name = rawName.trim();
-  if (!VARIABLE_NAME.test(name)) return t("variables.invalidName");
-
-  const project = store.state.document.project;
-  const variable = project.variables.find((candidate) => candidate.id === id);
-  if (!variable) return null;
-  if (project.variables.some((candidate) => candidate.id !== id && candidate.name === name)) {
-    return t("variables.duplicateName");
-  }
-  if (variable.name === name) return null;
-
-  store.update((document) => {
-    const target = document.project.variables.find((candidate) => candidate.id === id);
-    if (target) target.name = name;
-  });
-  toast(t("toast.variableRenamed", { name }));
-  return null;
-}
-
-function selectVariable(id: string): void {
-  const variable = store.state.document.project.variables.find((candidate) => candidate.id === id);
-  if (variable) toast(variable.name);
-}
-
-const VARIABLE_TYPES: ValueType[] = ["any", "text", "number", "boolean", "list", "dict"];
-
-async function addVariable(): Promise<void> {
-  const project = store.state.document.project;
-  const suggested = nextVariableName(project.variables.map((variable) => variable.name));
-  const result = await variableDialog({
-    title: t("variables.add"),
-    nameLabel: t("variables.promptName"),
-    typeLabel: t("variables.type"),
-    initialLabel: t("variables.initial"),
-    initialName: suggested,
-    types: VARIABLE_TYPES.map((type) => ({ value: type, label: t(`type.${type}`) })),
-    validateName: (value) => {
-      if (!/^[\p{L}_][\p{L}\p{N}_]*$/u.test(value)) return t("variables.invalidName");
-      if (project.variables.some((variable) => variable.name === value)) return t("variables.duplicateName");
-      return null;
-    },
-  });
-  if (result === null) return;
-  const type = result.type as ValueType;
-  let initial: Value | null = null;
-  if (result.initial !== "") {
-    if (type === "number") initial = Number(result.initial);
-    else if (type === "boolean") initial = result.initial === "true";
-    else if (type === "list" || type === "dict") initial = JSON.parse(result.initial) as Value;
-    else initial = result.initial;
-  }
-  store.update((document) => {
-    document.project.variables.push(createVariable(result.name, type, initial));
-  });
-}
-
-function nextVariableName(existing: readonly string[]): string {
-  let index = 1;
-  while (existing.includes(`var${index}`)) index += 1;
-  return `var${index}`;
-}
-
-async function deleteVariable(id: string): Promise<void> {
-  const project = store.state.document.project;
-  const variable = project.variables.find((candidate) => candidate.id === id);
-  if (!variable) return;
-  const proceed = await confirmDialog(
-    t("variables.confirmDelete", { name: variable.name }),
-    t("common.delete"),
-  );
-  if (!proceed) return;
-  store.update((document) => {
-    document.project.variables = document.project.variables.filter((candidate) => candidate.id !== id);
-    const visit = (node: BlockNode): void => {
-      const definition = registry.get(node.type);
-      const field = definition?.fields.find((candidate) => candidate.kind === "variable");
-      if (field && node.fields?.[field.name] === id) node.fields[field.name] = "";
-    };
-    walkProject(document.project, (node) => visit(node));
-  });
 }
 
 /* ------------------------------------------------------------------ dialogs */

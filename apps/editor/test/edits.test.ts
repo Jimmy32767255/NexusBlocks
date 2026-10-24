@@ -19,7 +19,7 @@ function starter() {
 }
 
 function instance(type: string, document = starter()) {
-  const result = newBlockInstance(defaultRegistry, document.project, type);
+  const result = newBlockInstance(defaultRegistry, type);
   assert.equal(result.ok, true, `expected ${type} to instantiate`);
   if (!result.ok) throw new Error("unreachable");
   return result.node;
@@ -32,21 +32,14 @@ describe("editor edits", () => {
     assert.equal(node.fields?.op, "==");
   });
 
-  it("refuses variable blocks when no variable exists", () => {
-    const result = newBlockInstance(defaultRegistry, createProject(), "var.get");
-    assert.deepEqual(result, { ok: false, reason: "variable" });
-  });
-
-  it("binds variable blocks to the first variable", () => {
-    const document = createDocument(createProject());
-    document.project.variables.push({ id: "var_1", name: "score", type: "number", initial: 0 });
-    const result = newBlockInstance(defaultRegistry, document.project, "var.set");
+  it("creates variable blocks with an empty name field", () => {
+    const result = newBlockInstance(defaultRegistry, "var.set");
     assert.equal(result.ok, true);
-    if (result.ok) assert.equal(result.node.fields?.variable, "var_1");
+    if (result.ok) assert.equal(result.node.fields?.variable, "");
   });
 
   it("rejects unknown block types", () => {
-    const result = newBlockInstance(defaultRegistry, createProject(), "nope.missing");
+    const result = newBlockInstance(defaultRegistry, "nope.missing");
     assert.deepEqual(result, { ok: false, reason: "unknown" });
   });
 
@@ -88,6 +81,8 @@ describe("editor edits", () => {
     const print = body[0]!;
 
     const value = instance("text.literal");
+    const current = findBlock(document.project, print.id)?.inputs?.text;
+    if (current && !Array.isArray(current)) unplugPort(document.project, print.id, "text");
     assert.equal(plugIntoPort(document.project, print.id, "text", value), true);
     assert.equal(plugIntoPort(document.project, print.id, "text", instance("text.literal")), false);
 

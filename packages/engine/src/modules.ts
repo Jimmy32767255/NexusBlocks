@@ -7,7 +7,6 @@ import {
   type ImportSpec,
   type BlockNode,
   type Project,
-  type VariableDef,
 } from "@nexus/ir";
 import { HostError } from "./host.ts";
 import type { HostBridge } from "./types.ts";
@@ -60,7 +59,6 @@ export async function resolveImports(
   const files: string[] = [];
   const visitedFiles = new Set<string>();
   const knownFunctions = new Set(collectFunctionIds(merged));
-  const knownVariables = new Set(merged.variables.map((variable) => variable.id));
   const importedFunctions: string[] = [];
   const queue: Pending[] = [{ project, depth: 0 }];
 
@@ -122,11 +120,6 @@ export async function resolveImports(
         merged.scripts.push(copy);
         knownFunctions.add(definition.id);
         importedFunctions.push(definition.id);
-      }
-      for (const variable of moduleProject.variables) {
-        if (knownVariables.has(variable.id)) continue;
-        merged.variables.push(variable as VariableDef);
-        knownVariables.add(variable.id);
       }
       queue.push({ project: moduleProject, depth: current.depth + 1 });
     }

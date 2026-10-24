@@ -36,6 +36,17 @@ const schemas = {
         ports: [{ name: "text", label: "text", kind: "value", type: "any" }],
       };
     }
+    if (type === "text.literal") {
+      return {
+        type,
+        kind: "expression",
+        category: "text",
+        label: "x",
+        output: "text",
+        fields: [{ name: "value", kind: "text", label: "x", default: "" }],
+        ports: [],
+      };
+    }
     return undefined;
   },
 };
