@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Nexus Blocks \u2014 an extensible visual programming environment",
+  "description": "Nexus Blocks — an extensible visual programming environment",
   "packageManager": "pnpm@12.15.0",
   "engines": {
     "node": ">=22"
@@ -15,7 +15,11 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test \"packages/*/test/**/*.test.ts\" \"apps/*/test/**/*.test.ts\"",
     "desktop": "pnpm --filter @nexus/desktop dev",
-    "desktop:build": "pnpm --filter @nexus/desktop build"
+    "desktop:build": "pnpm --filter @nexus/desktop build",
+    "package": "node scripts/package.mjs",
+    "package:linux": "node scripts/package.mjs linux",
+    "package:windows": "node scripts/package.mjs windows",
+    "package:all": "node scripts/package.mjs all"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",
