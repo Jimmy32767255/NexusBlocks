@@ -90,6 +90,22 @@ export function applyBlockWidths(root: ParentNode): void {
       : natural;
     head.style.width = `${top}px`;
     if (foot) foot.style.width = `${bottom}px`;
+    for (const bar of block.children) {
+      if (!(bar instanceof HTMLElement) || !bar.classList.contains("block__bar")) continue;
+      const mouth = bar.nextElementSibling;
+      const section = mouth instanceof HTMLElement ? directChild(mouth, ".stack") : null;
+      const child = section
+        ? Array.from(section.children).find(
+            (candidate): candidate is HTMLElement =>
+              candidate instanceof HTMLElement && candidate.classList.contains("block"),
+          )
+        : undefined;
+      bar.style.width = "";
+      const barNatural = Math.ceil(bar.getBoundingClientRect().width);
+      bar.style.width = child
+        ? `${Math.max(barNatural, child.offsetLeft + (blockWidths.get(child)?.top ?? 0))}px`
+        : `${barNatural}px`;
+    }
     blockWidths.set(block, { top, bottom });
   }
 }
@@ -133,6 +149,11 @@ export function renderBlock(node: BlockNode, context: BlockRenderContext): HTMLE
     style: { "--block-color": definition.color },
   });
 
+  if (node.type === "control.if") {
+    renderIfBody(root, node, definition, context, ports);
+    return root;
+  }
+
   const head = el("div", { class: "block__head" }, [
     el("span", { class: "block__label", text: t(definition.label) }),
   ]);
@@ -156,6 +177,51 @@ export function renderBlock(node: BlockNode, context: BlockRenderContext): HTMLE
   if (ports.some((port) => port.kind === "stack")) root.append(el("div", { class: "block__foot" }));
 
   return root;
+}
+
+/**
+ * if/else-if/else is laid out as separate horizontal bars, one per branch,
+ * instead of squeezing every condition into the single head bar.
+ */
+function renderIfBody(
+  root: HTMLElement,
+  node: BlockNode,
+  definition: BlockDefinition,
+  context: BlockRenderContext,
+  ports: PortDef[],
+): void {
+  const head = el("div", { class: "block__head" }, [
+    el("span", { class: "block__label", text: t(definition.label) }),
+  ]);
+  for (const field of definition.fields) head.append(renderField(node, field, context));
+  const condition = ports.find((port) => port.name === "condition" && port.kind === "value");
+  if (condition) head.append(renderValuePort(node, condition, context));
+  root.append(head);
+
+  const thenPort = ports.find((port) => port.name === "then" && port.kind === "stack");
+  if (thenPort) root.append(renderStack(node, thenPort, context));
+
+  const count = Number(node.fields?.elseIfs ?? 0);
+  for (let index = 1; index <= count; index += 1) {
+    const conditionPort = ports.find((port) => port.name === `elseIf${index}` && port.kind === "value");
+    const bar = el("div", { class: "block__bar", dataset: { branch: `elseIf${index}` } }, [
+      el("span", { class: "block__label", text: t("block.control.if.elseIf") }),
+    ]);
+    if (conditionPort) bar.append(renderValuePort(node, conditionPort, context));
+    root.append(bar);
+    const bodyPort = ports.find((port) => port.name === `elseIf${index}Body` && port.kind === "stack");
+    if (bodyPort) root.append(renderStack(node, bodyPort, context, { caption: false }));
+  }
+
+  root.append(
+    el("div", { class: "block__bar block__bar--else", dataset: { branch: "else" } }, [
+      el("span", { class: "block__label", text: t("block.control.if.else") }),
+    ]),
+  );
+  const elsePort = ports.find((port) => port.name === "else" && port.kind === "stack");
+  if (elsePort) root.append(renderStack(node, elsePort, context, { caption: false }));
+
+  root.append(el("div", { class: "block__foot" }));
 }
 
 function valueChild(node: BlockNode, port: string): BlockNode | null {
@@ -364,12 +430,19 @@ function renderValuePort(node: BlockNode, port: PortDef, context: BlockRenderCon
   return group;
 }
 
-function renderStack(node: BlockNode, port: PortDef, context: BlockRenderContext): HTMLElement {
+function renderStack(
+  node: BlockNode,
+  port: PortDef,
+  context: BlockRenderContext,
+  options: { caption?: boolean } = {},
+): HTMLElement {
   const raw = node.inputs?.[port.name];
   const stack = Array.isArray(raw) ? raw : [];
   const mouth = el("div", { class: "block__mouth" });
   const section = el("div", { class: "stack" });
-  section.append(el("span", { class: "stack__caption", text: t(port.label) }));
+  if (options.caption !== false) {
+    section.append(el("span", { class: "stack__caption", text: t(port.label) }));
+  }
   for (let index = 0; index <= stack.length; index += 1) {
     section.append(
       el("div", {

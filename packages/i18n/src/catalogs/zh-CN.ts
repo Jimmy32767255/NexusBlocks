@@ -278,6 +278,8 @@ export const zhCN: Catalog = {
   "block.logic.compare.port.a": "甲",
   "block.logic.compare.port.b": "乙",
 
+  "block.control.if.elseIf": "否则如果",
+  "block.control.if.else": "否则",
   "block.control.if.label": "如果",
   "block.control.if.description": "条件为真时执行“那么”，否则执行可选的“否则”。",
   "block.control.if.port.condition": "条件",

@@ -483,6 +483,17 @@ button {
   border-radius: 4px 4px 999px 999px;
 }
 
+/* C-shaped blocks show a bracket instead of a filled pill. */
+.toolbox__swatch--c {
+  width: 20px;
+  height: 18px;
+  background: transparent;
+  border: 3px solid var(--block-color);
+  border-right: 0;
+  border-radius: 5px 0 0 5px;
+  box-shadow: none;
+}
+
 .toolbox__label {
   font-size: 13px;
   color: color-mix(in srgb, var(--block-color) 35%, var(--text));
@@ -594,7 +605,8 @@ button {
   --block-min: 150px;
 }
 
-.block__head {
+.block__head,
+.block__bar {
   position: relative;
   width: max-content;
   min-width: var(--block-min);
@@ -621,9 +633,27 @@ button {
 /* C-shaped blocks staircase: JS sets each bar to the width of the first /
    last wrapped statement, so head and foot line up with the child edges. */
 .block--c > .block__head,
-.block--c > .block__foot {
+.block--c > .block__foot,
+.block--c > .block__bar {
   max-width: none;
   align-self: flex-start;
+}
+
+/* Branch bars (else if / else) look like additional horizontal rungs. */
+.block__bar {
+  min-height: 36px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-radius: 10px;
+}
+
+.block--c > .block__bar {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--block-color) 70%, #05080f),
+      color-mix(in srgb, var(--block-color) 58%, #05080f)
+    );
 }
 
 /* Hats have a semicircular top, value blocks are capsules, terminal

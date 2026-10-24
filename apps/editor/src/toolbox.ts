@@ -82,11 +82,15 @@ export function renderToolbox(options: ToolboxOptions): HTMLElement {
         attrs: { title: `${label}\n${definition.type}`, role: "button", tabindex: "0" },
       });
       row.style.setProperty("--block-color", definition.color);
+      const isC =
+        definition.ports.some((port) => port.kind === "stack") ||
+        definition.type === "control.if";
       row.append(
         el("span", {
           class: [
             "toolbox__swatch",
             `toolbox__swatch--${definition.kind}`,
+            isC ? "toolbox__swatch--c" : "",
             definition.terminal ? "toolbox__swatch--terminal" : "",
           ]
             .filter(Boolean)

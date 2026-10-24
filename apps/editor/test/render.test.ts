@@ -100,6 +100,7 @@ describe("editor rendering", () => {
     assert.match(swatch("io.print"), /toolbox__swatch--statement/);
     assert.match(swatch("text.literal"), /toolbox__swatch--expression/);
     assert.match(swatch("sys.exit"), /toolbox__swatch--terminal/);
+    assert.match(swatch("control.if"), /toolbox__swatch--c/);
   });
 
   it("collapses and expands toolbox groups, and a search reveals matches", () => {
@@ -431,7 +432,10 @@ describe("inline control sizing", () => {
     const ifBlock = view.surface.querySelector<HTMLElement>('[data-block-id="i"]');
     assert.ok(ifBlock);
     assert.equal(ifBlock.querySelectorAll(".block__mouth").length, 3);
-    assert.equal(ifBlock.querySelectorAll(".stack__caption").length, 3);
+    assert.equal(ifBlock.querySelectorAll(".stack__caption").length, 1);
+    assert.equal(ifBlock.querySelectorAll(".block__bar").length, 2);
+    assert.equal(ifBlock.querySelector('[data-branch="elseIf1"] .block__label')?.textContent, "否则如果");
+    assert.equal(ifBlock.querySelector('[data-branch="else"] .block__label')?.textContent, "否则");
   });
 });
 

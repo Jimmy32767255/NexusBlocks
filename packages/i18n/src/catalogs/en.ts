@@ -281,6 +281,8 @@ export const en: Catalog = {
   "block.logic.compare.port.a": "a",
   "block.logic.compare.port.b": "b",
 
+  "block.control.if.elseIf": "else if",
+  "block.control.if.else": "else",
   "block.control.if.label": "if",
   "block.control.if.description": "Run the “then” stack when the condition is true, otherwise the optional “else” stack.",
   "block.control.if.port.condition": "condition",
