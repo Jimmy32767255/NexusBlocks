@@ -4,6 +4,7 @@ import {
   IR_FORMAT,
   IR_VERSION,
   type BlockNode,
+  type DebugState,
   type FunctionDef,
   type NexusDocument,
   type Project,
@@ -140,11 +141,27 @@ function normalizeDocument(raw: Record<string, unknown>, warnings: string[]): Ne
   // Version 1 stored canvas positions and viewport; layout is automatic now.
   if (isRecord(raw.editor)) warnings.push("Dropped legacy canvas layout");
   const project = normalizeProject(projectRaw, warnings);
+  const debug = normalizeDebug(raw.debug, warnings);
   return {
     format: DOCUMENT_FORMAT,
     version: DOCUMENT_VERSION,
     project,
+    ...(debug ? { debug } : {}),
   };
+}
+
+function normalizeDebug(raw: unknown, warnings: string[]): DebugState | undefined {
+  if (raw === undefined) return undefined;
+  if (!isRecord(raw)) {
+    warnings.push("Dropped malformed debug metadata");
+    return undefined;
+  }
+  const rawIds = Array.isArray(raw.breakpoints) ? raw.breakpoints : [];
+  const breakpoints: string[] = [];
+  for (const id of rawIds) {
+    if (typeof id === "string" && !breakpoints.includes(id)) breakpoints.push(id);
+  }
+  return { breakpoints };
 }
 
 function normalizeProject(raw: Record<string, unknown>, warnings: string[]): Project {

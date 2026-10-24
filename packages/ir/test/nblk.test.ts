@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { describe, it } from "node:test";
 
 import {
   createBlock,
@@ -10,6 +10,7 @@ import {
   IMPORT_ALL_TYPE,
   IMPORT_NAMED_TYPE,
   parseNblk,
+  parseDocument,
   printNblk,
   type BlockNode,
   type NexusDocument,
@@ -254,4 +255,21 @@ test("negates numeric literals inline", () => {
   const value = print.inputs?.text as BlockNode;
   assert.equal(value.type, "math.number");
   assert.equal(value.fields?.value, -2);
+});
+
+describe("editor debug metadata", () => {
+  it("is preserved by JSON documents but never written into .nblk", () => {
+    const document = parseNblk('project "meta"\nlocale en\n\nstart:\n  print "hi"\n');
+    assert.equal(document.ok, true);
+    if (!document.ok) return;
+    document.document.debug = { breakpoints: [document.document.project.scripts[0]!.id] };
+    const text = printNblk(document.document);
+    assert.equal(text.includes("breakpoint"), false);
+    assert.equal(text.includes("debug"), false);
+
+    const reloaded = parseDocument(JSON.stringify(document.document));
+    assert.equal(reloaded.ok, true);
+    if (!reloaded.ok) return;
+    assert.deepEqual(reloaded.document.debug?.breakpoints, document.document.debug.breakpoints);
+  });
 });

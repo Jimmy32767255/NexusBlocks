@@ -86,6 +86,7 @@ export async function runProject(project: Project, options: RunOptions = {}): Pr
     stepLimit: options.stepLimit,
     yieldEvery: options.yieldEvery,
     describeFailure: options.describeFailure,
+    ...(options.debug ? { debug: options.debug } : {}),
   });
 
   emit({ kind: "status", status: "running" });

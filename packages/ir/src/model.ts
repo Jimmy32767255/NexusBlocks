@@ -111,11 +111,20 @@ export interface Project {
   metadata: Record<string, unknown>;
 }
 
+/**
+ * Editor-only debugging metadata. It travels with the autosave document but is
+ * deliberately omitted from `.nblk` files: code files stay plain programs.
+ */
+export interface DebugState {
+  breakpoints: BlockId[];
+}
+
 /** The on-disk document: the program plus its format marker. */
 export interface NexusDocument {
   format: "nexus-blocks/document";
   version: 2;
   project: Project;
+  debug?: DebugState;
 }
 
 export const DOCUMENT_FORMAT = "nexus-blocks/document" as const;

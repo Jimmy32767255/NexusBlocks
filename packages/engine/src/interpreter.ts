@@ -15,7 +15,7 @@ import {
 import { ReturnSignal } from "./blocks/functions.ts";
 import { ExitSignal, RuntimeFailure, StopSignal } from "./errors.ts";
 import type { BlockRegistry } from "./registry.ts";
-import type { BlockDefinition, ExecutionContext, HostBridge, RuntimeEvent } from "./types.ts";
+import type { BlockDefinition, DebugHooks, ExecutionContext, HostBridge, RuntimeEvent } from "./types.ts";
 
 export interface InterpreterOptions {
   host: HostBridge;
@@ -25,6 +25,8 @@ export interface InterpreterOptions {
   yieldEvery?: number;
   /** Localised text for caught runtime failures; defaults to the message key. */
   describeFailure?: (failure: RuntimeFailure) => string;
+  /** Editor debugger hooks; the interpreter works without them. */
+  debug?: DebugHooks;
 }
 
 export const DEFAULT_STEP_LIMIT = 100_000;
@@ -45,6 +47,7 @@ export class Interpreter implements ExecutionContext {
 
   private readonly registry: BlockRegistry;
   private readonly emit: (event: RuntimeEvent) => void;
+  private readonly debug: DebugHooks | undefined;
   private readonly stepLimit: number;
   private readonly yieldEvery: number;
   private readonly variables = new Map<string, Value>();
@@ -60,6 +63,7 @@ export class Interpreter implements ExecutionContext {
     this.host = options.host;
     this.emit = options.emit;
     this.describeFailureText = options.describeFailure ?? ((failure) => failure.messageKey);
+    this.debug = options.debug;
     this.signal = options.signal;
     this.stepLimit = options.stepLimit ?? DEFAULT_STEP_LIMIT;
     this.yieldEvery = Math.max(1, options.yieldEvery ?? DEFAULT_YIELD_EVERY);
@@ -79,6 +83,15 @@ export class Interpreter implements ExecutionContext {
     return this.steps;
   }
 
+  /** Current values of the project-level variables (debugger display). */
+  variableValues(): Record<string, Value> {
+    const values: Record<string, Value> = {};
+    for (const variable of this.project.variables) {
+      values[variable.id] = this.variables.get(variable.id) ?? defaultValue(variable.type);
+    }
+    return values;
+  }
+
   async runScripts(scripts: BlockNode[]): Promise<void> {
     await this.run(
       scripts.filter((node) => !isFunctionDefine(node.type) && !isImportType(node.type)),
@@ -88,12 +101,20 @@ export class Interpreter implements ExecutionContext {
   async run(blocks: BlockNode[]): Promise<void> {
     for (const node of blocks) {
       this.currentBlockId = node.id;
-      await this.tick();
       const definition = this.definitionFor(node);
+      // Hats are entry points, not steps. Debugging hooks (breakpoints,
+      // tracing, pause) only observe executable statements.
+      if (definition.kind === "statement") {
+        await this.debug?.beforeStatement?.(node, this);
+      }
+      await this.tick();
       if (definition.kind === "expression") {
         this.fail("runtime.error.expressionAsStatement", { type: node.type });
       }
       await definition.execute?.(this, node);
+      if (definition.kind === "statement") {
+        this.debug?.afterStatement?.(node, this);
+      }
     }
   }
 

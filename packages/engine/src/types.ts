@@ -110,6 +110,17 @@ export interface RunResult {
   error?: { messageKey: string; params: Record<string, string | number>; blockId?: string };
 }
 
+/** Per-statement hooks used by the editor debugger. */
+export interface DebugHooks {
+  beforeStatement?(node: BlockNode, view: DebugRuntimeView): void | Promise<void>;
+  afterStatement?(node: BlockNode, view: DebugRuntimeView): void | Promise<void>;
+}
+
+/** Read-only window the debugger gets into a running interpreter. */
+export interface DebugRuntimeView {
+  variableValues(): Record<string, Value>;
+}
+
 export interface RunOptions {
   onEvent?: (event: RuntimeEvent) => void;
   signal?: AbortSignal;
@@ -127,6 +138,8 @@ export interface RunOptions {
   yieldEvery?: number;
   /** Localised text for caught runtime failures; defaults to the message key. */
   describeFailure?: (failure: RuntimeFailure) => string;
+  /** Editor-only debugging hooks; never serialised into project files. */
+  debug?: DebugHooks;
 }
 
 export type LiteralMap = Record<string, FieldValue>;
