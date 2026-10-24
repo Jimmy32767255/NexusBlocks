@@ -1,4 +1,4 @@
-import { parseDocument, parseNblk, printNblk, serializeDocument, type NexusDocument } from "@nexus/ir";
+import { parseDocument, parseNblk, printNblk, serializeDocument, type NblkSchemaSource, type NexusDocument } from "@nexus/ir";
 
 const AUTOSAVE_KEY = "nexus-blocks:autosave";
 
@@ -35,8 +35,8 @@ export function projectFileName(doc: NexusDocument): string {
  * Browser download. The anchor has to be in the document for Firefox and
  * WebKit, and the object URL must outlive the navigation the click starts.
  */
-export function downloadDocument(doc: NexusDocument): void {
-  const blob = new Blob([printNblk(doc)], { type: "text/plain" });
+export function downloadDocument(doc: NexusDocument, schemas?: NblkSchemaSource): void {
+  const blob = new Blob([printNblk(doc, schemas)], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
   const anchor = globalThis.document.createElement("a");
   anchor.href = url;

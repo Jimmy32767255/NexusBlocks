@@ -487,7 +487,7 @@ async function save(): Promise<void> {
   if (desktopFiles) {
     let saved: { path: string } | null = null;
     try {
-      saved = await desktopFiles.save(printNblk(document), projectFileName(document));
+      saved = await desktopFiles.save(printNblk(document, registry), projectFileName(document));
     } catch (error) {
       toast(t("toast.saveFailed", { detail: errorMessage(error) }), "error");
       return;
@@ -499,7 +499,7 @@ async function save(): Promise<void> {
     toast(t("toast.savedTo", { path: saved.path }));
     return;
   }
-  downloadDocument(document);
+  downloadDocument(document, registry);
   store.markSaved();
   saveAutosave(document);
   toast(t("toast.saved"));

@@ -1048,9 +1048,16 @@ function expressionText(node: BlockNode, context: PrintContext): string {
   if (node.type === "time.get_os_time") return "time()";
   if (node.type.startsWith("func.call:")) {
     const decl = context.functions.get(node.type.slice("func.call:".length));
-    if (!decl) return rawText(node);
-    const args = decl.params.map((param) => portValue(node, param, "any", context));
-    return `${decl.name}(${args.join(", ")})`;
+    if (decl) {
+      const args = decl.params.map((param) => portValue(node, param, "any", context));
+      return `${decl.name}(${args.join(", ")})`;
+    }
+    const schema = context.schemas?.get(node.type);
+    if (schema) {
+      const args = (schema.ports ?? []).map((port) => portValue(node, port.name, port.type ?? "any", context));
+      return `${schema.label}(${args.join(", ")})`;
+    }
+    return rawText(node);
   }
   return rawText(node);
 }
@@ -1215,6 +1222,11 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
         if (decl) {
           const args = decl.params.map((param) => portValue(node, param, "any", context));
           return [`${decl.name}(${args.join(", ")})`];
+        }
+        const schema = context.schemas?.get(node.type);
+        if (schema) {
+          const args = (schema.ports ?? []).map((port) => portValue(node, port.name, port.type ?? "any", context));
+          return [`${schema.label}(${args.join(", ")})`];
         }
       }
       return printGeneric(node, context);
