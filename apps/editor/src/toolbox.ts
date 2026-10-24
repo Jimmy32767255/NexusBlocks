@@ -83,7 +83,15 @@ export function renderToolbox(options: ToolboxOptions): HTMLElement {
       });
       row.style.setProperty("--block-color", definition.color);
       row.append(
-        el("span", { class: "toolbox__swatch" }),
+        el("span", {
+          class: [
+            "toolbox__swatch",
+            `toolbox__swatch--${definition.kind}`,
+            definition.terminal ? "toolbox__swatch--terminal" : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+        }),
         el("span", { class: "toolbox__label", text: label }),
       );
       row.addEventListener("pointerdown", (event) => {

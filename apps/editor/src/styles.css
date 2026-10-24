@@ -461,11 +461,26 @@ button {
 }
 
 .toolbox__swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 15px;
+  border-radius: 4px;
   background: var(--block-color);
   box-shadow: 0 0 8px color-mix(in srgb, var(--block-color) 60%, transparent);
+}
+
+/* Type hint before the name: hat, statement, capsule expression, terminal. */
+.toolbox__swatch--hat {
+  border-radius: 999px 999px 4px 4px;
+}
+
+.toolbox__swatch--expression {
+  height: 13px;
+  border-radius: 999px;
+}
+
+.toolbox__swatch--terminal {
+  border-radius: 4px 4px 999px 999px;
 }
 
 .toolbox__label {
@@ -603,14 +618,12 @@ button {
   transition: outline-color 140ms ease;
 }
 
-/* Blocks with a body are as wide as their mouth; the bar spans that width. */
-/* Head and foot are both stretched to the block's full width: the C shape
-   closes flush at the top and the bottom, including when nested. */
+/* C-shaped blocks staircase: JS sets each bar to the width of the first /
+   last wrapped statement, so head and foot line up with the child edges. */
 .block--c > .block__head,
 .block--c > .block__foot {
-  width: auto;
   max-width: none;
-  align-self: stretch;
+  align-self: flex-start;
 }
 
 /* Hats have a semicircular top, value blocks are capsules, terminal

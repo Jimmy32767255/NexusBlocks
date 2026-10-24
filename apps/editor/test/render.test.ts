@@ -88,6 +88,20 @@ describe("editor rendering", () => {
     assert.equal(visible[0]?.dataset.toolbox, "io.print");
   });
 
+  it("hints block type with the toolbox swatch shape", () => {
+    const toolbox = renderToolbox({
+      registry: defaultRegistry,
+      onInsert: () => {},
+      onDragStart: () => {},
+    });
+    const swatch = (type: string) =>
+      toolbox.querySelector<HTMLElement>(`[data-toolbox="${type}"] .toolbox__swatch`)?.className ?? "";
+    assert.match(swatch("control.start"), /toolbox__swatch--hat/);
+    assert.match(swatch("io.print"), /toolbox__swatch--statement/);
+    assert.match(swatch("text.literal"), /toolbox__swatch--expression/);
+    assert.match(swatch("sys.exit"), /toolbox__swatch--terminal/);
+  });
+
   it("collapses and expands toolbox groups, and a search reveals matches", () => {
     window.localStorage.removeItem("nexus-blocks:toolbox-collapsed");
     const toolbox = renderToolbox({
