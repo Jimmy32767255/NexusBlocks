@@ -213,13 +213,17 @@ function renderIfBody(
     if (bodyPort) root.append(renderStack(node, bodyPort, context, { caption: false }));
   }
 
-  root.append(
-    el("div", { class: "block__bar block__bar--else", dataset: { branch: "else" } }, [
-      el("span", { class: "block__label", text: t("block.control.if.else") }),
-    ]),
-  );
-  const elsePort = ports.find((port) => port.name === "else" && port.kind === "stack");
-  if (elsePort) root.append(renderStack(node, elsePort, context, { caption: false }));
+  const elseInput = node.inputs?.else;
+  const hasElse = Array.isArray(elseInput) && elseInput.length > 0;
+  if (count > 0 || hasElse) {
+    root.append(
+      el("div", { class: "block__bar block__bar--else", dataset: { branch: "else" } }, [
+        el("span", { class: "block__label", text: t("block.control.if.else") }),
+      ]),
+    );
+    const elsePort = ports.find((port) => port.name === "else" && port.kind === "stack");
+    if (elsePort) root.append(renderStack(node, elsePort, context, { caption: false }));
+  }
 
   root.append(el("div", { class: "block__foot" }));
 }

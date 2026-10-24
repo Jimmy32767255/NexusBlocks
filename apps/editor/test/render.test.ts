@@ -437,6 +437,32 @@ describe("inline control sizing", () => {
     assert.equal(ifBlock.querySelector('[data-branch="elseIf1"] .block__label')?.textContent, "否则如果");
     assert.equal(ifBlock.querySelector('[data-branch="else"] .block__label')?.textContent, "否则");
   });
+
+  it("renders a plain if without an else branch", () => {
+    const document = createDocument(createProject());
+    document.project.scripts = [
+      {
+        id: "s",
+        type: "control.start",
+        inputs: {
+          body: [{ id: "plain", type: "control.if", fields: { elseIfs: 0 } }],
+        },
+      },
+    ];
+    const view = renderCanvas(document, {
+      registry: defaultRegistry,
+      selectedId: null,
+      variables: [],
+      zoom: 1,
+      viewport: { x: 0, y: 0 },
+      interactive: true,
+    });
+    const ifBlock = view.surface.querySelector<HTMLElement>('[data-block-id="plain"]');
+    assert.ok(ifBlock);
+    assert.equal(ifBlock.querySelectorAll(":scope > .block__mouth").length, 1);
+    assert.equal(ifBlock.querySelectorAll(":scope > .block__bar").length, 0);
+    assert.ok(ifBlock.querySelector(":scope > .block__foot"));
+  });
 });
 
 it("expression blocks render as capsules and terminal statements get their own class", () => {
