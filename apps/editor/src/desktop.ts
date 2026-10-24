@@ -113,3 +113,57 @@ export function createDesktopHost(
   };
 }
 
+
+export interface DesktopCli {
+  path: string;
+  run(source: string, locale: string, onEvent: (event: Value) => void): Promise<void>;
+  stop(): Promise<void>;
+}
+
+/**
+ * Stream a run through the standalone `nblk` interpreter. Returns null when the
+ * editor is not inside the desktop shell or the CLI is not installed.
+ */
+export async function createDesktopCli(): Promise<DesktopCli | null> {
+  if (!isDesktopShell()) return null;
+  try {
+    const [{ invoke }, { listen }] = await Promise.all([
+      import("@tauri-apps/api/core"),
+      import("@tauri-apps/api/event"),
+    ]);
+    const path = await invoke<string | null>("cli_status");
+    if (!path) return null;
+    return {
+      path,
+      async run(source, locale, onEvent) {
+        await new Promise<void>((resolve, reject) => {
+          let settled = false;
+          let unlistens: Array<() => void> = [];
+          const finish = () => {
+            settled = true;
+            for (const unlisten of unlistens) unlisten();
+            resolve();
+          };
+          Promise.all([
+            listen<Value>("cli-event", (event) => onEvent(event.payload)),
+            listen("cli-exit", finish),
+          ])
+            .then((registered) => {
+              unlistens = registered;
+              if (settled) for (const unlisten of registered) unlisten();
+            })
+            .catch(reject);
+          invoke("cli_run", { source, locale }).catch((error) => {
+            for (const unlisten of unlistens) unlisten();
+            reject(error);
+          });
+        });
+      },
+      async stop() {
+        await invoke("cli_stop");
+      },
+    };
+  } catch {
+    return null;
+  }
+}

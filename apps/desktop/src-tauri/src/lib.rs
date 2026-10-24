@@ -8,8 +8,11 @@
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs;
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use tauri::Manager;
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
 /// Mirrors `MAX_FILE_CHARS` in `@nexus/engine`.
@@ -289,6 +292,7 @@ async fn project_open(app: tauri::AppHandle) -> Value {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(CliProcess(Mutex::new(None)))
         // Native file dialogs for project save/open: a WebView cannot show a
         // system file picker, and `<a download>` is ignored by WebKitGTK, so
         // "save" would silently do nothing without this plugin.
@@ -296,10 +300,111 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             capability_invoke,
             project_save,
-            project_open
+            project_open,
+            cli_status,
+            cli_run,
+            cli_stop
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+
+/// The standalone interpreter process started by the editor, if any.
+struct CliProcess(Mutex<Option<Child>>);
+
+/// Find the standalone `nblk` executable: explicit override, next to the app,
+/// then PATH. Returns None when the user has not installed it.
+fn find_cli() -> Option<PathBuf> {
+    if let Ok(explicit) = std::env::var("NEXUS_NBLK") {
+        let path = PathBuf::from(explicit);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            for name in ["nblk", "nblk.exe"] {
+                let candidate = dir.join(name);
+                if candidate.is_file() {
+                    return Some(candidate);
+                }
+            }
+        }
+    }
+    let path_var = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path_var) {
+        for name in ["nblk", "nblk.exe"] {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
+fn cli_status() -> Option<String> {
+    find_cli().map(|path| path.display().to_string())
+}
+
+#[tauri::command]
+fn cli_stop(state: State<'_, CliProcess>) -> bool {
+    let child = state.0.lock().ok().and_then(|mut guard| guard.take());
+    match child {
+        Some(mut process) => process.kill().is_ok(),
+        None => false,
+    }
+}
+
+/// Run `.nblk` source in the standalone interpreter and stream its JSON events
+/// to the WebView. Falls back to the in-process engine when `nblk` is missing.
+#[tauri::command]
+fn cli_run(
+    app: AppHandle,
+    state: State<'_, CliProcess>,
+    source: String,
+    locale: String,
+) -> Result<String, String> {
+    let path = find_cli().ok_or_else(|| "cli.notFound".to_string())?;
+    if let Ok(mut guard) = state.0.lock() {
+        if let Some(mut previous) = guard.take() {
+            let _ = previous.kill();
+        }
+    }
+    let mut child = Command::new(&path)
+        .args(["--json", "-", "--lang", &locale])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| error.to_string())?;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(source.as_bytes());
+    }
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    if let Ok(mut guard) = state.0.lock() {
+        *guard = Some(child);
+    }
+    let app_handle = app.clone();
+    std::thread::spawn(move || {
+        if let Some(out) = stdout {
+            for line in BufReader::new(out).lines().map_while(Result::ok) {
+                let payload = serde_json::from_str::<Value>(&line)
+                    .unwrap_or_else(|_| json!({ "kind": "raw", "text": line }));
+                let _ = app_handle.emit("cli-event", payload);
+            }
+        }
+        if let Some(err) = stderr {
+            for line in BufReader::new(err).lines().map_while(Result::ok) {
+                let _ = app_handle.emit("cli-event", json!({ "kind": "stderr", "text": line }));
+            }
+        }
+        let _ = app_handle.emit("cli-exit", json!({}));
+    });
+    Ok(path.display().to_string())
 }
 
 #[cfg(test)]

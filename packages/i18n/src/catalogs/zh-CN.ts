@@ -197,6 +197,7 @@ export const zhCN: Catalog = {
   "toast.variableRenamed": "变量已重命名为“{name}”",
   "toast.noTarget": "请选中一个有空白输入的积木，或把积木拖到积木堆里",
   "toast.noScript": "请先添加“当程序开始”积木",
+  "toast.cliFailed": "无法通过 nblk 解释器运行，请查看终端输出",
 
   "dialog.open.title": "打开其他项目？",
   "dialog.open.body": "当前项目将被替换。如果想保留，请先下载副本。",
@@ -456,4 +457,14 @@ export const zhCN: Catalog = {
   "block.convert.toString.label": "转换 [值] 为字符串",
   "block.convert.toString.description": "把值转成字符串（数值会保留十进制写法）。",
   "block.convert.toString.port.value": "值",
+  "cli.usage": "用法：nblk <文件.nblk> [选项]\n\n运行 Nexus Blocks 程序。\n\n选项：\n  --check          只解析和校验，不运行\n  --json           按行输出 JSON 事件\n  --lang <code>    输出语言：zh-CN、en\n  -V, --version    显示版本\n  -h, --help       显示帮助\n\n使用 \"-\" 从标准输入读取程序。",
+  "cli.missingLang": "--lang 需要一个语言代码（zh-CN、en）。",
+  "cli.unknownOption": "未知选项：{option}",
+  "cli.multipleFiles": "一次只能运行一个程序文件。",
+  "cli.missingFile": "没有指定程序文件。",
+  "cli.fileNotFound": "找不到程序文件：{file}",
+  "cli.fileRead": "读取 {file} 失败：{message}",
+  "cli.parseFailed": "{file}:{line}：{message}",
+  "cli.checkOk": "解析成功：{blocks} 个积木。",
+  "runtime.error.fileAccess": "无法访问文件：{path}",
 };

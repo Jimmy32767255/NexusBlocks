@@ -59,7 +59,7 @@ import { toast } from "./toast.ts";
 import { renderToolbar } from "./toolbar.ts";
 import { renderToolbox } from "./toolbox.ts";
 import { renderVariables } from "./variables.ts";
-import { createDesktopFiles, createDesktopHost, isDesktopShell } from "./desktop.ts";
+import { createDesktopCli, createDesktopFiles, createDesktopHost, isDesktopShell } from "./desktop.ts";
 
 import "./styles.css";
 
@@ -68,6 +68,11 @@ if (!mount) throw new Error("Editor root element #app is missing");
 const host: HTMLElement = mount;
 // Real file system in the Tauri shell; the browser keeps the localStorage host.
 const desktopHost = isDesktopShell() ? createDesktopHost(handleEvent) : null;
+let cliRunner: Awaited<ReturnType<typeof createDesktopCli>> = null;
+let cliRunning = false;
+void (async () => {
+  cliRunner = await createDesktopCli();
+})();
 const desktopFiles = desktopHost ? createDesktopFiles() : null;
 
 setUiLocale(currentLocale());
@@ -381,10 +386,48 @@ function placeBlockAtCenter(type: string): void {
 
 /* ------------------------------------------------------------------ actions */
 
+async function runWithCli(): Promise<void> {
+  const runner = cliRunner;
+  if (!runner || cliRunning) return;
+  cliRunning = true;
+  store.clearLogs();
+  store.setStatus("running");
+  scheduleRender();
+  try {
+    const schemas = new Map(registry.all().map((definition) => [definition.type, definition]));
+    await runner.run(printNblk(store.state.document, schemas), currentLocale(), (value) => {
+      const event = value as {
+        kind?: string;
+        text?: string;
+        message?: string;
+        status?: RunStatus;
+      } | null;
+      const kind = event?.kind;
+      if (kind === "log") {
+        store.pushLog({ level: "info", text: String(event?.text ?? "") });
+      } else if (kind === "error" || kind === "stderr") {
+        store.pushLog({ level: "error", text: String(event?.message ?? event?.text ?? "") });
+      } else if (kind === "status" && event?.status) {
+        store.setStatus(event.status);
+      }
+      scheduleRender();
+    });
+  } catch {
+    toast(t("toast.cliFailed"), "error");
+  } finally {
+    cliRunning = false;
+    if (store.state.status === "running") store.setStatus("idle");
+  }
+}
+
 async function run(trace = false): Promise<void> {
-  if (controller) return;
+  if (controller || cliRunning) return;
   if (store.state.document.project.scripts.length === 0) {
     toast(t("toast.nothingToRun"), "error");
+    return;
+  }
+  if (cliRunner && !trace && store.breakpoints.size === 0) {
+    await runWithCli();
     return;
   }
   controller = new AbortController();
@@ -448,6 +491,7 @@ async function run(trace = false): Promise<void> {
 function stop(): void {
   controller?.abort();
   debugSession?.requestStop();
+  if (cliRunning) void cliRunner?.stop();
 }
 
 /** Keep the highlighted statement inside the stage while tracing or paused. */

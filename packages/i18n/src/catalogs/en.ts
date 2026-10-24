@@ -200,6 +200,7 @@ export const en: Catalog = {
   "toast.variableRenamed": "Variable renamed to “{name}”",
   "toast.noTarget": "Select a block with an empty input, or drop onto a stack",
   "toast.noScript": "Add a “when program starts” block first",
+  "toast.cliFailed": "Could not run through the nblk interpreter — check the terminal output",
 
   "dialog.open.title": "Open another project?",
   "dialog.open.body": "The current program will be replaced. Download it first if you want to keep it.",
@@ -459,4 +460,14 @@ export const en: Catalog = {
   "block.convert.toString.label": "convert [value] to text",
   "block.convert.toString.description": "Turn a value into its text form (numbers keep their decimal spelling).",
   "block.convert.toString.port.value": "value",
+  "cli.usage": "Usage: nblk <file.nblk> [options]\n\nRun a Nexus Blocks program.\n\nOptions:\n  --check          parse and validate without running\n  --json           emit newline-delimited JSON events\n  --lang <code>    output language: en, zh-CN\n  -V, --version    print the version\n  -h, --help       show this help\n\nUse \"-\" to read the program from standard input.",
+  "cli.missingLang": "Option --lang needs a language code (en, zh-CN).",
+  "cli.unknownOption": "Unknown option: {option}",
+  "cli.multipleFiles": "Only one program file can be run at a time.",
+  "cli.missingFile": "No program file given.",
+  "cli.fileNotFound": "Program file not found: {file}",
+  "cli.fileRead": "Could not read {file}: {message}",
+  "cli.parseFailed": "{file}:{line}: {message}",
+  "cli.checkOk": "Parsed successfully: {blocks} blocks.",
+  "runtime.error.fileAccess": "Cannot access file: {path}",
 };
