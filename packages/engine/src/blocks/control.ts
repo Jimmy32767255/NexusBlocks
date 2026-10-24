@@ -1,5 +1,5 @@
 import { countField, toDisplayText, typeOf, type FieldDef, type PortDef } from "@nexus/ir";
-import { BreakSignal, RuntimeFailure, StopSignal, ThrowSignal } from "../errors.ts";
+import { BreakSignal, GotoSignal, RuntimeFailure, StopSignal, ThrowSignal } from "../errors.ts";
 import type { BlockDefinition } from "../types.ts";
 
 /** Category colours are shared by the toolbox and the canvas. */
@@ -211,6 +211,36 @@ export const controlBlocks: BlockDefinition[] = [
           throw error;
         }
       }
+    },
+  },
+  {
+    type: "control.label",
+    kind: "statement",
+    category: "control",
+    label: "block.control.label.label",
+    description: "block.control.label.description",
+    output: "void",
+    color: CONTROL,
+    fields: [
+      { name: "name", kind: "text", label: "block.control.label.field.name", default: "label" },
+    ],
+    ports: [],
+    execute() {},
+  },
+  {
+    type: "control.goto",
+    kind: "statement",
+    category: "control",
+    label: "block.control.goto.label",
+    description: "block.control.goto.description",
+    output: "void",
+    color: CONTROL,
+    fields: [
+      { name: "name", kind: "text", label: "block.control.goto.field.name", default: "label" },
+    ],
+    ports: [],
+    execute(ctx, node) {
+      throw new GotoSignal(String(ctx.literal(node, "name")), node.id);
     },
   },
   {

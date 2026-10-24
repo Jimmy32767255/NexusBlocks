@@ -545,6 +545,20 @@ class Parser {
     return createBlock(IMPORT_NAMED_TYPE, { fields: { file: path, name: match[2]! } });
   }
 
+  /** Label names are bare words, or quoted strings when they contain spaces. */
+  private parseName(text: string, line: number): string {
+    const raw = text.trim();
+    if (raw.startsWith('"')) {
+      const expression = parseExpression(raw, line);
+      if (expression.kind !== "literal" || typeof expression.value !== "string") {
+        fail(line, "Label name must be a string");
+      }
+      return expression.value;
+    }
+    if (raw === "") fail(line, "Label name cannot be empty");
+    return raw;
+  }
+
   private parsePath(text: string, line: number): string {
     const expression = parseExpression(text, line);
     if (expression.kind !== "literal" || typeof expression.value !== "string") fail(line, "Import path must be a string");
@@ -579,6 +593,14 @@ class Parser {
       return rawNode(text.slice(4), line.number);
     }
 
+    if (/^label\s+/.test(text)) {
+      this.index += 1;
+      return createBlock("control.label", { fields: { name: this.parseName(text.slice(6), line.number) } });
+    }
+    if (/^goto\s+/.test(text)) {
+      this.index += 1;
+      return createBlock("control.goto", { fields: { name: this.parseName(text.slice(5), line.number) } });
+    }
     if (text === "break") {
       this.index += 1;
       return createBlock("control.break");
@@ -1154,6 +1176,10 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
       return [`forever:`, ...body("body")];
     case "control.wait":
       return [`wait ${portValue(node, "seconds", "number", context)}`];
+    case "control.label":
+      return [`label ${nameField(node)}`];
+    case "control.goto":
+      return [`goto ${nameField(node)}`];
     case "control.break":
       return ["break"];
     case "control.pass":
@@ -1286,4 +1312,10 @@ export function parseNblk(source: string): NblkParseResult {
     }
     throw error;
   }
+}
+
+/** Print a label name bare unless whitespace or quotes would break parsing. */
+function nameField(node: BlockNode): string {
+  const name = String(node.fields?.name ?? "label");
+  return /^[^\s"\\]+$/.test(name) ? name : JSON.stringify(name);
 }

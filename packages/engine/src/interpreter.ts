@@ -13,7 +13,7 @@ import {
   type ValueType,
 } from "@nexus/ir";
 import { ReturnSignal } from "./blocks/functions.ts";
-import { ExitSignal, RuntimeFailure, StopSignal } from "./errors.ts";
+import { ExitSignal, GotoSignal, RuntimeFailure, StopSignal } from "./errors.ts";
 import type { BlockRegistry } from "./registry.ts";
 import type { BlockDefinition, DebugHooks, ExecutionContext, HostBridge, RuntimeEvent } from "./types.ts";
 
@@ -93,9 +93,45 @@ export class Interpreter implements ExecutionContext {
   }
 
   async runScripts(scripts: BlockNode[]): Promise<void> {
-    await this.run(
-      scripts.filter((node) => !isFunctionDefine(node.type) && !isImportType(node.type)),
-    );
+    for (const node of scripts) {
+      if (isFunctionDefine(node.type) || isImportType(node.type)) continue;
+      await this.runFrame([node]);
+    }
+  }
+
+  /**
+   * Run one script/function frame. `goto` unwinds to the matching label by
+   * resuming the label's stack and then each enclosing stack after its child,
+   * so execution continues outward exactly where the jump landed.
+   */
+  private async runFrame(body: BlockNode[]): Promise<void> {
+    const labels = collectLabels(body);
+    let target: GotoTarget | null = null;
+    for (;;) {
+      try {
+        if (target) {
+          const next = target;
+          target = null;
+          await this.resumeFrom(next);
+        } else {
+          await this.run(body);
+        }
+        return;
+      } catch (error) {
+        if (!(error instanceof GotoSignal)) throw error;
+        const found = labels.get(error.label);
+        if (!found) this.fail("runtime.error.unknownLabel", { name: error.label });
+        target = found;
+      }
+    }
+  }
+
+  private async resumeFrom(target: GotoTarget): Promise<void> {
+    await this.run(target.stack.slice(target.index));
+    for (let index = target.ancestors.length - 1; index >= 0; index -= 1) {
+      const ancestor = target.ancestors[index]!;
+      await this.run(ancestor.stack.slice(ancestor.index + 1));
+    }
   }
 
   async run(blocks: BlockNode[]): Promise<void> {
@@ -180,7 +216,7 @@ export class Interpreter implements ExecutionContext {
     });
     this.frames.push(frame);
     try {
-      await this.run((decl.node.inputs?.body as BlockNode[] | undefined) ?? []);
+      await this.runFrame((decl.node.inputs?.body as BlockNode[] | undefined) ?? []);
     } catch (error) {
       if (error instanceof ReturnSignal) {
         if (decl.kind === "action") this.fail("runtime.error.returnInAction", { name: decl.name });
@@ -277,4 +313,31 @@ export class Interpreter implements ExecutionContext {
     }
     return definition;
   }
+}
+
+interface GotoTarget {
+  /** The stack that directly contains the label. */
+  stack: BlockNode[];
+  index: number;
+  /** Enclosing stacks from the frame root inwards, with the child's index. */
+  ancestors: { stack: BlockNode[]; index: number }[];
+}
+
+/** Index labels in a frame. First definition wins; catch branches are skipped. */
+function collectLabels(body: BlockNode[]): Map<string, GotoTarget> {
+  const labels = new Map<string, GotoTarget>();
+  const visit = (stack: BlockNode[], ancestors: { stack: BlockNode[]; index: number }[]): void => {
+    stack.forEach((node, index) => {
+      if (node.type === "control.label") {
+        const name = String(node.fields?.name ?? "").trim();
+        if (name && !labels.has(name)) labels.set(name, { stack, index, ancestors });
+      }
+      for (const [port, value] of Object.entries(node.inputs ?? {})) {
+        if (port === "catches" || !Array.isArray(value)) continue;
+        visit(value, [...ancestors, { stack, index }]);
+      }
+    });
+  };
+  visit(body, []);
+  return labels;
 }

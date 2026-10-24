@@ -129,6 +129,7 @@ export const en: Catalog = {
   "diag.function.misplacedReturn": "Return can only be used inside a function.",
   "diag.function.returnInAction": "Action function “{name}” cannot return a value.",
 
+  "runtime.error.unknownLabel": "No label named {name} in this script or function.",
   "runtime.error.unknownBlock": "Unknown block: {type}",
   "runtime.error.missingVariable": "Variable not found: {name}",
   "runtime.error.badNumber": "Cannot convert “{value}” to a number",
@@ -318,6 +319,12 @@ export const en: Catalog = {
   "block.control.wait.port.seconds": "seconds",
   "block.control.pass.label": "pass",
   "block.control.pass.description": "Do nothing; a placeholder for an empty branch.",
+  "block.control.label.label": "label",
+  "block.control.label.description": "A jump target. Execution continues here after a matching goto.",
+  "block.control.label.field.name": "name",
+  "block.control.goto.label": "goto",
+  "block.control.goto.description": "Jump to the label with this name in the same script or function.",
+  "block.control.goto.field.name": "name",
   "block.control.break.label": "break",
   "block.control.break.description": "Leave the innermost loop immediately.",
 

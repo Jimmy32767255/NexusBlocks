@@ -126,6 +126,7 @@ export const zhCN: Catalog = {
   "diag.function.misplacedReturn": "「返回」只能用在函数内部。",
   "diag.function.returnInAction": "操作函数“{name}”不能返回值。",
 
+  "runtime.error.unknownLabel": "当前脚本或函数中没有名为 {name} 的标记。",
   "runtime.error.unknownBlock": "未知积木：{type}",
   "runtime.error.missingVariable": "找不到变量：{name}",
   "runtime.error.badNumber": "无法把“{value}”转换成数字",
@@ -315,6 +316,12 @@ export const zhCN: Catalog = {
   "block.control.wait.port.seconds": "秒",
   "block.control.pass.label": "空语句",
   "block.control.pass.description": "什么也不做，用作占位。",
+  "block.control.label.label": "标记",
+  "block.control.label.description": "跳转目标。执行到对应的跳转到时会从这里继续。",
+  "block.control.label.field.name": "名称",
+  "block.control.goto.label": "跳转到",
+  "block.control.goto.description": "跳到同一脚本或函数中同名标记的位置继续执行。",
+  "block.control.goto.field.name": "名称",
   "block.control.break.label": "跳出循环",
   "block.control.break.description": "立即结束当前所在的循环。",
 

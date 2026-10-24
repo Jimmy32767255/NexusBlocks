@@ -46,6 +46,19 @@ export class BreakSignal extends Error {
   }
 }
 
+/** Internal control-flow signal: jump to a label in the current frame. */
+export class GotoSignal extends Error {
+  readonly label: string;
+  readonly blockId?: string;
+
+  constructor(label: string, blockId?: string) {
+    super(`goto ${label}`);
+    this.name = "GotoSignal";
+    this.label = label;
+    this.blockId = blockId;
+  }
+}
+
 /** Raised by `sys.exit`; ends the whole run with an exit code. */
 export class ExitSignal extends Error {
   readonly code: number;
