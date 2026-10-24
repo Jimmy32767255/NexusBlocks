@@ -14,7 +14,7 @@ interface BlockDefinition extends BlockSchema {
 
 - `kind`：`hat`（入口）、`statement`（语句）、`expression`（表达式）。
 - `output`：表达式的结果类型；语句与 hat 为 `void`。
-- `fields`：属性编辑器（文本、数字、下拉、布尔、变量下拉）。
+- `fields`：属性编辑器（文本、数字、下拉、布尔、变量名输入）。
 - `ports`：`stack`（可嵌套语句串）或 `value`（可插表达式块）。
 - `label` / `description`：message key，由编辑器翻译。
 - `execute` 处理语句/ hat，`evaluate` 返回表达式值；两者都可以是 async。
@@ -53,8 +53,10 @@ interface BlockDefinition extends BlockSchema {
 | `text.contains` | 文本 | 判断包含关系 | `text`、`needle` 值 |
 | `time.get_os_time` | 系统 | 当前本地时间（`YYYY-MM-DD HH:mm:ss`） | 无 |
 | `os.exec_command` | 系统 | 用系统 shell 执行命令，打印输出；退出码非 0 报错。需要宿主提供 `os.exec` 能力（桌面版支持，浏览器不支持） | `command` 值 |
-| `var.set` | 变量 | 给变量赋值 | 属性 `variable`，`value` 值 |
-| `var.get` | 变量 | 读取变量 | 属性 `variable` |
+| `var.create` | 变量 | 运行时创建变量，类型 `any`/`text`/`number`/`boolean`/`list`/`dict`，初始值按类型校验 | 属性 `name`、`type`，`value` 值 |
+| `var.delete` | 变量 | 删除运行时创建的变量 | 属性 `name` |
+| `var.set` | 变量 | 给变量赋值（变量必须已创建，否则报 `runtime.error.missingVariable`） | 属性 `variable`，`value` 值 |
+| `var.get` | 变量 | 读取变量（变量必须已创建） | 属性 `variable` |
 | `list.literal` | 列表与字典 | JSON 列表字面量 | 属性 `items`，如 `[1, 2, 3]` |
 | `list.length` / `list.get` | 列表与字典 | 长度 / 按 0 起始下标取值 | `items` 列表，`index` 数字 |
 | `list.add` / `list.set` | 列表与字典 | 末尾追加 / 替换某项 | `items`、`index`、`value` |
@@ -111,7 +113,7 @@ interface ExecutionContext {
 - 值就是纯 JSON：`Value[]` 与 `{ [key: string]: Value }`，可以跨进程传输、直接序列化。
 - 字面量积木把文本字段按 JSON 解析；格式不符会抛出可翻译错误 `runtime.error.badJson`。
 - `list.add`、`list.set`、`dict.set` 就地修改容器（引用语义）；需要保留旧值应先复制。下标越界会抛 `runtime.error.badIndex`。
-- 变量本身可以声明为 `list` / `dict` 类型（新建变量对话框里选择），`var.get` 返回的就是同一个容器。
+- 变量可以用「创建变量」声明为 `list` / `dict` 类型，`var.get` 返回的就是同一个容器。
 
 ## 积木形状
 
