@@ -13,6 +13,7 @@ export const en: Catalog = {
   "toolbar.runTrace": "Trace",
   "toolbar.pause": "Pause",
   "toolbar.resume": "Continue",
+  "toolbar.step": "Step",
   "toolbar.stop": "Stop",
   "toolbar.new": "New project",
   "toolbar.open": "Open project",

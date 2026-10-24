@@ -30,6 +30,10 @@ export class DebugSession implements DebugHooks {
   private pauseRequested = false;
   private paused = false;
   private stopped = false;
+  /** Set while a paused session should execute exactly one more statement. */
+  private stepPending = false;
+  /** Pause at the next statement after a step was granted. */
+  private stepArmed = false;
   private waiters: Array<{ resolve: () => void; reject: (error: unknown) => void }> = [];
 
   constructor(options: DebugSessionOptions) {
@@ -72,6 +76,16 @@ export class DebugSession implements DebugHooks {
     this.options.onResume?.();
   }
 
+  /** Execute one statement, then pause again at the next boundary. */
+  step(): void {
+    if (this.stopped || !this.paused) return;
+    this.stepPending = true;
+    this.paused = false;
+    const waiters = this.waiters;
+    this.waiters = [];
+    for (const waiter of waiters) waiter.resolve();
+  }
+
   /** Abort a paused interpreter; the next gate throws `StopSignal`. */
   requestStop(): void {
     if (this.stopped) return;
@@ -85,12 +99,33 @@ export class DebugSession implements DebugHooks {
     if (this.stopped || this.signal.aborted) throw new StopSignal();
     this.options.onStatement?.(node.id);
     if (this.traceDelay > 0) await this.sleep(this.traceDelay);
-    if (this.breakpoints.has(node.id) || this.pauseRequested) {
+
+    let shouldPause = this.breakpoints.has(node.id) || this.pauseRequested;
+    if (this.stepPending) {
+      // The user stepped while paused here: run this statement and arm a pause
+      // for the next boundary, even if this node has a breakpoint too.
+      this.stepPending = false;
+      this.stepArmed = true;
+      this.pauseRequested = false;
+      shouldPause = false;
+    } else if (this.stepArmed) {
+      this.stepArmed = false;
+      shouldPause = true;
+    }
+
+    if (shouldPause) {
       this.pauseRequested = false;
       this.paused = true;
       this.options.onPause?.(node.id, view.variableValues());
       await this.waitForResume();
       if (this.stopped) throw new StopSignal();
+      if (this.stepPending) {
+        // A step was granted while we were waiting: run this statement, then
+        // pause again at the next boundary.
+        this.stepPending = false;
+        this.stepArmed = true;
+        this.paused = false;
+      }
     }
   }
 

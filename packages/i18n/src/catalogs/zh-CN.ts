@@ -10,6 +10,7 @@ export const zhCN: Catalog = {
   "toolbar.runTrace": "跟踪",
   "toolbar.pause": "暂停",
   "toolbar.resume": "继续",
+  "toolbar.step": "步进",
   "toolbar.stop": "停止",
   "toolbar.new": "新建项目",
   "toolbar.open": "打开项目",

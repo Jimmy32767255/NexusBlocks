@@ -14,6 +14,7 @@ export interface ToolbarOptions {
   onRunTrace: () => void;
   onPause: () => void;
   onResume: () => void;
+  onStep: () => void;
   onStop: () => void;
   onNew: () => void;
   onOpen: () => void;
@@ -114,6 +115,16 @@ export function renderToolbar(options: ToolbarOptions): HTMLElement {
     [icon("play", 15)],
   );
 
+  const stepButton = el(
+    "button",
+    {
+      class: "icon-button icon-button--step",
+      attrs: { type: "button", title: t("toolbar.step"), "aria-label": t("toolbar.step"), disabled: !paused },
+      on: { click: options.onStep },
+    },
+    [icon("step", 15)],
+  );
+
   const iconButton = (name: IconName, title: string, handler: () => void, disabled = false): HTMLElement =>
     el(
       "button",
@@ -136,6 +147,7 @@ export function renderToolbar(options: ToolbarOptions): HTMLElement {
       traceButton,
       pauseButton,
       resumeButton,
+      stepButton,
       stopButton,
       el("span", { class: "topbar__divider" }),
       iconButton("undo", t("toolbar.undo"), options.onUndo, !options.canUndo),

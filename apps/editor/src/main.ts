@@ -230,6 +230,7 @@ function renderNow(): void {
     onRunTrace: () => void run(true),
     onPause: () => debugSession?.requestPause(),
     onResume: () => debugSession?.resume(),
+    onStep: () => debugSession?.step(),
     onStop: () => stop(),
     onNew: () => void newProject(),
     onOpen: () => void openProject(),
@@ -1023,6 +1024,18 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (editing) return;
+
+  if (event.key === "F8") {
+    event.preventDefault();
+    if (store.state.status === "paused") debugSession?.resume();
+    else if (store.state.status === "running") debugSession?.requestPause();
+    return;
+  }
+  if (event.key === "F10") {
+    event.preventDefault();
+    debugSession?.step();
+    return;
+  }
 
   if (modifier && key === "z") {
     event.preventDefault();

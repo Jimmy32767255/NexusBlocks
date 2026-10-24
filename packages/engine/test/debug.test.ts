@@ -91,6 +91,32 @@ describe("debug session", () => {
     assert.equal((await run).status, "finished");
   });
 
+  it("steps exactly one statement and pauses again", async () => {
+    const { project, first, second } = twoPrints();
+    const controller = new AbortController();
+    const pauses: string[] = [];
+    const session = sessionFor(controller.signal, (id) => pauses.push(id), [first]);
+
+    const run = runProject(project, {
+      signal: controller.signal,
+      debug: session,
+      registry: createProjectRegistry(project),
+      host: createLocalHost(() => {}),
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.deepEqual(pauses, [first]);
+    assert.equal(session.isPaused, true);
+
+    session.step();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.deepEqual(pauses, [first, second]);
+    assert.equal(session.isPaused, true);
+
+    session.step();
+    assert.equal((await run).status, "finished");
+  });
+
   it("stops a paused program without resuming", async () => {
     const { project, second } = twoPrints();
     const controller = new AbortController();
