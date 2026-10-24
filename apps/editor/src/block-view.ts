@@ -34,6 +34,66 @@ export function autoSizeControl(control: HTMLInputElement | HTMLSelectElement): 
   input.style.width = `${clampWidth(measureText(input.value) + 22, 54, 320)}px`;
 }
 
+function directChild(parent: HTMLElement, selector: string): HTMLElement | null {
+  for (const child of parent.children) {
+    if (child.matches(selector)) return child as HTMLElement;
+  }
+  return null;
+}
+
+interface BlockWidths {
+  /** Width the top bar should span, in px. */
+  top: number;
+  /** Width the bottom lip should span, in px. */
+  bottom: number;
+}
+
+const blockWidths = new WeakMap<HTMLElement, BlockWidths>();
+
+/**
+ * Make C-shaped blocks staircase: the top bar matches the first wrapped
+ * statement and the bottom lip the last one, recursing through nested C blocks.
+ * Runs after the canvas is mounted; widths live in inline styles only.
+ */
+export function applyBlockWidths(root: ParentNode): void {
+  const blocks = Array.from(root.querySelectorAll<HTMLElement>(".block"));
+  for (const block of blocks.reverse()) {
+    const head = directChild(block, ".block__head");
+    if (!head) continue;
+    if (!block.classList.contains("block--c")) {
+      const width = Math.ceil(head.getBoundingClientRect().width);
+      blockWidths.set(block, { top: width, bottom: width });
+      continue;
+    }
+
+    const foot = directChild(block, ".block__foot");
+    head.style.width = "";
+    const natural = Math.ceil(head.getBoundingClientRect().width);
+    const stacks: HTMLElement[][] = [];
+    for (const mouth of block.children) {
+      if (!mouth.classList.contains("block__mouth")) continue;
+      const section = directChild(mouth as HTMLElement, ".stack");
+      if (!section) continue;
+      stacks.push(
+        Array.from(section.children).filter(
+          (child): child is HTMLElement => child instanceof HTMLElement && child.classList.contains("block"),
+        ),
+      );
+    }
+    const first = stacks.find((list) => list.length > 0)?.[0];
+    const last = [...stacks].reverse().find((list) => list.length > 0)?.at(-1);
+    const top = first
+      ? Math.max(natural, first.offsetLeft + (blockWidths.get(first)?.top ?? 0))
+      : natural;
+    const bottom = last
+      ? last.offsetLeft + (blockWidths.get(last)?.bottom ?? 0)
+      : natural;
+    head.style.width = `${top}px`;
+    if (foot) foot.style.width = `${bottom}px`;
+    blockWidths.set(block, { top, bottom });
+  }
+}
+
 export interface BlockRenderContext {
   registry: BlockRegistry;
   selectedId: string | null;

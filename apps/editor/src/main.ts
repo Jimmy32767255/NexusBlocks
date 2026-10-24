@@ -28,6 +28,7 @@ import {
   type Value,
   type ValueType,
 } from "@nexus/ir";
+import { applyBlockWidths } from "./block-view.ts";
 import { renderCanvas } from "./canvas.ts";
 import { renderConsole } from "./console.ts";
 import { confirmDialog, helpBody, openDialog, variableDialog } from "./dialogs.ts";
@@ -250,6 +251,7 @@ function renderNow(): void {
   host.replaceChildren(
     el("div", { class: "app" }, [toolbar, el("main", { class: "workspace" }, [toolbox, stage, side])]),
   );
+  applyBlockWidths(stage);
   applyViewport();
 }
 

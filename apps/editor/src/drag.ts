@@ -9,7 +9,7 @@ import {
   type BlockNode,
   type ValueType,
 } from "@nexus/ir";
-import { renderBlock } from "./block-view.ts";
+import { applyBlockWidths, renderBlock } from "./block-view.ts";
 import {
   createScriptWith,
   insertIntoStack,
@@ -182,6 +182,7 @@ function activate(current: Session): boolean {
   current.active = true;
   current.ghost = buildGhost(payload.blocks, deps);
   document.body.append(current.ghost);
+  applyBlockWidths(current.ghost);
   document.body.classList.add("is-dragging");
   moveGhost(current);
   return true;
