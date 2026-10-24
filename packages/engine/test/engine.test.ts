@@ -934,3 +934,75 @@ test("os.exec_command prints stdout and fails on non-zero exits", async () => {
   assert.equal(failingResult.error?.messageKey, "runtime.error.commandFailed");
   assert.deepEqual(failingResult.error?.params, { code: 7 });
 });
+
+test("boolean conversions cover numbers, text and booleans", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: {
+              value: createBlock("convert.toNumber", {
+                inputs: { text: createBlock("logic.boolean", { fields: { value: true } }) },
+              }),
+            },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: { value: createBlock("logic.boolean", { fields: { value: false } }) },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: {
+              value: createBlock("convert.toBoolean", {
+                inputs: { value: createBlock("math.number", { fields: { value: 0 } }) },
+              }),
+            },
+          }),
+        },
+      }),
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: {
+              value: createBlock("convert.toBoolean", {
+                inputs: { value: createBlock("text.literal", { fields: { value: "false" } }) },
+              }),
+            },
+          }),
+        },
+      }),
+    ]),
+  );
+  const events: RuntimeEvent[] = [];
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(loggedTexts(events), ["1", "false", "false", "false"]);
+});
+
+test("convert to boolean rejects other text", async () => {
+  const project = projectWith(
+    start([
+      createBlock("io.print", {
+        inputs: {
+          text: createBlock("convert.toString", {
+            inputs: {
+              value: createBlock("convert.toBoolean", {
+                inputs: { value: createBlock("text.literal", { fields: { value: "yes" } }) },
+              }),
+            },
+          }),
+        },
+      }),
+    ]),
+  );
+  const result = await runProject(project);
+  assert.equal(result.status, "error");
+  assert.equal(result.error?.messageKey, "runtime.error.toBoolean");
+});

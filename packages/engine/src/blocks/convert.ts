@@ -20,12 +20,33 @@ export const convertBlocks: BlockDefinition[] = [
     ports: [{ name: "text", label: "block.convert.toNumber.port.text", kind: "value", type: "text", default: "0" }],
     async evaluate(ctx, node) {
       const raw = await ctx.input(node, "text");
+      if (typeof raw === "boolean") return raw ? 1 : 0;
       if (typeof raw === "number" && Number.isFinite(raw)) return raw;
       const value = String(raw).trim();
       if (!NUMBER_PATTERN.test(value)) {
         ctx.fail("runtime.error.toNumber", { value });
       }
       return Number(value);
+    },
+  },
+  {
+    type: "convert.toBoolean",
+    kind: "expression",
+    category: "convert",
+    label: "block.convert.toBoolean.label",
+    description: "block.convert.toBoolean.description",
+    output: "boolean",
+    color: CONVERT,
+    fields: [],
+    ports: [{ name: "value", label: "block.convert.toBoolean.port.value", kind: "value", type: "any", default: "" }],
+    async evaluate(ctx, node) {
+      const raw = await ctx.input(node, "value");
+      if (typeof raw === "boolean") return raw;
+      if (typeof raw === "number") return raw !== 0;
+      const text = String(raw).trim().toLowerCase();
+      if (text === "true") return true;
+      if (text === "false") return false;
+      ctx.fail("runtime.error.toBoolean", { value: String(raw) });
     },
   },
   {
