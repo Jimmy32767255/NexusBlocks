@@ -1,4 +1,4 @@
-import { validateProject, type Project } from "@nexus/ir";
+import { bindNameCalls, validateProject, type Project } from "@nexus/ir";
 import { CapabilityUnavailableError, createLocalHost } from "./host.ts";
 import { Interpreter } from "./interpreter.ts";
 import { BreakSignal, ExitSignal, RuntimeFailure, StopSignal } from "./errors.ts";
@@ -38,6 +38,31 @@ export async function runProject(project: Project, options: RunOptions = {}): Pr
         error: { messageKey: first.messageKey, params: first.params, blockId: first.blockId },
       };
     }
+  }
+
+  const missingNames = bindNameCalls(project);
+  if (missingNames.length > 0) {
+    for (const missing of missingNames) {
+      emit({
+        kind: "error",
+        blockId: missing.blockId,
+        messageKey: "runtime.error.unknownFunction",
+        params: { name: missing.name },
+        time: Date.now(),
+      });
+    }
+    const first = missingNames[0]!;
+    emit({ kind: "status", status: "error", durationMs: performance.now() - started });
+    return {
+      status: "error",
+      durationMs: performance.now() - started,
+      steps: 0,
+      error: {
+        messageKey: "runtime.error.unknownFunction",
+        params: { name: first.name },
+        blockId: first.blockId,
+      },
+    };
   }
 
   const registry = options.registry ?? createProjectRegistry(project);

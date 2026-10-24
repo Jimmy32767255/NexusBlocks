@@ -1,5 +1,6 @@
 import {
   isFunctionDefine,
+  parseNblk,
   functionDeclFromNode,
   importSpecOf,
   parseDocument,
@@ -93,11 +94,15 @@ export async function resolveImports(
         continue;
       }
 
-      const parsed = parseDocument(text);
+      const parsed = spec.path.endsWith(".nblk") ? parseNblk(text) : parseDocument(text);
       if (!parsed.ok) {
+        const detail = parsed.error;
         errors.push({
           messageKey: "runtime.error.importInvalid",
-          params: { file: spec.path, message: parsed.error },
+          params: {
+            file: spec.path,
+            message: typeof detail === "string" ? detail : `line ${detail.line}: ${detail.message}`,
+          },
           blockId: spec.blockId,
         });
         continue;

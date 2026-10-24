@@ -1,0 +1,18 @@
+{
+  "name": "@nexus/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone Nexus Blocks interpreter",
+  "exports": {
+    ".": "./src/main.ts"
+  },
+  "bin": {
+    "nblk": "./dist/nblk"
+  },
+  "dependencies": {
+    "@nexus/engine": "workspace:*",
+    "@nexus/i18n": "workspace:*",
+    "@nexus/ir": "workspace:*"
+  }
+}

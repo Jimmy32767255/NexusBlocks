@@ -1,12 +1,13 @@
 import {
   VALUE_TYPES,
   type BlockNode,
+  type Project,
   type BlockSchema,
   type FieldValue,
   type PortDef,
   type ValueType,
 } from "./model.ts";
-import { walkBlocks } from "./traverse.ts";
+import { walkBlocks, walkProject } from "./traverse.ts";
 
 /** Legacy hat that defines a function; read as a value function. */
 export const FUNCTION_DEFINE_TYPE = "func.define" as const;
@@ -21,6 +22,8 @@ export const FUNCTION_DEFINE_TYPES = [
 ] as const;
 /** Expression/statement prefix for generated function call blocks. */
 export const FUNCTION_CALL_PREFIX = "func.call:" as const;
+/** Calls parsed from text before imports are resolved carry a function name. */
+export const FUNCTION_NAME_CALL_PREFIX = "func.call:name:" as const;
 /** Expression that reads a parameter inside a function body. */
 export const FUNCTION_PARAM_TYPE = "func.param" as const;
 /** Statement that leaves the current function with a value. */
@@ -149,6 +152,45 @@ function paramPort(param: FunctionParam): PortDef {
 }
 
 /** Toolbox/canvas schema for a call to the given function. */
+export function functionNameCallType(name: string): string {
+  return `${FUNCTION_NAME_CALL_PREFIX}${name}`;
+}
+
+export function functionNameCallOf(type: string): string | null {
+  return type.startsWith(FUNCTION_NAME_CALL_PREFIX) ? type.slice(FUNCTION_NAME_CALL_PREFIX.length) : null;
+}
+
+/**
+ * Rewrite name-based calls (produced by the text parser) into id-based calls
+ * once all functions are known. Arguments were parsed into `arg0..argN` and
+ * are renamed to the declaration's parameter names.
+ */
+export function bindNameCalls(project: Project): { name: string; blockId: string }[] {
+  const byName = new Map<string, FunctionDecl>();
+  for (const decl of collectFunctions(project.scripts)) byName.set(decl.name, decl);
+  const missing: { name: string; blockId: string }[] = [];
+  walkProject(project, (node) => {
+    const name = functionNameCallOf(node.type);
+    if (name === null) return;
+    const decl = byName.get(name);
+    if (!decl) {
+      missing.push({ name, blockId: node.id });
+      return;
+    }
+    node.type = functionCallType(decl.id);
+    const fields = node.fields;
+    if (!fields) return;
+    decl.params.forEach((param, index) => {
+      const key = `arg${index}`;
+      if (key in fields) {
+        fields[param.name] = fields[key]!;
+        delete fields[key];
+      }
+    });
+  });
+  return missing;
+}
+
 export function createFunctionCallSchema(decl: FunctionDecl): BlockSchema {
   const ports = decl.params.map(paramPort);
   return {

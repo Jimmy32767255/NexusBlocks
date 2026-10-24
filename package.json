@@ -19,12 +19,18 @@
     "package": "node scripts/package.mjs",
     "package:linux": "node scripts/package.mjs linux",
     "package:windows": "node scripts/package.mjs windows",
-    "package:all": "node scripts/package.mjs all"
+    "package:all": "node scripts/package.mjs all",
+    "cli:build": "pnpm --filter @nexus/cli exec node scripts/build.mjs",
+    "cli:package": "pnpm --filter @nexus/cli exec node scripts/build.mjs && pnpm --filter @nexus/cli exec node scripts/compile.mjs",
+    "cli:install": "pnpm cli:package && node packages/cli/scripts/install.mjs",
+    "cli:package:windows": "pnpm --filter @nexus/cli exec node scripts/build.mjs && pnpm --filter @nexus/cli exec node scripts/compile.mjs windows"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",
     "@types/node": "^24.7.0",
+    "esbuild": "^0.28.2",
     "jsdom": "^30.1.3",
+    "postject": "1.0.0-alpha.6",
     "typescript": "^5.9.3",
     "vite": "^6.3.5"
   },

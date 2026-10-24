@@ -27,6 +27,7 @@ import {
   collectFunctions,
   formatParams,
   functionCallType,
+  functionNameCallType,
   parseParams,
   FUNCTION_DEFINE_ACTION_TYPE,
   FUNCTION_DEFINE_TYPE,
@@ -954,7 +955,17 @@ class Parser {
     }
     for (const [id, pending] of this.pending) {
       const decl = byName.get(pending.name);
-      if (!decl) fail(pending.line, `Unknown function: ${pending.name}`);
+      const unresolved = decl === undefined;
+      if (unresolved) {
+        let node: BlockNode | undefined;
+        this.findNode(id, (candidate) => {
+          node = candidate;
+        });
+        if (!node) continue;
+        node.type = functionNameCallType(pending.name);
+        pending.args.forEach((value, index) => this.assign(node!, `arg${index}`, value));
+        continue;
+      }
       if (pending.args.length > decl.params.length) {
         fail(pending.line, `Too many arguments for ${pending.name} (expected ${decl.params.length})`);
       }
