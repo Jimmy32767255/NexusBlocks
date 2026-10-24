@@ -205,4 +205,9 @@ export interface BlockSchema {
   hidden?: boolean;
   /** Statement that ends control flow, so nothing can be attached underneath. */
   terminal?: boolean;
+  /**
+   * Where the block can run. `desktop` blocks need a host capability that the
+   * browser build cannot provide; the toolbox still offers them everywhere.
+   */
+  platforms?: "any" | "desktop";
 }

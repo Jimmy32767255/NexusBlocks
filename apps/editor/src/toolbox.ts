@@ -1,7 +1,11 @@
-import type { BlockRegistry } from "@nexus/engine";
+import type { BlockDefinition, BlockRegistry } from "@nexus/engine";
+import { renderBlockDetails } from "./block-info.ts";
+import { openDialog } from "./dialogs.ts";
 import { el } from "./dom.ts";
 import { icon } from "./icons.ts";
 import { t } from "./i18n.ts";
+
+const TIP_DELAY_MS = 600;
 
 const COLLAPSED_KEY = "nexus-blocks:toolbox-collapsed";
 
@@ -25,6 +29,83 @@ function saveCollapsed(collapsed: Set<string>): void {
 
 const collapsedGroups = loadCollapsed();
 
+window.addEventListener("scroll", hideTip, true);
+
+let tipTimer: number | null = null;
+let hideTimer: number | null = null;
+let tipElement: HTMLElement | null = null;
+
+/** Remove the tip immediately and cancel any pending timers. */
+function hideTip(): void {
+  if (tipTimer !== null) window.clearTimeout(tipTimer);
+  if (hideTimer !== null) window.clearTimeout(hideTimer);
+  tipTimer = null;
+  hideTimer = null;
+  tipElement?.remove();
+  tipElement = null;
+}
+
+/**
+ * Hide after a short grace period so the pointer can travel from the row to
+ * the tooltip and click its "more" link without it vanishing.
+ */
+function hideTipSoon(): void {
+  // Cancel a pending appearance right away: leaving must never pop a tip.
+  if (tipTimer !== null) window.clearTimeout(tipTimer);
+  tipTimer = null;
+  if (hideTimer !== null) window.clearTimeout(hideTimer);
+  hideTimer = window.setTimeout(hideTip, 160);
+}
+
+/** Show the short hover card under `anchor`, with a link to the full sheet. */
+function showTip(anchor: HTMLElement, definition: BlockDefinition): void {
+  hideTip();
+  const tip = el("div", { class: "block-tip", attrs: { role: "tooltip" } });
+  tip.append(
+    el("div", { class: "block-tip__title", text: t(definition.label) }),
+    el("div", { class: "block-tip__type", text: definition.type }),
+  );
+  if (definition.description) {
+    tip.append(el("p", { class: "block-tip__text", text: t(definition.description) }));
+  }
+  const more = el("button", {
+    class: "block-tip__more",
+    text: t("toolbox.tip.more"),
+    attrs: { type: "button" },
+  });
+  more.addEventListener("click", (event) => {
+    event.stopPropagation();
+    hideTip();
+    void openDialog({
+      title: t(definition.label),
+      body: renderBlockDetails(definition),
+      actions: [{ label: t("common.close"), value: "close" }],
+    });
+  });
+  tip.append(more);
+
+  const rect = anchor.getBoundingClientRect();
+  tip.style.left = `${Math.round(rect.left + 8)}px`;
+  tip.style.top = `${Math.round(rect.bottom + 6)}px`;
+  tip.addEventListener("pointerenter", () => {
+    if (hideTimer !== null) window.clearTimeout(hideTimer);
+    hideTimer = null;
+  });
+  tip.addEventListener("pointerleave", hideTipSoon);
+  document.body.append(tip);
+  tipElement = tip;
+}
+
+/** Start the hover timer; drags and pointer-out cancel it. */
+function scheduleTip(anchor: HTMLElement, definition: BlockDefinition): void {
+  hideTip();
+  if (document.body.classList.contains("is-dragging")) return;
+  tipTimer = window.setTimeout(() => {
+    tipTimer = null;
+    showTip(anchor, definition);
+  }, TIP_DELAY_MS);
+}
+
 export interface ToolboxOptions {
   registry: BlockRegistry;
   onInsert: (type: string) => void;
@@ -32,6 +113,7 @@ export interface ToolboxOptions {
 }
 
 export function renderToolbox(options: ToolboxOptions): HTMLElement {
+  hideTip();
   const search = el("input", {
     class: "input input--search",
     attrs: { type: "search", placeholder: t("toolbox.search"), "aria-label": t("toolbox.search") },
@@ -98,7 +180,12 @@ export function renderToolbox(options: ToolboxOptions): HTMLElement {
         }),
         el("span", { class: "toolbox__label", text: label }),
       );
+      row.addEventListener("pointerenter", () => scheduleTip(row, definition));
+      row.addEventListener("pointerleave", hideTipSoon);
+      row.addEventListener("focus", () => scheduleTip(row, definition));
+      row.addEventListener("blur", hideTipSoon);
       row.addEventListener("pointerdown", (event) => {
+        hideTip();
         if (event.button !== 0) return;
         event.preventDefault();
         options.onDragStart(event, definition.type);
