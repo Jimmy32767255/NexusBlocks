@@ -24,7 +24,6 @@ import type { Store } from "./store.ts";
 export interface DragDeps {
   store: Store;
   registry: BlockRegistry;
-  variables: () => readonly { id: string; name: string }[];
   zoom: () => number;
   surface: () => HTMLElement | null;
   createInstance: (type: string) => InstanceResult;
@@ -124,7 +123,7 @@ function activate(current: Session): boolean {
   if (source.kind === "toolbox") {
     const result = deps.createInstance(source.type);
     if (!result.ok) {
-      deps.toast(result.reason === "variable" ? "toast.variableRequired" : "toast.dropInvalid");
+      deps.toast("toast.dropInvalid");
       cleanup();
       return false;
     }
@@ -193,7 +192,6 @@ function buildGhost(blocks: BlockNode[], deps: DragDeps): HTMLElement {
   const context = {
     registry: deps.registry,
     selectedId: null,
-    variables: deps.variables(),
     interactive: false,
   };
   for (const block of blocks) ghost.append(renderBlock(block, context));

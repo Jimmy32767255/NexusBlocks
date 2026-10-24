@@ -7,7 +7,6 @@ import { t } from "./i18n.ts";
 export interface CanvasOptions {
   registry: BlockRegistry;
   selectedId: string | null;
-  variables: readonly { id: string; name: string }[];
   zoom: number;
   viewport: { x: number; y: number };
   interactive: boolean;
@@ -32,7 +31,6 @@ export function renderCanvas(document: NexusDocument, options: CanvasOptions): C
   const context = {
     registry: options.registry,
     selectedId: options.selectedId,
-    variables: options.variables,
     interactive: options.interactive,
     ...(options.breakpoints ? { breakpoints: options.breakpoints } : {}),
     ...(options.debugCurrentId ? { debugCurrentId: options.debugCurrentId } : {}),

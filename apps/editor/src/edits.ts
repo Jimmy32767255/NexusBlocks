@@ -14,17 +14,10 @@ import type { BlockRegistry } from "@nexus/engine";
 
 export type InstanceResult =
   | { ok: true; node: BlockNode }
-  | { ok: false; reason: "unknown" | "variable" };
+  | { ok: false; reason: "unknown" };
 
-/**
- * Instantiate a block from its schema, filling declared fields with defaults.
- * Variable blocks require at least one variable to exist.
- */
-export function newBlockInstance(
-  registry: BlockRegistry,
-  project: Project,
-  type: string,
-): InstanceResult {
+/** Instantiate a block from its schema, filling declared fields with defaults. */
+export function newBlockInstance(registry: BlockRegistry, type: string): InstanceResult {
   const definition = registry.get(type);
   if (!definition) return { ok: false, reason: "unknown" };
 
@@ -33,13 +26,7 @@ export function newBlockInstance(
 
   const fields: Record<string, string | number | boolean> = {};
   for (const field of definition.fields) {
-    let value = field.default;
-    if (field.kind === "variable") {
-      const variable = project.variables[0];
-      if (!variable) return { ok: false, reason: "variable" };
-      value = variable.id;
-    }
-    fields[field.name] = value;
+    fields[field.name] = field.default;
   }
   node.fields = fields;
   return { ok: true, node };

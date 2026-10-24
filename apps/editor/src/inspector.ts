@@ -7,7 +7,6 @@ import { t } from "./i18n.ts";
 export interface InspectorOptions {
   registry: BlockRegistry;
   selected: BlockNode | null;
-  variables: readonly { id: string; name: string }[];
   onFieldChange: (blockId: string, field: string, value: string | number | boolean) => void;
   onLiteralChange: (blockId: string, port: string, value: string | number | boolean) => void;
   onUnplug: (blockId: string, port: string) => void;
@@ -210,20 +209,12 @@ function renderInspectorField(node: BlockNode, field: FieldDef, options: Inspect
       break;
     }
     case "variable": {
-      const select = el("select", { class: "input" });
-      if (options.variables.length === 0) {
-        select.append(el("option", { text: t("inspector.noVariables"), attrs: { value: "" } }));
-      }
-      for (const variable of options.variables) {
-        select.append(
-          el("option", {
-            text: variable.name,
-            attrs: { value: variable.id, selected: variable.id === String(raw) },
-          }),
-        );
-      }
-      select.addEventListener("change", () => options.onFieldChange(node.id, field.name, select.value));
-      control = select;
+      const input = el("input", {
+        class: "input",
+        attrs: { type: "text", value: String(raw ?? ""), placeholder: t("inspector.variableName") },
+      });
+      input.addEventListener("change", () => options.onFieldChange(node.id, field.name, input.value.trim()));
+      control = input;
       break;
     }
     case "text":
