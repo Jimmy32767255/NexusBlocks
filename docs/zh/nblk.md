@@ -49,6 +49,8 @@ start:
 | 退出程序 | `exit expr` |
 | 执行系统命令 | `run expr` |
 | 注释 | `note "text"` |
+| 标记 | `label name`（名称有空格时写 `label "with space"`） |
+| 跳转 | `goto name` |
 | 跳出循环 | `break` |
 | 返回 | `return expr`（仅函数体） |
 | 未知积木 | `raw {"type": "...", "fields": {...}}` |

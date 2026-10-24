@@ -18,7 +18,7 @@ Working today:
 
 - A complete visual editor: toolbox, drag & drop with snapping, nested blocks, canvas pan/zoom, inspector, variables panel, console, problems panel, undo/redo, and local autosave.
 - **Debugging**: pause/resume, single-step execution, per-statement breakpoints, and trace mode with live variable values. Debug state lives in the editor and is never written to `.nblk` files.
-- 54 built-in blocks across control/IO/comments/logic/math/text/variables, plus waiting, breaking out of loops, error handling (throw/try/catch), lists and dictionaries, function definitions/parameters, and local file I/O. Every function definition also yields a dynamic call block.
+- 56 built-in blocks across control/IO/comments/logic/math/text/variables, plus waiting, breaking out of loops, error handling (throw/try/catch), lists and dictionaries, function definitions/parameters, and local file I/O. Every function definition also yields a dynamic call block.
 - An interpreter with a step limit, cancellation, event stream (logs, output, status, errors), and variable scopes.
 - English and Chinese UI, runtime messages, and program output in the project locale.
 - **Desktop shell (Tauri 2)**: loads the same editor bundle; `fs.*` reaches the real file system (absolute paths, `~/…`, or home-relative), while the browser build keeps its localStorage file area.

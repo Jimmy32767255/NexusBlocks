@@ -30,6 +30,8 @@ interface BlockDefinition extends BlockSchema {
 | `control.while` | 控制 | 条件为真时重复 | `condition` 布尔值、`body` 栈 |
 | `control.repeatWith` | 控制 | 重复并计数，当前轮次从 1 开始写入变量 | `times` 数字、`body` 栈，属性 `variable` |
 | `control.wait` | 控制 | 等待若干秒（可被「停止」中断） | `seconds` 数字 |
+| `control.label` | 控制 | 标记一个跳转目标 | 属性 `name` |
+| `control.goto` | 控制 | 跳转到同一脚本/函数中的标记 | 属性 `name` |
 | `control.pass` | 控制 | 空语句，什么也不做 | — |
 | `comment.note` | 注释 | 注释语句，运行时不产生任何效果 | 属性 `text` |
 | `sys.exit` | 系统 | 立即结束整个程序 | `code` 数字状态码 |
@@ -187,6 +189,15 @@ registry.grouped();         // 按类别分组，供工具箱
 ## 跳出循环
 
 `control.break` 抛出内部 `BreakSignal`，只由循环积木捕获（`control.repeat`、`control.forever`、`control.while`、`control.repeatWith`）。如果在循环外执行，整次运行以 `runtime.error.breakOutsideLoop` 报错。`func.return` 用同一套控制流信号，两者都会安全穿过 `control.if` 等普通语句。
+
+## 标记与跳转
+
+`control.label` 是空操作，`control.goto` 抛出 `GotoSignal(name)`。信号由当前脚本或函数的 `runFrame` 捕获：在帧内按出现顺序（深度优先）查找第一个同名标记，然后从该标记所在的语句继续执行，再依次执行各层外层栈中位于容器之后的语句。
+
+- 标记可以放在任意嵌套位置；跳进循环体或条件分支后，程序会从标记处继续，而不会重新判断外层条件或重跑循环头部。
+- 标签只在当前脚本或函数内可见；查找不跨越函数调用边界。
+- 找不到同名标记时以 `runtime.error.unknownLabel`（参数 `{name}`）结束运行。
+- 同名标记重复时第一个生效；`catch` 分支里的标记暂不参与索引。
 
 ## 错误处理
 
