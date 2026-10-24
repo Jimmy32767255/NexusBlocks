@@ -48,6 +48,20 @@ function compare(op: string, a: Value, b: Value): boolean {
 
 export const logicBlocks: BlockDefinition[] = [
   {
+    type: "logic.not",
+    kind: "expression",
+    category: "logic",
+    label: "block.logic.not.label",
+    description: "block.logic.not.description",
+    output: "boolean",
+    color: LOGIC,
+    fields: [],
+    ports: [{ name: "value", label: "block.logic.not.port.value", kind: "value", type: "boolean", default: true }],
+    async evaluate(ctx, node) {
+      return !truthy(await ctx.input(node, "value"));
+    },
+  },
+  {
     type: "logic.boolean",
     kind: "expression",
     category: "logic",
