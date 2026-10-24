@@ -290,7 +290,7 @@ export const en: Catalog = {
   "block.control.if.port.else": "else",
   "block.control.if.port.elseIfCondition": "else if condition",
   "block.control.if.port.elseIfBody": "else if body",
-  "block.control.if.field.elseIfs": "else-if branches",
+  "block.control.if.field.elseIfs": "extra branches",
   "block.grow.add": "Add item",
   "block.grow.remove": "Remove item",
   "block.grow.addParam": "Add parameter",

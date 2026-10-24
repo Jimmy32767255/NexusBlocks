@@ -674,7 +674,11 @@ class Parser {
         }
         break;
       }
-      node.fields = { ...(node.fields ?? {}), elseIfs: count };
+      node.fields = {
+        ...(node.fields ?? {}),
+        // Extension value: 0 = plain if, 1 = if/else, N = if + (N-1) else-if + else.
+        elseIfs: count > 0 || node.inputs?.else !== undefined ? count + 1 : 0,
+      };
       return node;
     }
     if (text.startsWith("while ") && text.endsWith(":")) {
@@ -1153,7 +1157,7 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
     case "control.if": {
       const lines = [`if ${portValue(node, "condition", "boolean", context)}:`];
       lines.push(...body("then"));
-      const count = Number(node.fields?.elseIfs ?? 0);
+      const count = Math.max(0, Number(node.fields?.elseIfs ?? 0) - 1);
       for (let index = 1; index <= count; index += 1) {
         lines.push(`else if ${portValue(node, `elseIf${index}`, "boolean", context)}:`);
         lines.push(...body(`elseIf${index}Body`));

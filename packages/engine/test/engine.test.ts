@@ -787,7 +787,7 @@ test("if blocks run the matching else-if branch", async () => {
   const project = projectWith(
     start([
       createBlock("control.if", {
-        fields: { elseIfs: 2 },
+        fields: { elseIfs: 3 },
         inputs: {
           condition: createBlock("logic.boolean", { fields: { value: false } }),
           elseIf1: createBlock("logic.boolean", { fields: { value: false } }),

@@ -410,7 +410,7 @@ describe("inline control sizing", () => {
         inputs: {
           body: [
             { id: "j", type: "text.join", fields: { count: 3 } },
-            { id: "i", type: "control.if", fields: { elseIfs: 1 } },
+            { id: "i", type: "control.if", fields: { elseIfs: 2 } },
           ],
         },
       },
@@ -435,6 +435,32 @@ describe("inline control sizing", () => {
     assert.equal(ifBlock.querySelectorAll(".stack__caption").length, 1);
     assert.equal(ifBlock.querySelectorAll(".block__bar").length, 2);
     assert.equal(ifBlock.querySelector('[data-branch="elseIf1"] .block__label')?.textContent, "否则如果");
+    assert.equal(ifBlock.querySelector('[data-branch="else"] .block__label')?.textContent, "否则");
+  });
+
+  it("renders if/else for extension value one", () => {
+    const document = createDocument(createProject());
+    document.project.scripts = [
+      {
+        id: "s",
+        type: "control.start",
+        inputs: {
+          body: [{ id: "pair", type: "control.if", fields: { elseIfs: 1 } }],
+        },
+      },
+    ];
+    const view = renderCanvas(document, {
+      registry: defaultRegistry,
+      selectedId: null,
+      variables: [],
+      zoom: 1,
+      viewport: { x: 0, y: 0 },
+      interactive: true,
+    });
+    const ifBlock = view.surface.querySelector<HTMLElement>('[data-block-id="pair"]');
+    assert.ok(ifBlock);
+    assert.equal(ifBlock.querySelectorAll(":scope > .block__mouth").length, 2);
+    assert.equal(ifBlock.querySelectorAll(":scope > .block__bar").length, 1);
     assert.equal(ifBlock.querySelector('[data-branch="else"] .block__label')?.textContent, "否则");
   });
 

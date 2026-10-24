@@ -73,7 +73,7 @@ export const controlBlocks: BlockDefinition[] = [
     fields: [IF_ELSEIFS],
     ports: [],
     dynamicPorts(node): PortDef[] {
-      const count = countField(node, IF_ELSEIFS);
+      const count = Math.max(0, countField(node, IF_ELSEIFS) - 1);
       const ports: PortDef[] = [
         { name: "condition", label: "block.control.if.port.condition", kind: "value", type: "boolean", default: false },
         { name: "then", label: "block.control.if.port.then", kind: "stack" },
@@ -92,7 +92,8 @@ export const controlBlocks: BlockDefinition[] = [
         await ctx.run(ctx.stack(node, "then"));
         return;
       }
-      for (let index = 1; index <= countField(node, IF_ELSEIFS); index += 1) {
+      const count = Math.max(0, countField(node, IF_ELSEIFS) - 1);
+      for (let index = 1; index <= count; index += 1) {
         if (await ctx.input(node, `elseIf${index}`)) {
           await ctx.run(ctx.stack(node, `elseIf${index}Body`));
           return;

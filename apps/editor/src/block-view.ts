@@ -201,7 +201,8 @@ function renderIfBody(
   const thenPort = ports.find((port) => port.name === "then" && port.kind === "stack");
   if (thenPort) root.append(renderStack(node, thenPort, context));
 
-  const count = Number(node.fields?.elseIfs ?? 0);
+  const ext = Number(node.fields?.elseIfs ?? 0);
+  const count = Math.max(0, ext - 1);
   for (let index = 1; index <= count; index += 1) {
     const conditionPort = ports.find((port) => port.name === `elseIf${index}` && port.kind === "value");
     const bar = el("div", { class: "block__bar", dataset: { branch: `elseIf${index}` } }, [
@@ -215,7 +216,7 @@ function renderIfBody(
 
   const elseInput = node.inputs?.else;
   const hasElse = Array.isArray(elseInput) && elseInput.length > 0;
-  if (count > 0 || hasElse) {
+  if (ext > 0 || hasElse) {
     root.append(
       el("div", { class: "block__bar block__bar--else", dataset: { branch: "else" } }, [
         el("span", { class: "block__label", text: t("block.control.if.else") }),

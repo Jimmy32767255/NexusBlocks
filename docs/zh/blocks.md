@@ -146,7 +146,7 @@ registry.grouped();         // 按类别分组，供工具箱
 部分积木支持在画布上直接增减内容，状态存在积木自己的字段里：
 
 - `text.join`：字段 `count`（2–8）。端口按 `a`、`b`、`c`… 依次生成。
-- `control.if`：字段 `elseIfs`（0–4）。每个否则如果分支生成 `elseIfN`（布尔条件）与 `elseIfNBody`（栈）两个端口，最后仍是 `else`。
+- `control.if`：字段 `elseIfs` 是扩展值（0–4）。0 为普通 if；N≥1 时生成 N−1 个 `elseIfN`（布尔条件）与 `elseIfNBody`（栈）端口，外加 `else` 端口。
 - `func.define`：`params` 是文本字段，画布上的 `+`/`−` 会按 `名称:类型` 语法追加或删除最后一个参数。
 
 这类端口由 `BlockSchema.dynamicPorts(node)` 给出；校验、渲染、拖拽和解释器都通过 `portsOf(schema, node)` 读取，因此插件的自定义积木也可以用同样方式实现可增长端口。

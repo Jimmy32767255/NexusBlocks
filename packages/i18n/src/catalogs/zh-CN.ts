@@ -287,7 +287,7 @@ export const zhCN: Catalog = {
   "block.control.if.port.else": "否则",
   "block.control.if.port.elseIfCondition": "否则如果条件",
   "block.control.if.port.elseIfBody": "否则如果执行",
-  "block.control.if.field.elseIfs": "否则如果分支",
+  "block.control.if.field.elseIfs": "扩展分支",
   "block.grow.add": "增加一项",
   "block.grow.remove": "减少一项",
   "block.grow.addParam": "增加参数",
