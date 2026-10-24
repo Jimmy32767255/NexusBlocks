@@ -46,7 +46,7 @@ export const convertBlocks: BlockDefinition[] = [
       const text = String(raw).trim().toLowerCase();
       if (text === "true") return true;
       if (text === "false") return false;
-      ctx.fail("runtime.error.toBoolean", { value: String(raw) });
+      return ctx.fail("runtime.error.toBoolean", { value: String(raw) });
     },
   },
   {

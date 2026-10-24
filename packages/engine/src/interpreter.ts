@@ -71,25 +71,15 @@ export class Interpreter implements ExecutionContext {
     for (const decl of collectFunctions(project.scripts)) {
       this.functions.set(decl.id, decl);
     }
-    for (const variable of project.variables) {
-      this.variables.set(
-        variable.id,
-        variable.initial ?? defaultValue(variable.type),
-      );
-    }
   }
 
   get stepCount(): number {
     return this.steps;
   }
 
-  /** Current values of the project-level variables (debugger display). */
+  /** Live variables declared at run time, keyed by name (debugger display). */
   variableValues(): Record<string, Value> {
-    const values: Record<string, Value> = {};
-    for (const variable of this.project.variables) {
-      values[variable.id] = this.variables.get(variable.id) ?? defaultValue(variable.type);
-    }
-    return values;
+    return Object.fromEntries(this.variables);
   }
 
   async runScripts(scripts: BlockNode[]): Promise<void> {
@@ -229,18 +219,34 @@ export class Interpreter implements ExecutionContext {
     return defaultValue(decl.returnType);
   }
 
-  getVariable(id: string): Value {
-    if (!this.variables.has(id)) {
-      this.fail("runtime.error.missingVariable", { name: this.variableName(id) });
+  getVariable(name: string): Value {
+    if (!this.variables.has(name)) {
+      this.fail("runtime.error.missingVariable", { name });
     }
-    return this.variables.get(id) ?? null;
+    return this.variables.get(name) ?? null;
   }
 
-  setVariable(id: string, value: Value): void {
-    if (!this.variables.has(id)) {
-      this.fail("runtime.error.missingVariable", { name: this.variableName(id) });
+  hasVariable(name: string): boolean {
+    return this.variables.has(name);
+  }
+
+  setVariable(name: string, value: Value): void {
+    if (!this.variables.has(name)) {
+      this.fail("runtime.error.missingVariable", { name });
     }
-    this.variables.set(id, value);
+    this.variables.set(name, value);
+  }
+
+  createVariable(name: string, value: Value): void {
+    if (this.variables.has(name)) this.fail("runtime.error.variableExists", { name });
+    this.variables.set(name, value);
+  }
+
+  deleteVariable(name: string): void {
+    if (!this.variables.has(name)) {
+      this.fail("runtime.error.missingVariable", { name });
+    }
+    this.variables.delete(name);
   }
 
   coerce(value: Value, type: ValueType, _blockId: string): Value {
@@ -255,10 +261,6 @@ export class Interpreter implements ExecutionContext {
 
   describeFailure(failure: RuntimeFailure): string {
     return this.describeFailureText(failure);
-  }
-
-  variableName(id: string): string {
-    return this.project.variables.find((variable) => variable.id === id)?.name ?? id;
   }
 
   print(value: Value, blockId?: string): void {

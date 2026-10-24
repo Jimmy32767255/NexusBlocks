@@ -3,7 +3,6 @@ import { test } from "node:test";
 import {
   createBlock,
   createProject,
-  createVariable,
   functionCallType,
   validateProject,
   type BlockNode,
@@ -76,15 +75,17 @@ test("variables can be passed as function arguments", async () => {
       }) },
     })] },
   });
-  const variable = createVariable("n", "number", 4);
   const call = createBlock(functionCallType("sq"), {
-    inputs: { x: createBlock("var.get", { fields: { variable: variable.id } }) },
+    inputs: { x: createBlock("var.get", { fields: { variable: "n" } }) },
   });
   const main = createBlock("control.start", { inputs: { body: [
+    createBlock("var.create", {
+      fields: { name: "n", type: "number" },
+      inputs: { value: createBlock("math.number", { fields: { value: 4 } }) },
+    }),
     createBlock("io.print", { inputs: { text: call } }),
   ] } });
   const project: Project = createProject({ name: "vars" });
-  project.variables.push(variable);
   project.scripts.push(hat, main);
 
   const registry = createProjectRegistry(project);

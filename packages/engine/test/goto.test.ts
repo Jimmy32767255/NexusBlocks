@@ -3,7 +3,6 @@ import { test } from "node:test";
 import {
   createBlock,
   createProject,
-  createVariable,
   type BlockNode,
   type Project,
 } from "@nexus/ir";
@@ -40,34 +39,36 @@ test("goto forward skips the statements in between", async () => {
 
 test("goto backward loops until the counter reaches the bound", async () => {
   const project: Project = createProject();
-  const total = createVariable("total", "number", 0);
-  project.variables.push(total);
   project.scripts = [
     start([
+      createBlock("var.create", {
+        fields: { name: "total", type: "number" },
+        inputs: { value: createBlock("math.number", { fields: { value: 0 } }) },
+      }),
       createBlock("var.set", {
-        fields: { variable: total.id },
+        fields: { variable: "total" },
         inputs: { value: createBlock("math.number", { fields: { value: 0 } }) },
       }),
       label("again"),
       createBlock("var.set", {
-        fields: { variable: total.id },
+        fields: { variable: "total" },
         inputs: {
           value: createBlock("math.arithmetic", {
             fields: { op: "+" },
             inputs: {
-              a: createBlock("var.get", { fields: { variable: total.id } }),
+              a: createBlock("var.get", { fields: { variable: "total" } }),
               b: createBlock("math.number", { fields: { value: 1 } }),
             },
           }),
         },
       }),
-      createBlock("io.print", { inputs: { text: createBlock("var.get", { fields: { variable: total.id } }) } }),
+      createBlock("io.print", { inputs: { text: createBlock("var.get", { fields: { variable: "total" } }) } }),
       createBlock("control.if", {
         inputs: {
           condition: createBlock("logic.compare", {
             fields: { op: "<" },
             inputs: {
-              a: createBlock("var.get", { fields: { variable: total.id } }),
+              a: createBlock("var.get", { fields: { variable: "total" } }),
               b: createBlock("math.number", { fields: { value: 3 } }),
             },
           }),

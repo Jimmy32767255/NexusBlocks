@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import {
   createBlock,
   createProject,
-  createVariable,
   validateProject,
   type BlockNode,
   type Project,
@@ -14,16 +13,19 @@ function start(body: BlockNode[]): BlockNode {
   return createBlock("control.start", { inputs: { body } });
 }
 
+function declare(name: string, type: string, value: BlockNode): BlockNode {
+  return createBlock("var.create", { fields: { name, type }, inputs: { value } });
+}
+
 function print(value: string | BlockNode): BlockNode {
   return typeof value === "string"
     ? createBlock("io.print", { fields: { text: value } })
     : createBlock("io.print", { inputs: { text: value } });
 }
 
-function projectWith(script: BlockNode, variables: Project["variables"] = []): Project {
+function projectWith(script: BlockNode): Project {
   const project = createProject({ name: "exceptions", locale: "en" });
   project.scripts.push(script);
-  project.variables.push(...variables);
   return project;
 }
 
@@ -64,17 +66,17 @@ test("a non-matching catch lets the exception escape", async () => {
 });
 
 test("typed catch stores the message in a variable", async () => {
-  const target = createVariable("err", "text", "");
   const thrown = createBlock("control.throw", { fields: { value: "kaboom" } });
-  const show = print(createBlock("var.get", { fields: { variable: target.id } }));
+  const show = print(createBlock("var.get", { fields: { variable: "err" } }));
   const handler = createBlock("control.catchAssign", {
-    fields: { exception: "text", target: target.id },
+    fields: { exception: "text", target: "err" },
     inputs: { body: [show] },
   });
   const script = start([
+    declare("err", "text", createBlock("text.literal", { fields: { value: "" } })),
     createBlock("control.try", { inputs: { body: [thrown], catches: [handler] } }),
   ]);
-  const result = await run(projectWith(script, [target]));
+  const result = await run(projectWith(script));
   assert.equal(result.status, "finished");
   assert.deepEqual(result.logs, ["kaboom"]);
 });
@@ -90,10 +92,9 @@ test("catch is skipped when nothing is thrown", async () => {
 });
 
 test("runtime errors can be caught as text", async () => {
-  const target = createVariable("err", "text", "");
-  const show = print(createBlock("var.get", { fields: { variable: target.id } }));
+  const show = print(createBlock("var.get", { fields: { variable: "err" } }));
   const handler = createBlock("control.catchAssign", {
-    fields: { exception: "error", target: target.id },
+    fields: { exception: "error", target: "err" },
     inputs: { body: [show] },
   });
   const divide = createBlock("math.arithmetic", {
@@ -104,11 +105,12 @@ test("runtime errors can be caught as text", async () => {
     },
   });
   const script = start([
+    declare("err", "text", createBlock("text.literal", { fields: { value: "" } })),
     createBlock("control.try", {
       inputs: { body: [print(divide)], catches: [handler] },
     }),
   ]);
-  const result = await run(projectWith(script, [target]));
+  const result = await run(projectWith(script));
   assert.equal(result.status, "finished");
   assert.equal(result.logs[0], "runtime.error.divisionByZero");
 });
