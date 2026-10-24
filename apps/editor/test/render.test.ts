@@ -36,6 +36,38 @@ function starterPrint() {
 }
 
 describe("editor rendering", () => {
+  it("shows a breakpoint switch for statements and hides it for hats", () => {
+    const statement = createBlock("io.print", { id: "bp-print", fields: { text: "x" } });
+    const base = {
+      registry: defaultRegistry,
+      variables: [],
+      onFieldChange: () => {},
+      onLiteralChange: () => {},
+      onUnplug: () => {},
+      onDelete: () => {},
+    };
+    const withSwitch = renderInspector({
+      ...base,
+      selected: statement,
+      breakpoint: true,
+      onToggleBreakpoint: () => {},
+    });
+    assert.ok(withSwitch.querySelector(".inspector__switch"));
+    assert.equal(
+      withSwitch.querySelector<HTMLInputElement>(".switch__input")?.checked,
+      true,
+    );
+
+    const hat = createBlock("control.start", { id: "bp-hat", inputs: { body: [] } });
+    const withoutSwitch = renderInspector({
+      ...base,
+      selected: hat,
+      breakpoint: true,
+      onToggleBreakpoint: () => {},
+    });
+    assert.equal(withoutSwitch.querySelector(".inspector__switch"), null);
+  });
+
   it("renders every registered block and filters by label", () => {
     const toolbox = renderToolbox({
       registry: defaultRegistry,
@@ -173,6 +205,23 @@ describe("editor rendering", () => {
     const statement = view.root.querySelector(".block--statement")!;
     assert.equal(statement.querySelectorAll(":scope > .block__mouth").length, 0);
     assert.equal(statement.querySelectorAll(":scope > .block__foot").length, 0);
+  });
+
+  it("marks breakpointed and currently executing blocks", () => {
+    const { document, print } = starterPrint();
+    const view = renderCanvas(document, {
+      registry: defaultRegistry,
+      selectedId: null,
+      variables: document.project.variables,
+      zoom: 1,
+      viewport: { x: 0, y: 0 },
+      interactive: false,
+      breakpoints: new Set([print.id]),
+      debugCurrentId: print.id,
+    });
+    const block = view.root.querySelector<HTMLElement>(`[data-block-id="${print.id}"]`);
+    assert.ok(block?.classList.contains("block--breakpoint"));
+    assert.ok(block?.classList.contains("block--debug-current"));
   });
 
   it("renders scripts in document order without stored coordinates", () => {

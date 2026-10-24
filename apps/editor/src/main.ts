@@ -2,6 +2,7 @@ import {
   createLocalHost,
   createProjectRegistry,
   createStarterDocument,
+  DebugSession,
   resolveImports,
   runProject,
   type BlockRegistry,
@@ -78,6 +79,11 @@ let importTimer: number | null = null;
 const editorHost = desktopHost ?? createLocalHost(handleEvent, window.localStorage);
 
 let controller: AbortController | null = null;
+let debugSession: DebugSession | null = null;
+let debugTrace = false;
+let debugPaused = false;
+let debugCurrentId: string | null = null;
+let debugValues: Record<string, Value> | null = null;
 let surface: HTMLElement | null = null;
 let frame: number | null = null;
 /** Pan offset of the automatic layout. Never stored in the document. */
@@ -87,6 +93,7 @@ let autosaveTimer: number | null = null;
 const STATUS_KEYS: Record<RunStatus, string> = {
   idle: "status.idle",
   running: "status.running",
+  paused: "status.paused",
   finished: "status.finished",
   stopped: "status.stopped",
   error: "status.error",
@@ -131,7 +138,9 @@ function renderNow(): void {
     variables: document.project.variables,
     zoom: state.zoom,
     viewport,
-    interactive: !running,
+    interactive: !running && state.status !== "paused",
+    breakpoints: store.breakpoints,
+    debugCurrentId,
   });
   surface = canvas.surface;
 
@@ -185,9 +194,18 @@ function renderNow(): void {
           ? { index: scriptIndex, total: document.project.scripts.length }
           : null,
       onMoveScript: (delta) => moveSelectedScript(delta),
+      breakpoint: selected ? store.breakpoints.has(selected.id) : false,
+      onToggleBreakpoint: (enabled) => {
+        if (!selected) return;
+        if (enabled !== store.breakpoints.has(selected.id)) {
+          store.toggleBreakpoint(selected.id);
+          debugSession?.setBreakpoints(store.breakpoints);
+        }
+      },
     }),
     renderVariables({
       variables: document.project.variables,
+      values: debugValues,
       usage: variableUsage(),
       onAdd: () => void addVariable(),
       onDelete: (id) => void deleteVariable(id),
@@ -208,7 +226,10 @@ function renderNow(): void {
     canUndo: store.canUndo(),
     canRedo: store.canRedo(),
     zoom: state.zoom,
-    onRun: () => void run(),
+    onRun: () => void run(false),
+    onRunTrace: () => void run(true),
+    onPause: () => debugSession?.requestPause(),
+    onResume: () => debugSession?.resume(),
     onStop: () => stop(),
     onNew: () => void newProject(),
     onOpen: () => void openProject(),
@@ -358,18 +379,52 @@ function placeBlockAtCenter(type: string): void {
 
 /* ------------------------------------------------------------------ actions */
 
-async function run(): Promise<void> {
-  if (store.state.status === "running") return;
+async function run(trace = false): Promise<void> {
+  if (controller) return;
   if (store.state.document.project.scripts.length === 0) {
     toast(t("toast.nothingToRun"), "error");
     return;
   }
   controller = new AbortController();
+  debugTrace = trace;
+  debugPaused = false;
+  debugCurrentId = null;
+  debugValues = null;
+  const session = new DebugSession({
+    signal: controller.signal,
+    traceDelay: trace ? 450 : 0,
+    breakpoints: store.breakpoints,
+    onStatement: (blockId) => {
+      debugCurrentId = blockId;
+      if (trace) {
+        scheduleRender();
+        requestAnimationFrame(() => focusBlock(blockId));
+      }
+    },
+    onPause: (blockId, values) => {
+      debugPaused = true;
+      debugCurrentId = blockId;
+      debugValues = values as Record<string, Value>;
+      store.setStatus("paused");
+      scheduleRender();
+      requestAnimationFrame(() => focusBlock(blockId));
+    },
+    onResume: () => {
+      debugPaused = false;
+      store.setStatus("running");
+    },
+    onVariables: (values) => {
+      debugValues = values as Record<string, Value>;
+      if (trace || debugPaused) scheduleRender();
+    },
+  });
+  debugSession = session;
   store.clearLogs();
   store.setStatus("running");
   try {
     await runProject(store.state.document.project, {
       signal: controller.signal,
+      debug: session,
       onEvent: handleEvent,
       describeFailure: translateFailure,
       // Workspace files live in localStorage in the browser; the desktop
@@ -377,13 +432,42 @@ async function run(): Promise<void> {
       ...(desktopHost ? { host: desktopHost } : { storage: window.localStorage }),
     });
   } finally {
+    debugSession = null;
     controller = null;
+    debugTrace = false;
+    debugPaused = false;
+    debugCurrentId = null;
+    debugValues = null;
     scheduleAutosave();
+    scheduleRender();
   }
 }
 
 function stop(): void {
   controller?.abort();
+  debugSession?.requestStop();
+}
+
+/** Keep the highlighted statement inside the stage while tracing or paused. */
+function focusBlock(blockId: string): void {
+  if (!surface) return;
+  const stage = surface.closest(".canvas-host") as HTMLElement | null;
+  const target = surface.querySelector<HTMLElement>(
+    `.block[data-block-id="${CSS.escape(blockId)}"]`,
+  );
+  if (!stage || !target) return;
+  const stageRect = stage.getBoundingClientRect();
+  const rect = target.getBoundingClientRect();
+  const pad = 64;
+  let dx = 0;
+  let dy = 0;
+  if (rect.left < stageRect.left + pad) dx = stageRect.left + pad - rect.left;
+  else if (rect.right > stageRect.right - pad) dx = stageRect.right - pad - rect.right;
+  if (rect.top < stageRect.top + pad) dy = stageRect.top + pad - rect.top;
+  else if (rect.bottom > stageRect.bottom - pad) dy = stageRect.bottom - pad - rect.bottom;
+  if (dx === 0 && dy === 0) return;
+  viewport = clampViewport({ x: viewport.x + dx, y: viewport.y + dy });
+  applyViewport();
 }
 
 /** Best-effort message for anything thrown across the desktop bridge. */

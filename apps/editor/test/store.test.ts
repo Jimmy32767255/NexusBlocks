@@ -95,6 +95,19 @@ describe("editor store", () => {
     assert.equal(store.state.logs.length, 0);
   });
 
+  it("toggles breakpoints without marking the document dirty", () => {
+    const store = freshStore();
+    const blockId = "block-1";
+    const scriptsBefore = JSON.stringify(store.state.document.project.scripts);
+    store.toggleBreakpoint(blockId);
+    assert.equal(store.breakpoints.has(blockId), true);
+    assert.equal(store.state.dirty, false);
+    assert.equal(store.canUndo(), false);
+    store.toggleBreakpoint(blockId);
+    assert.equal(store.breakpoints.has(blockId), false);
+    assert.equal(JSON.stringify(store.state.document.project.scripts) === scriptsBefore, true);
+  });
+
   it("clamps zoom into the supported range", () => {
     const store = freshStore();
     store.setZoom(10);

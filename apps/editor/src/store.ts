@@ -6,7 +6,7 @@ import {
 } from "@nexus/ir";
 import { defaultRegistry, type BlockRegistry } from "@nexus/engine";
 
-export type RunStatus = "idle" | "running" | "finished" | "stopped" | "error";
+export type RunStatus = "idle" | "running" | "paused" | "finished" | "stopped" | "error";
 
 export interface LogEntry {
   id: number;
@@ -51,6 +51,25 @@ export class Store {
 
   get state(): EditorState {
     return this.current;
+  }
+
+  /** Blocks that pause execution when reached (editor-only metadata). */
+  get breakpoints(): ReadonlySet<string> {
+    return new Set(this.current.document.debug?.breakpoints ?? []);
+  }
+
+  /** Toggle a breakpoint without touching undo history or the dirty flag. */
+  toggleBreakpoint(blockId: string): void {
+    this.update(
+      (document) => {
+        const ids = new Set(document.debug?.breakpoints ?? []);
+        if (ids.has(blockId)) ids.delete(blockId);
+        else ids.add(blockId);
+        if (ids.size === 0) delete document.debug;
+        else document.debug = { breakpoints: [...ids] };
+      },
+      { history: false, dirty: false },
+    );
   }
 
   subscribe(listener: () => void): () => void {

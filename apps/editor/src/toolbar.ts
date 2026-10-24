@@ -11,6 +11,9 @@ export interface ToolbarOptions {
   canRedo: boolean;
   zoom: number;
   onRun: () => void;
+  onRunTrace: () => void;
+  onPause: () => void;
+  onResume: () => void;
   onStop: () => void;
   onNew: () => void;
   onOpen: () => void;
@@ -28,7 +31,8 @@ export interface ToolbarOptions {
 }
 
 export function renderToolbar(options: ToolbarOptions): HTMLElement {
-  const running = options.status === "running";
+  const active = options.status === "running" || options.status === "paused";
+  const paused = options.status === "paused";
 
   const name = el("input", {
     class: "project-name",
@@ -64,20 +68,50 @@ export function renderToolbar(options: ToolbarOptions): HTMLElement {
     "button",
     {
       class: "button button--run",
-      attrs: { type: "button", title: t("toolbar.run") },
+      attrs: { type: "button", title: t("toolbar.run"), disabled: active },
       on: { click: options.onRun },
     },
     [icon("play", 15), el("span", { text: t("toolbar.run") })],
+  );
+
+  const traceButton = el(
+    "button",
+    {
+      class: "button button--trace",
+      attrs: { type: "button", title: t("toolbar.runTrace"), disabled: active },
+      on: { click: options.onRunTrace },
+    },
+    [icon("trace", 15), el("span", { text: t("toolbar.runTrace") })],
   );
 
   const stopButton = el(
     "button",
     {
       class: "button button--stop",
-      attrs: { type: "button", title: t("toolbar.stop"), disabled: !running },
+      attrs: { type: "button", title: t("toolbar.stop"), disabled: !active },
       on: { click: options.onStop },
     },
     [icon("stop", 15), el("span", { text: t("toolbar.stop") })],
+  );
+
+  const pauseButton = el(
+    "button",
+    {
+      class: "icon-button icon-button--pause",
+      attrs: { type: "button", title: t("toolbar.pause"), "aria-label": t("toolbar.pause"), disabled: !active || paused },
+      on: { click: options.onPause },
+    },
+    [icon("pause", 15)],
+  );
+
+  const resumeButton = el(
+    "button",
+    {
+      class: "icon-button icon-button--resume",
+      attrs: { type: "button", title: t("toolbar.resume"), "aria-label": t("toolbar.resume"), disabled: !paused },
+      on: { click: options.onResume },
+    },
+    [icon("play", 15)],
   );
 
   const iconButton = (name: IconName, title: string, handler: () => void, disabled = false): HTMLElement =>
@@ -99,6 +133,9 @@ export function renderToolbar(options: ToolbarOptions): HTMLElement {
     name,
     el("div", { class: "topbar__actions" }, [
       runButton,
+      traceButton,
+      pauseButton,
+      resumeButton,
       stopButton,
       el("span", { class: "topbar__divider" }),
       iconButton("undo", t("toolbar.undo"), options.onUndo, !options.canUndo),

@@ -1,8 +1,11 @@
+import { toDisplayText, type Value } from "@nexus/ir";
 import { el } from "./dom.ts";
 import { icon } from "./icons.ts";
 import { t } from "./i18n.ts";
 
 export interface VariablesOptions {
+  /** Live values keyed by variable id; shown while paused or tracing. */
+  values?: Record<string, Value> | null;
   variables: readonly { id: string; name: string }[];
   usage: ReadonlyMap<string, number>;
   onAdd: () => void;
@@ -34,6 +37,12 @@ export function renderVariables(options: VariablesOptions): HTMLElement {
       el("span", { class: "variables__dot" }),
       name,
       el("span", { class: "variables__usage", text: String(used) }),
+      options.values
+        ? el("code", {
+            class: "variables__value",
+            text: formatValue(options.values[variable.id]),
+          })
+        : null,
       el("button", {
         class: "icon-button icon-button--danger",
         attrs: { type: "button", title: t("variables.delete") },
@@ -135,4 +144,9 @@ function beginRename(
     error.remove();
     input.replaceWith(name);
   });
+}
+
+function formatValue(value: Value | undefined): string {
+  if (value === undefined) return "—";
+  return typeof value === "string" ? JSON.stringify(value) : toDisplayText(value);
 }

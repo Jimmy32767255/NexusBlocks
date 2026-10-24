@@ -15,6 +15,9 @@ export interface InspectorOptions {
   /** Position in `project.scripts` when the block is a top-level hat. */
   scriptPosition?: { index: number; total: number } | null;
   onMoveScript?: (delta: -1 | 1) => void;
+  /** Breakpoint state, only meaningful for action statements. */
+  breakpoint?: boolean;
+  onToggleBreakpoint?: (enabled: boolean) => void;
 }
 
 export function renderInspector(options: InspectorOptions): HTMLElement {
@@ -42,6 +45,26 @@ export function renderInspector(options: InspectorOptions): HTMLElement {
   );
   if (definition.description) {
     body.append(el("p", { class: "inspector__description", text: t(definition.description) }));
+  }
+
+  if (
+    definition.kind === "statement" &&
+    definition.category !== "comment" &&
+    options.onToggleBreakpoint
+  ) {
+    const toggle = el("input", {
+      class: "switch__input",
+      attrs: { type: "checkbox", checked: options.breakpoint ?? false },
+    }) as HTMLInputElement;
+    toggle.addEventListener("change", () => options.onToggleBreakpoint?.(toggle.checked));
+    body.append(
+      el("label", { class: "inspector__switch" }, [
+        toggle,
+        el("span", { class: "switch__track" }),
+        el("span", { class: "switch__label", text: t("inspector.breakpoint") }),
+        el("span", { class: "inspector__breakpoint-dot" }),
+      ]),
+    );
   }
   body.append(el("code", { class: "inspector__type", text: definition.type }));
 

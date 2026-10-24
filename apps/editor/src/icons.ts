@@ -6,6 +6,8 @@ const PATHS = {
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
   play: '<path d="M7 4l13 8-13 8z" fill="currentColor" stroke="none"/>',
+  pause: '<rect x="7" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="13" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/>',
+  trace: '<path d="M5 5v14"/><path d="m9 9 4 3-4 3z" fill="currentColor" stroke="none"/><circle cx="17" cy="7" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>',
   stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
   zoomIn: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6M11 8v6"/>',
   zoomOut: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6"/>',

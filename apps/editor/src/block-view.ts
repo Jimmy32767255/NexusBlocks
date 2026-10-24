@@ -39,6 +39,8 @@ export interface BlockRenderContext {
   selectedId: string | null;
   variables: readonly { id: string; name: string }[];
   interactive: boolean;
+  breakpoints?: ReadonlySet<string>;
+  debugCurrentId?: string | null;
 }
 
 /** Render one block, recursing into plugged expressions and nested stacks. */
@@ -61,6 +63,8 @@ export function renderBlock(node: BlockNode, context: BlockRenderContext): HTMLE
       ports.some((port) => port.kind === "stack") ? "block--c" : "",
       definition.terminal ? "block--terminal" : "",
       context.selectedId === node.id ? "block--selected" : "",
+      context.breakpoints?.has(node.id) ? "block--breakpoint" : "",
+      context.debugCurrentId === node.id ? "block--debug-current" : "",
     ]
       .filter(Boolean)
       .join(" "),

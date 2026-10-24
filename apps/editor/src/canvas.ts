@@ -11,6 +11,8 @@ export interface CanvasOptions {
   zoom: number;
   viewport: { x: number; y: number };
   interactive: boolean;
+  breakpoints?: ReadonlySet<string>;
+  debugCurrentId?: string | null;
 }
 
 export interface CanvasView {
@@ -32,6 +34,8 @@ export function renderCanvas(document: NexusDocument, options: CanvasOptions): C
     selectedId: options.selectedId,
     variables: options.variables,
     interactive: options.interactive,
+    ...(options.breakpoints ? { breakpoints: options.breakpoints } : {}),
+    ...(options.debugCurrentId ? { debugCurrentId: options.debugCurrentId } : {}),
   };
 
   for (const hat of document.project.scripts) {
