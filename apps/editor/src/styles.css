@@ -604,7 +604,10 @@ button {
 }
 
 /* Blocks with a body are as wide as their mouth; the bar spans that width. */
-.block--c > .block__head {
+/* Head and foot are both stretched to the block's full width: the C shape
+   closes flush at the top and the bottom, including when nested. */
+.block--c > .block__head,
+.block--c > .block__foot {
   width: auto;
   max-width: none;
   align-self: stretch;

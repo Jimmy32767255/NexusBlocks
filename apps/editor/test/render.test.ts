@@ -202,6 +202,9 @@ describe("editor rendering", () => {
     const hat = view.root.querySelector(".block--hat")!;
     assert.equal(hat.querySelectorAll(":scope > .block__mouth").length, 1);
     assert.equal(hat.querySelectorAll(":scope > .block__foot").length, 1);
+    // Width comes from the layout (head, mouth and foot share one column),
+    // never from per-frame JavaScript measurements.
+    assert.equal(hat.querySelector<HTMLElement>(":scope > .block__foot")!.style.width, "");
     const statement = view.root.querySelector(".block--statement")!;
     assert.equal(statement.querySelectorAll(":scope > .block__mouth").length, 0);
     assert.equal(statement.querySelectorAll(":scope > .block__foot").length, 0);

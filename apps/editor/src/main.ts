@@ -33,7 +33,7 @@ import { renderConsole } from "./console.ts";
 import { confirmDialog, helpBody, openDialog, variableDialog } from "./dialogs.ts";
 import { el } from "./dom.ts";
 import { startBlockDrag, startToolboxDrag, type DragDeps } from "./drag.ts";
-import { autoSizeControl, syncCBlockFeet } from "./block-view.ts";
+import { autoSizeControl } from "./block-view.ts";
 import {
   createScriptWith,
   moveScript,
@@ -249,7 +249,6 @@ function renderNow(): void {
   host.replaceChildren(
     el("div", { class: "app" }, [toolbar, el("main", { class: "workspace" }, [toolbox, stage, side])]),
   );
-  syncCBlockFeet(host);
   applyViewport();
 }
 
