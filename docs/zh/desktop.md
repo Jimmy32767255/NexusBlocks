@@ -53,11 +53,11 @@ Failed to initialize gtk backend!: BoolError { message: "Failed to initialize GT
 
 | 动作 | 桌面版 | 浏览器版 |
 | --- | --- | --- |
-| 保存 | `project_save` 打开系统「另存为」，把 JSON 写到你选的位置 | 下载到浏览器默认目录 |
+| 保存 | `project_save` 打开系统「另存为」，把 `.nblk` 写到你选的位置 | 下载到浏览器默认目录 |
 | 打开 | `project_open` 打开系统文件选择器，读回文本后按同一套校验解析 | `<input type="file">` |
 
 - 取消对话框不会提示“已保存”，文档也不会被标记为已保存；
-- 项目文件名取自项目名（`/ \ : * ? " < > |` 换成 `-`），后缀固定 `.nexusblocks.json`；
+- 项目文件名取自项目名（`/ \ : * ? " < > |` 换成 `-`），后缀固定 `.nblk`；
 - 写入前会自动创建目标目录，失败按 `runtime.error.file*` 报错并弹提示；
 - 桌面与浏览器共用 `persist.ts` 的解析/序列化，文件格式完全一致，可以互相拷。
 

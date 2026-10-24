@@ -1,6 +1,6 @@
 # 架构总览
 
-Nexus Blocks 由三部分组成：**语言（IR + 引擎）**、**编辑器（Web 前端）**、**宿主（未来：Tauri 桌面壳）**。三者只通过 JSON 文档、积木注册表与能力调用通信，因此可以独立演进。
+Nexus Blocks 由三部分组成：**语言（IR + 引擎）**、**编辑器（Web 前端）**、**宿主（未来：Tauri 桌面壳）**。三者只通过文档（`NexusDocument`）、积木注册表与能力调用通信，因此可以独立演进。
 
 ## 数据流
 
@@ -8,7 +8,7 @@ Nexus Blocks 由三部分组成：**语言（IR + 引擎）**、**编辑器（We
 用户拖拽 ──▶ Editor Store（唯一状态源）
                  │  document（NexusDocument：语言 + 布局）
                  ▼
-        serializeDocument → .nexusblocks.json（自动保存 / 导出）
+        serializeDocument / printNblk → .nblk（保存 / 导出；自动保存仍用 JSON）
                  │
                  ▼
         parseDocument → validateProject（结构校验）

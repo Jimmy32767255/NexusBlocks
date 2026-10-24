@@ -6,6 +6,7 @@ Nexus Blocks 的文档目前以简体中文为主，英文版 README 覆盖项�
 
 - [架构总览](zh/architecture.md) — 数据流、模块边界、能力模型
 - [语言与 IR](zh/ir.md) — 文档格式、值类型、序列化、校验
+- [`.nblk` 文本格式](zh/nblk.md) — 类 Python 的程序文件语法
 - [积木系统](zh/blocks.md) — 定义 schema、内置积木、如何新增积木
 - [编辑器使用指南](zh/editor.md) — 界面、拖拽规则、快捷键
 - [国际化](zh/i18n.md) — 语言包、message key、新增语言
