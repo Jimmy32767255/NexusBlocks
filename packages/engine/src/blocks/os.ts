@@ -24,6 +24,7 @@ function asCommandResult(value: Value): CommandResult {
 export const osBlocks: BlockDefinition[] = [
   {
     type: "os.exec_command",
+    platforms: "desktop",
     kind: "statement",
     category: "system",
     output: "void",
