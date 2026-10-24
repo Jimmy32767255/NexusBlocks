@@ -8,20 +8,18 @@
  * project "Hello"
  * locale zh-CN
  *
- * variables:
- *   score: number = 0
- *
  * start:
+ *   create score as 0
  *   print "Hello, world!"
  *   set score to score + 1
  * ```
  *
  * Blocks are printed with their own syntax; blocks without a dedicated form
  * fall back to a `raw { ... }` JSON form so unknown/future blocks still round
- * trip. Variables, parameters and functions are referenced by name while the
- * in-memory model keeps its numeric/string ids.
+ * trip. Variables live at run time: `var.create` declares one, and every other
+ * block refers to it by name.
  */
-import { createBlock, createDocument, createProject, createVariable, touchProject } from "./create.ts";
+import { createBlock, createDocument, createProject, touchProject } from "./create.ts";
 import { createId } from "./ids.ts";
 import {
   collectFunctions,
@@ -45,7 +43,6 @@ import type {
   Project,
   Value,
   ValueType,
-  VariableDef,
 } from "./model.ts";
 import { VALUE_TYPES } from "./model.ts";
 import { defaultValue } from "./values.ts";
@@ -346,6 +343,14 @@ function parseExpression(text: string, line: number): Expr {
   }
 }
 
+/** Collection literals cannot live in a field, so wrap them in a block. */
+function literalBlock(value: Value): BlockNode {
+  const items = JSON.stringify(value);
+  return Array.isArray(value)
+    ? createBlock("list.literal", { fields: { items } })
+    : createBlock("dict.literal", { fields: { items } });
+}
+
 function literalOf(expr: Expr, line: number): Value {
   if (expr.kind !== "literal") fail(line, "Only constant values are allowed here");
   return expr.value;
@@ -409,10 +414,9 @@ class Parser {
   private readonly lines: Line[] = [];
   private index = 0;
   private project: Project;
-  private readonly variables = new Map<string, VariableDef>();
   private readonly pending = new Map<string, CallPending>();
   private readonly params = new Set<string>();
-  private readonly warnings: string[] = [];
+  readonly warnings: string[] = [];
 
   constructor(source: string) {
     const rawLines = source.replace(/\r\n?/g, "\n").split("\n");
@@ -430,7 +434,7 @@ class Parser {
 
   parse(): NexusDocument {
     this.parseHeader();
-    this.parseVariables();
+    this.skipLegacyVariables();
     while (this.index < this.lines.length) {
       const node = this.parseScript();
       this.project.scripts.push(node);
@@ -463,31 +467,17 @@ class Parser {
     }
   }
 
-  private parseVariables(): void {
+  /**
+   * Older files start with a `variables:` section. Variables are declared at
+   * run time now, so the section is dropped with a warning instead of failing.
+   */
+  private skipLegacyVariables(): void {
     if (this.index >= this.lines.length) return;
     const line = this.lines[this.index]!;
     if (line.indent !== 0 || line.text !== "variables:") return;
     this.index += 1;
-    while (this.index < this.lines.length && this.lines[this.index]!.indent > 0) {
-      const variableLine = this.lines[this.index]!;
-      this.index += 1;
-      const match = /^([\p{L}_][\p{L}\p{N}_]*)\s*:\s*([\w-]+)\s*=\s*(.+)$/u.exec(variableLine.text);
-      if (!match) fail(variableLine.number, "Expected `name: type = value`");
-      const name = match[1]!;
-      const type = match[2]!;
-      if (!VALUE_TYPES.includes(type as ValueType)) fail(variableLine.number, `Unknown type: ${type}`);
-      if (type === "void") fail(variableLine.number, "Variables cannot be void");
-      if (this.variables.has(name)) fail(variableLine.number, `Duplicate variable: ${name}`);
-      let initial: Value;
-      try {
-        initial = JSON.parse(match[3]!) as Value;
-      } catch {
-        fail(variableLine.number, "Variable initial value must be JSON (strings need quotes)");
-      }
-      const variable = createVariable(name, type as ValueType, initial);
-      this.variables.set(name, variable);
-      this.project.variables.push(variable);
-    }
+    while (this.index < this.lines.length && this.lines[this.index]!.indent > 0) this.index += 1;
+    this.warnings.push("Ignored the legacy variables section; declare variables at run time instead");
   }
 
   private parseScript(): BlockNode {
@@ -634,13 +624,7 @@ class Parser {
         }
         let node: BlockNode;
         if (target) {
-          let variable = this.variables.get(target);
-          if (!variable) {
-            variable = createVariable(target, "text", "");
-            this.variables.set(target, variable);
-            this.project.variables.push(variable);
-          }
-          node = createBlock("control.catchAssign", { fields: { exception: filter ?? "error", target: variable.id } });
+          node = createBlock("control.catchAssign", { fields: { exception: filter ?? "error", target } });
         } else if (filter !== undefined) {
           node = createBlock("control.catchType", { fields: { exception: filter } });
         } else {
@@ -693,14 +677,7 @@ class Parser {
       const withMatch = /^repeat\s+with\s+([\p{L}_][\p{L}\p{N}_]*)\s+times\s+(.+):$/u.exec(text);
       if (withMatch) {
         this.index += 1;
-        const name = withMatch[1]!;
-        let variable = this.variables.get(name);
-        if (!variable) {
-          variable = createVariable(name, "number", 0);
-          this.variables.set(name, variable);
-          this.project.variables.push(variable);
-        }
-        const node = createBlock("control.repeatWith", { fields: { variable: variable.id } });
+        const node = createBlock("control.repeatWith", { fields: { variable: withMatch[1]! } });
         this.assign(node, "times", parseExpression(withMatch[2]!, line.number));
         this.parseBody(node, "body", indent);
         return node;
@@ -756,13 +733,26 @@ class Parser {
       if (typeof value !== "string") fail(line.number, "A note needs a string");
       return createBlock("comment.note", { fields: { text: value } });
     }
+    if (text.startsWith("create ")) {
+      const created = /^create\s+([\p{L}_][\p{L}\p{N}_]*)(?:\s*:\s*([\w-]+))?\s+as\s+(.+)$/u.exec(text);
+      if (!created) fail(line.number, "Expected `create name as value` or `create name: type as value`");
+      this.index += 1;
+      const type = created[2] ?? "any";
+      if (!VALUE_TYPES.includes(type as ValueType)) fail(line.number, `Unknown type: ${type}`);
+      const node = createBlock("var.create", { fields: { name: created[1]!, type } });
+      this.assign(node, "value", parseExpression(created[3]!, line.number));
+      return node;
+    }
+    if (text.startsWith("delete ")) {
+      const name = this.parseName(text.slice(7), line.number);
+      this.index += 1;
+      return createBlock("var.delete", { fields: { name } });
+    }
     if (text.startsWith("set ")) {
       const assignment = /^set\s+([\p{L}_][\p{L}\p{N}_]*)\s+to\s+(.+)$/u.exec(text);
       if (!assignment) fail(line.number, "Expected `set name to value`");
       this.index += 1;
-      const variable = this.variables.get(assignment[1]!);
-      if (!variable) fail(line.number, `Unknown variable: ${assignment[1]}`);
-      const node = createBlock("var.set", { fields: { variable: variable.id } });
+      const node = createBlock("var.set", { fields: { variable: assignment[1]! } });
       this.assign(node, "value", parseExpression(assignment[2]!, line.number));
       return node;
     }
@@ -826,8 +816,10 @@ class Parser {
   private assign(node: BlockNode, port: string, expression: Expr): void {
     if (expression.kind === "literal") {
       const value = expression.value;
-      if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
-        fail(0, "Only text, number and boolean literals can be inline; use a list/dict block for collections");
+      if (value === null) return;
+      if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+        node.inputs = { ...(node.inputs ?? {}), [port]: literalBlock(value) };
+        return;
       }
       node.fields = { ...(node.fields ?? {}), [port]: value };
       return;
@@ -841,9 +833,7 @@ class Parser {
         throw new NblkFailure(0, "Internal: literal cannot be a block");
       case "name": {
         if (this.params.has(expression.name)) return createBlock(FUNCTION_PARAM_TYPE, { fields: { name: expression.name } });
-        const variable = this.variables.get(expression.name);
-        if (!variable) fail(0, `Unknown variable: ${expression.name}`);
-        return createBlock("var.get", { fields: { variable: variable.id } });
+        return createBlock("var.get", { fields: { variable: expression.name } });
       }
       case "index": {
         const node = createBlock("list.get");
@@ -872,15 +862,10 @@ class Parser {
         this.assign(node, "b", { kind: "literal", value: -1 });
         return node;
       }
-      case "list": {
-        const value = expression.items.map((item) => literalOf(item, 0));
-        return createBlock("list.literal", { fields: { items: JSON.stringify(value) } });
-      }
-      case "dict": {
-        const record: Record<string, Value> = {};
-        for (const entry of expression.entries) record[entry.key] = literalOf(entry.value, 0);
-        return createBlock("dict.literal", { fields: { items: JSON.stringify(record) } });
-      }
+      case "list":
+        return createBlock("list.literal", { fields: { items: JSON.stringify(valueOfExpr(expression)) } });
+      case "dict":
+        return createBlock("dict.literal", { fields: { items: JSON.stringify(valueOfExpr(expression)) } });
       case "call":
         return this.callNode(expression);
       default:
@@ -1000,8 +985,12 @@ class Parser {
 interface PrintContext {
   project: Project;
   schemas?: NblkSchemaSource;
-  variables: Map<string, string>;
   functions: Map<string, { name: string; params: string[]; returnType: string; kind: "value" | "action" }>;
+}
+
+/** Read a name-typed field, tolerating older documents that stored ids. */
+function variableNameOf(node: BlockNode, field: string): string {
+  return String(node.fields?.[field] ?? "") || "variable";
 }
 
 function rawNode(raw: string, line: number, expression = false): BlockNode {
@@ -1041,7 +1030,7 @@ function expressionText(node: BlockNode, context: PrintContext): string {
     return value.type === "math.arithmetic" || value.type === "logic.compare" ? `(${text})` : text;
   };
   if (node.type === FUNCTION_PARAM_TYPE) return String(node.fields?.name ?? "param");
-  if (node.type === "var.get") return context.variables.get(String(node.fields?.variable ?? "")) ?? rawText(node);
+  if (node.type === "var.get") return variableNameOf(node, "variable");
   if (node.type === "text.literal") return literalText(String(node.fields?.value ?? ""));
   if (node.type === "math.number") return literalText(Number(node.fields?.value ?? 0));
   if (node.type === "logic.boolean") return String(Boolean(node.fields?.value));
@@ -1181,10 +1170,11 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
     }
     case "control.repeat":
       return [`repeat ${portValue(node, "times", "number", context)}:`, ...body("body")];
-    case "control.repeatWith": {
-      const variable = context.variables.get(String(node.fields?.variable ?? "")) ?? "item";
-      return [`repeat with ${variable} times ${portValue(node, "times", "number", context)}:`, ...body("body")];
-    }
+    case "control.repeatWith":
+      return [
+        `repeat with ${variableNameOf(node, "variable")} times ${portValue(node, "times", "number", context)}:`,
+        ...body("body"),
+      ];
     case "control.while":
       return [`while ${portValue(node, "condition", "boolean", context)}:`, ...body("body")];
     case "control.forever":
@@ -1209,8 +1199,8 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
           if (catcher.type === "control.catch") lines.push("catch:");
           else if (catcher.type === "control.catchType") lines.push(`catch ${String(catcher.fields?.exception ?? "error")}:`);
           else if (catcher.type === "control.catchAssign") {
-            const target = context.variables.get(String(catcher.fields?.target ?? ""));
-            lines.push(`catch ${String(catcher.fields?.exception ?? "error")} as ${target ?? "error"}:`);
+            const target = String(catcher.fields?.target ?? "error");
+            lines.push(`catch ${String(catcher.fields?.exception ?? "error")} as ${target}:`);
           } else {
             lines.push(...renderBlock(catcher, context));
             continue;
@@ -1231,10 +1221,15 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
     }
     case "io.print":
       return [`print ${portValue(node, "text", "any", context)}`];
-    case "var.set": {
-      const variable = context.variables.get(String(node.fields?.variable ?? "")) ?? "variable";
-      return [`set ${variable} to ${portValue(node, "value", "any", context)}`];
+    case "var.create": {
+      const type = String(node.fields?.type ?? "any");
+      const suffix = type === "any" ? "" : `: ${type}`;
+      return [`create ${String(node.fields?.name ?? "name")}${suffix} as ${portValue(node, "value", "any", context)}`];
     }
+    case "var.delete":
+      return [`delete ${String(node.fields?.name ?? "name")}`];
+    case "var.set":
+      return [`set ${variableNameOf(node, "variable")} to ${portValue(node, "value", "any", context)}`];
     case "list.set":
       return [
         `setitem(${portValue(node, "items", "list", context)}, ${portValue(node, "index", "number", context)}, ${portValue(node, "value", "any", context)})`,
@@ -1294,18 +1289,11 @@ export function printNblk(document: NexusDocument, schemas?: NblkSchemaSource): 
   const context: PrintContext = {
     project,
     schemas,
-    variables: new Map(project.variables.map((variable) => [variable.id, variable.name])),
     functions,
   };
   const lines: string[] = [];
   lines.push(`project ${JSON.stringify(project.name)}`);
   lines.push(`locale ${project.locale}`);
-  if (project.variables.length > 0) {
-    lines.push("", "variables:");
-    for (const variable of project.variables) {
-      lines.push(`  ${variable.name}: ${variable.type} = ${inlineJson(variable.initial ?? null)}`);
-    }
-  }
   if (project.scripts.length > 0) lines.push("");
   project.scripts.forEach((script, index) => {
     const previous = project.scripts[index - 1];
@@ -1319,8 +1307,9 @@ export function printNblk(document: NexusDocument, schemas?: NblkSchemaSource): 
 /** Parse `.nblk` text into a document. */
 export function parseNblk(source: string): NblkParseResult {
   try {
-    const document = new Parser(source).parse();
-    return { ok: true, document, warnings: [] };
+    const parser = new Parser(source);
+    const document = parser.parse();
+    return { ok: true, document, warnings: [...parser.warnings] };
   } catch (error) {
     if (error instanceof NblkFailure) {
       return { ok: false, error: { line: error.line, message: error.message } };

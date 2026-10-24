@@ -48,24 +48,23 @@ test("prints and reparses a document idempotently", () => {
   assert.match(first, /print "Hello, world!"/);
 });
 
-test("roundtrips variables with all value types", () => {
+test("roundtrips runtime variable declarations with all value types", () => {
   const source = `project "Vars"
 locale zh-CN
 
-variables:
-  n: number = 2.5
-  t: text = "a\\"b"
-  b: boolean = true
-  l: list = ["a", 1, false, [2]]
-  d: dict = {"k": 1, "n": [2, 3]}
-  e: any = null
-
 start:
+  create n: number as 2.5
+  create t: text as "a\\"b"
+  create b: boolean as true
+  create l: list as ["a", 1, false, [2]]
+  create d: dict as {"k": 1, "n": [2, 3]}
+  create e as null
   print n
 `;
   const document = parseOk(source);
+  const body = (document.project.scripts[0]!.inputs!.body as BlockNode[]);
   assert.deepEqual(
-    document.project.variables.map((variable) => [variable.name, variable.type]),
+    body.slice(0, 6).map((node) => [node.fields?.name, node.fields?.type]),
     [
       ["n", "number"],
       ["t", "text"],
@@ -75,21 +74,33 @@ start:
       ["e", "any"],
     ],
   );
-  assert.deepEqual(document.project.variables[3]!.initial, ["a", 1, false, [2]]);
   const printed = printNblk(document);
-  assert.match(printed, /l: list = \["a", 1, false, \[2\]\]/);
-  assert.match(printed, /d: dict = \{"k": 1, "n": \[2, 3\]\}/);
+  assert.match(printed, /create l: list as \["a", 1, false, \[2\]\]/);
+  assert.match(printed, /create d: dict as \{"k": 1, "n": \[2, 3\]\}/);
   assert.equal(printNblk(parseOk(printed)), printed);
+});
+
+test("drops the legacy variables section with a warning", () => {
+  const result = parseNblk(`project "Legacy"
+
+variables:
+  n: number = 2
+
+start:
+  print "hi"
+`);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.document.project.scripts.length, 1);
+  assert.equal(result.warnings.length, 1);
 });
 
 test("parses control flow", () => {
   const document = parseOk(`project "Flow"
 
-variables:
-  score: number = 0
-  i: number = 0
-
 start:
+  create score: number as 0
+  create i: number as 0
   if score > 2:
     print "big"
   else if score == 2:
@@ -105,7 +116,7 @@ start:
   forever:
     break
 `);
-  const [conditional, repeat, loop, repeatWith, forever] = body(document);
+  const [, , conditional, repeat, loop, repeatWith, forever] = body(document);
   assert.equal(conditional!.type, "control.if");
   assert.ok(conditional!.inputs?.elseIf1);
   assert.ok(conditional!.inputs?.else);
@@ -147,10 +158,8 @@ define action greet(name: text):
 test("parses try/catch forms", () => {
   const document = parseOk(`project "Errors"
 
-variables:
-  message: text = ""
-
 start:
+  create message: text as ""
   try:
     throw "boom"
   catch:
@@ -158,13 +167,13 @@ start:
   catch text as message:
     print message
 `);
-  const tryBlock = body(document)[0]!;
+  const tryBlock = body(document)[1]!;
   assert.equal(tryBlock.type, "control.try");
   const catchers = tryBlock.inputs?.catches as BlockNode[];
   assert.equal(catchers.length, 2);
   assert.equal(catchers[0]!.type, "control.catch");
   assert.equal(catchers[1]!.type, "control.catchAssign");
-  assert.equal(catchers[1]!.fields?.target, document.project.variables[0]!.id);
+  assert.equal(catchers[1]!.fields?.target, "message");
 });
 
 test("parses the three import forms", () => {
@@ -201,7 +210,7 @@ start:
   assert.equal(body(again)[0]!.type, "future.block");
 });
 
-test("declares loop and catch variables on demand", () => {
+test("keeps loop counters and catch targets as plain names", () => {
   const document = parseOk(`project "Auto"
 
 start:
@@ -212,13 +221,10 @@ start:
   catch text as message:
     print message
 `);
-  assert.deepEqual(
-    document.project.variables.map((variable) => [variable.name, variable.type]),
-    [
-      ["i", "number"],
-      ["message", "text"],
-    ],
-  );
+  const [repeatWith, tryBlock] = body(document);
+  assert.equal(repeatWith!.fields?.variable, "i");
+  const catcher = (tryBlock!.inputs?.catches as BlockNode[])[0]!;
+  assert.equal(catcher.fields?.target, "message");
 });
 
 test("roundtrips raw expression blocks", () => {
@@ -237,12 +243,9 @@ start:
 });
 
 test("reports readable errors with line numbers", () => {
-  const unknownVariable = parseNblk(`project "Bad"\n\nstart:\n  set nope to 1\n`);
-  assert.equal(unknownVariable.ok, false);
-  if (!unknownVariable.ok) {
-    assert.equal(unknownVariable.error.line, 4);
-    assert.match(unknownVariable.error.message, /Unknown variable: nope/);
-  }
+  const badIndent = parseNblk(`project "Bad"\n\nstart:\n  print "a"\n    print "b"\n`);
+  assert.equal(badIndent.ok, false);
+  if (!badIndent.ok) assert.equal(badIndent.error.line, 5);
 
   const unknownBlock = parseNblk(`project "Bad"\n\nstart:\n  whatever 1\n`);
   assert.equal(unknownBlock.ok, false);
