@@ -88,6 +88,8 @@ describe("editor edits", () => {
     const print = body[0]!;
 
     const value = instance("text.literal");
+    const current = findBlock(document.project, print.id)?.inputs?.text;
+    if (current && !Array.isArray(current)) unplugPort(document.project, print.id, "text");
     assert.equal(plugIntoPort(document.project, print.id, "text", value), true);
     assert.equal(plugIntoPort(document.project, print.id, "text", instance("text.literal")), false);
 

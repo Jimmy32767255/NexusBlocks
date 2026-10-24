@@ -210,7 +210,7 @@ describe("editor rendering", () => {
     });
 
     assert.equal(view.root.querySelectorAll(".script").length, 1);
-    assert.equal(view.root.querySelectorAll(".block").length, 2);
+    assert.equal(view.root.querySelectorAll(".block").length, 3);
     assert.equal(view.root.querySelector(".canvas__empty"), null);
 
     // Hat blocks render one flat bar plus a C-shaped mouth, never a wrapping box.
@@ -294,16 +294,17 @@ describe("editor rendering", () => {
     assert.ok(view.root.querySelector(".canvas__empty"));
   });
 
-  it("edits the inline literal through the inspector", () => {
+  it("edits a plugged text literal through the inspector", () => {
     const { document: doc, print } = starterPrint();
+    const literal = findBlock(doc.project, (print.inputs?.text as { id: string }).id)!;
     const changes: [string, string, string | number | boolean][] = [];
 
     const panel = renderInspector({
       registry: defaultRegistry,
-      selected: findBlock(doc.project, print.id) ?? null,
+      selected: literal,
       variables: doc.project.variables,
-      onFieldChange: () => {},
-      onLiteralChange: (blockId, field, value) => changes.push([blockId, field, value]),
+      onFieldChange: (blockId, field, value) => changes.push([blockId, field, value]),
+      onLiteralChange: () => {},
       onUnplug: () => {},
       onDelete: () => {},
     });
@@ -314,7 +315,7 @@ describe("editor rendering", () => {
     input.value = "Hi";
     input.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
 
-    assert.deepEqual(changes, [[print.id, "text", "Hi"]]);
+    assert.deepEqual(changes, [[literal.id, "value", "Hi"]]);
   });
 
   it("renders console lines and follows block links", () => {

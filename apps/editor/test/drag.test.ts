@@ -113,6 +113,7 @@ describe("editor drag and drop", () => {
     const { store, canvas, deps, toasts } = setup();
     const start = store.state.document.project.scripts[0]!;
     const print = (start.inputs?.body as { id: string }[])[0]!;
+    if (print.inputs && "text" in print.inputs) delete print.inputs.text;
 
     const slot = document.createElement("div");
     slot.dataset.drop = "value";

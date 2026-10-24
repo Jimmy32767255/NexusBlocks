@@ -394,7 +394,9 @@ function renderValuePort(node: BlockNode, port: PortDef, context: BlockRenderCon
   } else {
     const raw = node.fields?.[port.name];
     const value = raw === undefined ? port.default ?? "" : raw;
-    if (type === "boolean") {
+    if (type === "any") {
+      chip.append(el("span", { class: "port__hint", text: t("block.port.dropValue") }));
+    } else if (type === "boolean") {
       const select = el("select", {
         class: "port__input port__select",
         attrs: { disabled: !context.interactive },

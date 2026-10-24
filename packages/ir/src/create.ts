@@ -74,7 +74,9 @@ export function createHelloWorldScript(): BlockNode {
     inputs: {
       body: [
         createBlock("io.print", {
-          fields: { text: "Hello, world!" },
+          inputs: {
+            text: createBlock("text.literal", { fields: { value: "Hello, world!" } }),
+          },
         }),
       ],
     },

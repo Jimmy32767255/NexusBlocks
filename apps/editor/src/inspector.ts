@@ -261,6 +261,10 @@ function renderInspectorPort(node: BlockNode, port: PortDef, options: InspectorO
     return row;
   }
 
+  if (port.type === "any") {
+    row.append(el("span", { class: "field__hint", text: t("block.port.dropValue") }));
+    return row;
+  }
   const raw = node.fields?.[port.name] ?? port.default ?? "";
   let control: HTMLElement;
   if (port.type === "boolean") {

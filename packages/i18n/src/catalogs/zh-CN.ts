@@ -303,6 +303,7 @@ export const zhCN: Catalog = {
   "block.control.if.port.elseIfBody": "否则如果执行",
   "block.control.if.field.elseIfs": "扩展分支",
   "block.grow.add": "增加一项",
+  "block.port.dropValue": "把文本、数字或真/假积木拖到这里",
   "block.grow.remove": "减少一项",
   "block.grow.addParam": "增加参数",
   "block.grow.removeParam": "减少参数",
