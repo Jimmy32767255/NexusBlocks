@@ -46,6 +46,7 @@ import type {
 } from "./model.ts";
 import { VALUE_TYPES } from "./model.ts";
 import { defaultValue } from "./values.ts";
+import { localizeLine, typeToZh } from "./nblk-zh.ts";
 
 export const NBLK_EXTENSION = ".nblk" as const;
 
@@ -427,7 +428,7 @@ class Parser {
         fail(lineIndex + 1, "Tabs are not allowed for indentation; use spaces");
       }
       const indent = raw.length - raw.trimStart().length;
-      this.lines.push({ indent, text: raw.trim(), number: lineIndex + 1 });
+      this.lines.push({ indent, text: localizeLine(raw.trim()), number: lineIndex + 1 });
     });
     this.project = createProject();
   }
@@ -1020,7 +1021,37 @@ function rawNode(raw: string, line: number, expression = false): BlockNode {
   return node;
 }
 
+/** Exception filters keep their English ids in the document but print in Chinese. */
+const ZH_EXCEPTIONS: Record<string, string> = {
+  any: "任意",
+  error: "错误",
+  text: "文本",
+  number: "数字",
+  boolean: "布尔值",
+  list: "列表",
+  dict: "字典",
+};
+
+function zhException(filter: string): string {
+  return ZH_EXCEPTIONS[filter] ?? filter;
+}
+
+/** Function parameter list, printed with Chinese type names. */
+function paramsToZh(params: string): string {
+  return params
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "")
+    .map((entry) => {
+      const colon = entry.indexOf(":");
+      if (colon === -1) return entry;
+      return `${entry.slice(0, colon).trim()}: ${typeToZh(entry.slice(colon + 1).trim())}`;
+    })
+    .join(", ");
+}
+
 function literalText(value: FieldValue): string {
+  if (typeof value === "boolean") return value ? "真" : "假";
   return JSON.stringify(value);
 }
 
@@ -1033,7 +1064,7 @@ function expressionText(node: BlockNode, context: PrintContext): string {
   if (node.type === "var.get") return variableNameOf(node, "variable");
   if (node.type === "text.literal") return literalText(String(node.fields?.value ?? ""));
   if (node.type === "math.number") return literalText(Number(node.fields?.value ?? 0));
-  if (node.type === "logic.boolean") return String(Boolean(node.fields?.value));
+  if (node.type === "logic.boolean") return Boolean(node.fields?.value) ? "真" : "假";
   if (node.type === "math.arithmetic") {
     const op = String(node.fields?.op ?? "+");
     return `${portValue(node, "a", "number", context)} ${op} ${portValue(node, "b", "number", context)}`;
@@ -1043,10 +1074,10 @@ function expressionText(node: BlockNode, context: PrintContext): string {
     return `${portValue(node, "a", "any", context)} ${op} ${portValue(node, "b", "any", context)}`;
   }
   if (node.type === "text.contains") {
-    return `contains(${portValue(node, "text", "text", context)}, ${portValue(node, "needle", "text", context)})`;
+    return `包含(${portValue(node, "text", "text", context)}, ${portValue(node, "needle", "text", context)})`;
   }
   if (node.type === "text.splitAt") {
-    return `split(${portValue(node, "text", "text", context)}, ${portValue(node, "separator", "text", context)}, ${portValue(node, "index", "number", context)})`;
+    return `拆分(${portValue(node, "text", "text", context)}, ${portValue(node, "separator", "text", context)}, ${portValue(node, "index", "number", context)})`;
   }
   if (node.type === "text.join") {
     const count = Math.max(1, Number(node.fields?.count ?? 2));
@@ -1054,24 +1085,24 @@ function expressionText(node: BlockNode, context: PrintContext): string {
     for (let index = 0; index < count; index += 1) {
       parts.push(portValue(node, String.fromCharCode(97 + index), "text", context));
     }
-    return `join(${parts.join(", ")})`;
+    return `连接(${parts.join(", ")})`;
   }
-  if (node.type === "list.length") return `length(${portValue(node, "items", "list", context)})`;
+  if (node.type === "list.length") return `长度(${portValue(node, "items", "list", context)})`;
   if (node.type === "list.get") {
     const items = node.inputs?.items;
-    return `getitem(${items && !Array.isArray(items) ? expressionText(items, context) : "[]"}, ${portValue(node, "index", "number", context)})`;
+    return `取元素(${items && !Array.isArray(items) ? expressionText(items, context) : "[]"}, ${portValue(node, "index", "number", context)})`;
   }
   if (node.type === "list.literal") return compactJson(String(node.fields?.items ?? "[]"), node);
-  if (node.type === "dict.get") return `getkey(${portValue(node, "dict", "dict", context)}, ${portValue(node, "key", "text", context)})`;
-  if (node.type === "dict.has") return `haskey(${portValue(node, "dict", "dict", context)}, ${portValue(node, "key", "text", context)})`;
-  if (node.type === "dict.keys") return `keysof(${portValue(node, "dict", "dict", context)})`;
+  if (node.type === "dict.get") return `取值(${portValue(node, "dict", "dict", context)}, ${portValue(node, "key", "text", context)})`;
+  if (node.type === "dict.has") return `有键(${portValue(node, "dict", "dict", context)}, ${portValue(node, "key", "text", context)})`;
+  if (node.type === "dict.keys") return `键列表(${portValue(node, "dict", "dict", context)})`;
   if (node.type === "dict.literal") return compactJson(String(node.fields?.items ?? "{}"), node);
-  if (node.type === "convert.toNumber") return `toNumber(${portValue(node, "text", "text", context)})`;
-  if (node.type === "convert.toString") return `toString(${portValue(node, "value", "any", context)})`;
-  if (node.type === "file.read") return `readfile(${portValue(node, "path", "text", context)})`;
-  if (node.type === "file.exists") return `exists(${portValue(node, "path", "text", context)})`;
-  if (node.type === "file.list") return "listfiles()";
-  if (node.type === "time.get_os_time") return "time()";
+  if (node.type === "convert.toNumber") return `转数字(${portValue(node, "text", "text", context)})`;
+  if (node.type === "convert.toString") return `转文本(${portValue(node, "value", "any", context)})`;
+  if (node.type === "file.read") return `读取文件(${portValue(node, "path", "text", context)})`;
+  if (node.type === "file.exists") return `存在(${portValue(node, "path", "text", context)})`;
+  if (node.type === "file.list") return "列出文件()";
+  if (node.type === "time.get_os_time") return "当前时间()";
   if (node.type.startsWith("func.call:")) {
     const decl = context.functions.get(node.type.slice("func.call:".length));
     if (decl) {
@@ -1102,13 +1133,14 @@ function inlineJson(value: Value): string {
     if (!Number.isFinite(value)) fail(0, "Non-finite number in document");
     return String(value);
   }
-  if (typeof value === "boolean" || value === null) return String(value);
+  if (typeof value === "boolean") return value ? "真" : "假";
+  if (value === null) return "空";
   if (Array.isArray(value)) return `[${value.map(inlineJson).join(", ")}]`;
   return `{${Object.entries(value).map(([key, item]) => `${JSON.stringify(key)}: ${inlineJson(item)}`).join(", ")}}`;
 }
 
 function rawText(node: BlockNode): string {
-  return `raw(${JSON.stringify(node)})`;
+  return `原始(${JSON.stringify(node)})`;
 }
 
 function portValue(node: BlockNode, port: string, type: ValueType, context: PrintContext): string {
@@ -1135,72 +1167,72 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
   const body = (port: string): string[] => stackLines(node, port, context).map((line) => "  " + line);
   switch (node.type) {
     case "control.start":
-      return [`start:`, ...body("body")];
+      return [`开始:`, ...body("body")];
     case FUNCTION_DEFINE_VALUE_TYPE:
     case FUNCTION_DEFINE_ACTION_TYPE:
     case FUNCTION_DEFINE_TYPE: {
       const name = String(node.fields?.name ?? "function");
       const params = String(node.fields?.params ?? "");
-      if (node.type === FUNCTION_DEFINE_ACTION_TYPE) return [`define action ${name}(${params}):`, ...body("body")];
-      const keyword = node.type === FUNCTION_DEFINE_TYPE ? "function" : "value";
-      const returnType = String(node.fields?.returnType ?? "any");
-      return [`define ${keyword} ${name}(${params}) -> ${returnType}:`, ...body("body")];
+      if (node.type === FUNCTION_DEFINE_ACTION_TYPE) return [`定义操作 ${name}(${paramsToZh(params)}):`, ...body("body")];
+      const keyword = node.type === FUNCTION_DEFINE_TYPE ? "函数" : "取值";
+      const returnType = typeToZh(String(node.fields?.returnType ?? "any"));
+      return [`定义${keyword} ${name}(${paramsToZh(params)}) -> ${returnType}:`, ...body("body")];
     }
     case IMPORT_ALL_TYPE:
-      return [`import ${JSON.stringify(String(node.fields?.file ?? ""))}`];
+      return [`导入 ${JSON.stringify(String(node.fields?.file ?? ""))}`];
     case IMPORT_NAMED_TYPE:
-      return [`from ${JSON.stringify(String(node.fields?.file ?? ""))} import ${String(node.fields?.name ?? "")}`];
+      return [`从 ${JSON.stringify(String(node.fields?.file ?? ""))} 导入 ${String(node.fields?.name ?? "")}`];
     case IMPORT_ALIAS_TYPE:
       return [
-        `from ${JSON.stringify(String(node.fields?.file ?? ""))} import ${String(node.fields?.name ?? "")} as ${String(node.fields?.alias ?? "")}`,
+        `从 ${JSON.stringify(String(node.fields?.file ?? ""))} 导入 ${String(node.fields?.name ?? "")} 作为 ${String(node.fields?.alias ?? "")}`,
       ];
     case "control.if": {
-      const lines = [`if ${portValue(node, "condition", "boolean", context)}:`];
+      const lines = [`如果 ${portValue(node, "condition", "boolean", context)}:`];
       lines.push(...body("then"));
       const count = Math.max(0, Number(node.fields?.elseIfs ?? 0) - 1);
       for (let index = 1; index <= count; index += 1) {
-        lines.push(`else if ${portValue(node, `elseIf${index}`, "boolean", context)}:`);
+        lines.push(`否则如果 ${portValue(node, `elseIf${index}`, "boolean", context)}:`);
         lines.push(...body(`elseIf${index}Body`));
       }
       if (node.inputs?.else !== undefined) {
-        lines.push("else:");
+        lines.push("否则:");
         lines.push(...body("else"));
       }
       return lines;
     }
     case "control.repeat":
-      return [`repeat ${portValue(node, "times", "number", context)}:`, ...body("body")];
+      return [`重复 ${portValue(node, "times", "number", context)} 次:`, ...body("body")];
     case "control.repeatWith":
       return [
-        `repeat with ${variableNameOf(node, "variable")} times ${portValue(node, "times", "number", context)}:`,
+        `重复 使用 ${variableNameOf(node, "variable")} 共 ${portValue(node, "times", "number", context)} 次:`,
         ...body("body"),
       ];
     case "control.while":
-      return [`while ${portValue(node, "condition", "boolean", context)}:`, ...body("body")];
+      return [`当 ${portValue(node, "condition", "boolean", context)}:`, ...body("body")];
     case "control.forever":
-      return [`forever:`, ...body("body")];
+      return [`无限重复:`, ...body("body")];
     case "control.wait":
-      return [`wait ${portValue(node, "seconds", "number", context)}`];
+      return [`等待 ${portValue(node, "seconds", "number", context)} 秒`];
     case "control.label":
-      return [`label ${nameField(node)}`];
+      return [`标记 ${nameField(node)}`];
     case "control.goto":
-      return [`goto ${nameField(node)}`];
+      return [`跳转到 ${nameField(node)}`];
     case "control.break":
-      return ["break"];
+      return ["跳出循环"];
     case "control.pass":
-      return ["pass"];
+      return ["跳过"];
     case "control.throw":
-      return [`throw ${portValue(node, "value", "any", context)}`];
+      return [`抛出 ${portValue(node, "value", "any", context)}`];
     case "control.try": {
-      const lines = ["try:", ...body("body")];
+      const lines = ["尝试:", ...body("body")];
       const catchers = node.inputs?.catches;
       if (Array.isArray(catchers)) {
         for (const catcher of catchers) {
-          if (catcher.type === "control.catch") lines.push("catch:");
-          else if (catcher.type === "control.catchType") lines.push(`catch ${String(catcher.fields?.exception ?? "error")}:`);
+          if (catcher.type === "control.catch") lines.push("捕获:");
+          else if (catcher.type === "control.catchType") lines.push(`捕获 ${zhException(String(catcher.fields?.exception ?? "error"))}:`);
           else if (catcher.type === "control.catchAssign") {
             const target = String(catcher.fields?.target ?? "error");
-            lines.push(`catch ${String(catcher.fields?.exception ?? "error")} as ${target}:`);
+            lines.push(`捕获 ${zhException(String(catcher.fields?.exception ?? "error"))} 作为 ${target}:`);
           } else {
             lines.push(...renderBlock(catcher, context));
             continue;
@@ -1211,47 +1243,47 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
       return lines;
     }
     case "sys.exit":
-      return [`exit ${portValue(node, "code", "number", context)}`];
+      return [`退出程序 ${portValue(node, "code", "number", context)}`];
     case FUNCTION_RETURN_TYPE: {
       const value = node.fields?.value;
       const input = node.inputs?.value;
-      if (value !== undefined) return [`return ${literalText(value)}`];
-      if (input && !Array.isArray(input)) return [`return ${expressionText(input, context)}`];
-      return ["return"];
+      if (value !== undefined) return [`返回 ${literalText(value)}`];
+      if (input && !Array.isArray(input)) return [`返回 ${expressionText(input, context)}`];
+      return ["返回"];
     }
     case "io.print":
-      return [`print ${portValue(node, "text", "any", context)}`];
+      return [`打印 ${portValue(node, "text", "any", context)}`];
     case "var.create": {
       const type = String(node.fields?.type ?? "any");
-      const suffix = type === "any" ? "" : `: ${type}`;
-      return [`create ${String(node.fields?.name ?? "name")}${suffix} as ${portValue(node, "value", "any", context)}`];
+      const suffix = type === "any" ? "" : `: ${typeToZh(type)}`;
+      return [`创建变量 ${String(node.fields?.name ?? "name")}${suffix} 为 ${portValue(node, "value", "any", context)}`];
     }
     case "var.delete":
-      return [`delete ${String(node.fields?.name ?? "name")}`];
+      return [`删除变量 ${String(node.fields?.name ?? "name")}`];
     case "var.set":
-      return [`set ${variableNameOf(node, "variable")} to ${portValue(node, "value", "any", context)}`];
+      return [`设置 ${variableNameOf(node, "variable")} 为 ${portValue(node, "value", "any", context)}`];
     case "list.set":
       return [
-        `setitem(${portValue(node, "items", "list", context)}, ${portValue(node, "index", "number", context)}, ${portValue(node, "value", "any", context)})`,
+        `设置元素(${portValue(node, "items", "list", context)}, ${portValue(node, "index", "number", context)}, ${portValue(node, "value", "any", context)})`,
       ];
     case "list.add":
-      return [`add(${portValue(node, "items", "list", context)}, ${portValue(node, "value", "any", context)})`];
+      return [`添加(${portValue(node, "items", "list", context)}, ${portValue(node, "value", "any", context)})`];
     case "dict.set":
       return [
-        `setkey(${portValue(node, "dict", "dict", context)}, ${portValue(node, "key", "text", context)}, ${portValue(node, "value", "any", context)})`,
+        `设置键(${portValue(node, "dict", "dict", context)}, ${portValue(node, "key", "text", context)}, ${portValue(node, "value", "any", context)})`,
       ];
     case "file.write":
-      return [`writefile(${portValue(node, "path", "text", context)}, ${portValue(node, "content", "any", context)})`];
+      return [`写入文件(${portValue(node, "path", "text", context)}, ${portValue(node, "content", "any", context)})`];
     case "file.delete":
-      return [`deletefile(${portValue(node, "path", "text", context)})`];
+      return [`删除文件(${portValue(node, "path", "text", context)})`];
     case "os.exec_command":
-      return [`run ${portValue(node, "command", "text", context)}`];
+      return [`执行命令 ${portValue(node, "command", "text", context)}`];
     case "comment.note":
-      return [`note ${literalText(String(node.fields?.text ?? ""))}`];
+      return [`注释 ${literalText(String(node.fields?.text ?? ""))}`];
     case "control.catch":
     case "control.catchType":
     case "control.catchAssign":
-      return [`raw ${JSON.stringify(node)}`];
+      return [`原始 ${JSON.stringify(node)}`];
     default: {
       if (node.type.startsWith("func.call:")) {
         const decl = context.functions.get(node.type.slice("func.call:".length));
@@ -1271,7 +1303,7 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
 }
 
 function printGeneric(node: BlockNode, _context: PrintContext): string[] {
-  return [`raw ${JSON.stringify(node)}`];
+  return [`原始 ${JSON.stringify(node)}`];
 }
 
 /** Render a document as `.nblk` text. Schemas improve dynamic ports. */
@@ -1292,8 +1324,8 @@ export function printNblk(document: NexusDocument, schemas?: NblkSchemaSource): 
     functions,
   };
   const lines: string[] = [];
-  lines.push(`project ${JSON.stringify(project.name)}`);
-  lines.push(`locale ${project.locale}`);
+  lines.push(`项目 ${JSON.stringify(project.name)}`);
+  lines.push(`语言 ${project.locale}`);
   if (project.scripts.length > 0) lines.push("");
   project.scripts.forEach((script, index) => {
     const previous = project.scripts[index - 1];
