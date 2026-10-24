@@ -25,11 +25,11 @@ function demo() {
 describe("project files", () => {
   it("derives a safe file name from the project name", () => {
     const doc = demo();
-    assert.equal(projectFileName(doc), "demo.nexusblocks.json");
+    assert.equal(projectFileName(doc), "demo.nblk");
     doc.project.name = "a/b:c";
-    assert.equal(projectFileName(doc), "a-b-c.nexusblocks.json");
+    assert.equal(projectFileName(doc), "a-b-c.nblk");
     doc.project.name = "   ";
-    assert.equal(projectFileName(doc), "nexus-blocks.nexusblocks.json");
+    assert.equal(projectFileName(doc), "nexus-blocks.nblk");
   });
 
   it("round-trips through readDocument", () => {
@@ -41,9 +41,23 @@ describe("project files", () => {
     assert.deepEqual(result.warnings, []);
   });
 
-  it("reports invalid JSON instead of throwing", () => {
-    const result = readDocument("{ not json");
-    assert.equal(result.ok, false);
+  it("reads nblk source and still accepts legacy JSON", () => {
+    const nblk = readDocument('project "Text"\n\nstart:\n  print "hi"\n');
+    assert.equal(nblk.ok, true);
+    if (nblk.ok) {
+      assert.equal(nblk.document.project.name, "Text");
+      assert.equal(nblk.document.project.scripts.length, 1);
+    }
+    const legacy = readDocument(serializeDocument(demo()));
+    assert.equal(legacy.ok, true);
+  });
+
+  it("reports invalid files with a line number instead of throwing", () => {
+    const json = readDocument("{ not json");
+    assert.equal(json.ok, false);
+    const nblk = readDocument('project "Bad"\n\nstart:\n  nope 1\n');
+    assert.equal(nblk.ok, false);
+    if (!nblk.ok) assert.match(nblk.error, /Line 4/);
   });
 
   it("clicking save produces a download with the project payload", () => {
@@ -69,7 +83,7 @@ describe("project files", () => {
       URL.createObjectURL = originalCreate;
       URL.revokeObjectURL = originalRevoke;
     }
-    assert.deepEqual(clicks, [{ download: "demo.nexusblocks.json", href: "blob:demo" }]);
+    assert.deepEqual(clicks, [{ download: "demo.nblk", href: "blob:demo" }]);
     assert.deepEqual(urls, ["blob:demo"]);
     // The anchor must not linger in the document after the click.
     assert.equal(dom.window.document.querySelectorAll("a").length, 0);

@@ -22,7 +22,7 @@ import {
   formatParams,
   parseParams,
   portsOf,
-  serializeDocument,
+  printNblk,
   type Diagnostic,
   type Value,
   type ValueType,
@@ -487,7 +487,7 @@ async function save(): Promise<void> {
   if (desktopFiles) {
     let saved: { path: string } | null = null;
     try {
-      saved = await desktopFiles.save(serializeDocument(document), projectFileName(document));
+      saved = await desktopFiles.save(printNblk(document), projectFileName(document));
     } catch (error) {
       toast(t("toast.saveFailed", { detail: errorMessage(error) }), "error");
       return;

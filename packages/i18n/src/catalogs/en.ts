@@ -52,7 +52,7 @@ export const en: Catalog = {
   "inspector.moveUp": "Move script up",
   "inspector.moveDown": "Move script down",
   "docs.title": "Documentation",
-  "docs.body": "Nexus Blocks runs programs made of stacked blocks.\n◂ Drag blocks from the left panel, or click a block to insert it at the view centre.\n◂ Press Run to execute every script headed by “when program starts”.\n◂ Projects are saved as JSON; “Save a copy” downloads the current document.\n◂ Blocks are declarative: the engine, storage and UI read the same block registry, so new blocks and capabilities (files, processes, network) can be added without redesigning the editor.\n◂ Full documentation lives in docs/README.md of the repository.",
+  "docs.body": "Nexus Blocks runs programs made of stacked blocks.\n◂ Drag blocks from the left panel, or click a block to insert it at the view centre.\n◂ Press Run to execute every script headed by “when program starts”.\n◂ Projects are saved as readable .nblk text; “Save a copy” downloads the current document.\n◂ Blocks are declarative: the engine, storage and UI read the same block registry, so new blocks and capabilities (files, processes, network) can be added without redesigning the editor.\n◂ Full documentation lives in docs/README.md of the repository.",
   "type.any": "Any value",
   "type.text": "Text",
   "type.number": "Number",

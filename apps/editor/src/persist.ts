@@ -1,4 +1,4 @@
-import { parseDocument, serializeDocument, type NexusDocument } from "@nexus/ir";
+import { parseDocument, parseNblk, printNblk, serializeDocument, type NexusDocument } from "@nexus/ir";
 
 const AUTOSAVE_KEY = "nexus-blocks:autosave";
 
@@ -28,7 +28,7 @@ export function saveAutosave(doc: NexusDocument): void {
 /** Suggested file name for a project, without directories. */
 export function projectFileName(doc: NexusDocument): string {
   const name = doc.project.name.trim().replace(/[\\/:*?"<>|]/g, "-") || "nexus-blocks";
-  return `${name}.nexusblocks.json`;
+  return `${name}.nblk`;
 }
 
 /**
@@ -36,7 +36,7 @@ export function projectFileName(doc: NexusDocument): string {
  * WebKit, and the object URL must outlive the navigation the click starts.
  */
 export function downloadDocument(doc: NexusDocument): void {
-  const blob = new Blob([serializeDocument(doc)], { type: "application/json" });
+  const blob = new Blob([printNblk(doc)], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
   const anchor = globalThis.document.createElement("a");
   anchor.href = url;
@@ -50,10 +50,10 @@ export function downloadDocument(doc: NexusDocument): void {
 }
 
 /**
- * Ask for a `.nexusblocks.json` file; `null` when cancelled.
- * `accept` is a file-input attribute; native dialogs filter by extension.
+ * Ask for a `.nblk` file; `null` when cancelled. Older `.json` documents are
+ * still accepted so existing projects keep opening.
  */
-export function pickDocument(accept = ".json,application/json"): Promise<OpenResult | null> {
+export function pickDocument(accept = ".nblk,.json,text/plain,application/json"): Promise<OpenResult | null> {
   return new Promise((resolve) => {
     const input = globalThis.document.createElement("input");
     input.type = "file";
@@ -72,10 +72,7 @@ export function pickDocument(accept = ".json,application/json"): Promise<OpenRes
       }
       file
         .text()
-        .then((text) => {
-          const parsed = parseDocument(text);
-          done(parsed.ok ? { ok: true, document: parsed.document, warnings: parsed.warnings } : parsed);
-        })
+        .then((text) => done(readDocument(text)))
         .catch((error: unknown) => {
           done({ ok: false, error: error instanceof Error ? error.message : String(error) });
         });
@@ -87,8 +84,13 @@ export function pickDocument(accept = ".json,application/json"): Promise<OpenRes
   });
 }
 
-/** Read a document from raw text, used by the desktop file dialog. */
+/** Read a document from raw text: `.nblk` first, legacy JSON as fallback. */
 export function readDocument(text: string): OpenResult {
-  const parsed = parseDocument(text);
-  return parsed.ok ? { ok: true, document: parsed.document, warnings: parsed.warnings } : parsed;
+  if (text.trimStart().startsWith("{")) {
+    const parsed = parseDocument(text);
+    return parsed.ok ? { ok: true, document: parsed.document, warnings: parsed.warnings } : parsed;
+  }
+  const parsed = parseNblk(text);
+  if (parsed.ok) return { ok: true, document: parsed.document, warnings: parsed.warnings };
+  return { ok: false, error: `Line ${parsed.error.line}: ${parsed.error.message}` };
 }

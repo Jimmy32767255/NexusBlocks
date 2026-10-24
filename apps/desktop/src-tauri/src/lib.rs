@@ -193,7 +193,7 @@ fn run_shell(command: &str) -> Value {
 }
 
 /// Extension used for project files written by the desktop shell.
-const PROJECT_EXTENSION: &str = "nexusblocks.json";
+const PROJECT_EXTENSION: &str = "nblk";
 
 /// Strip path separators and control characters so a project name cannot
 /// escape the directory the user picks.
@@ -249,7 +249,7 @@ async fn project_save(app: tauri::AppHandle, content: String, suggested_name: St
         .dialog()
         .file()
         .set_file_name(name)
-        .add_filter("Nexus Blocks project", &["json"])
+        .add_filter("Nexus Blocks project", &["nblk", "json"])
         .blocking_save_file();
     let Some(picked) = picked else {
         return ok(Value::Null);
@@ -270,7 +270,7 @@ async fn project_open(app: tauri::AppHandle) -> Value {
     let picked = app
         .dialog()
         .file()
-        .add_filter("Nexus Blocks project", &["json"])
+        .add_filter("Nexus Blocks project", &["nblk", "json"])
         .blocking_pick_file();
     let Some(picked) = picked else {
         return ok(Value::Null);
@@ -345,17 +345,14 @@ mod tests {
         assert_eq!(file_stem("..."), "nexus-blocks");
         assert_eq!(file_stem(""), "nexus-blocks");
         assert_eq!(file_stem("..hidden"), "hidden");
-        assert_eq!(file_name("demo"), "demo.nexusblocks.json");
-        assert_eq!(
-            file_name("demo.nexusblocks.json"),
-            "demo.nexusblocks.json"
-        );
+        assert_eq!(file_name("demo"), "demo.nblk");
+        assert_eq!(file_name("demo.nblk"), "demo.nblk");
     }
 
     #[test]
     fn writes_the_project_file_into_a_missing_directory() {
         let dir = std::env::temp_dir().join(format!("nexus-save-{}", std::process::id()));
-        let file = dir.join("nested").join("demo.nexusblocks.json");
+        let file = dir.join("nested").join("demo.nblk");
         assert_eq!(write_text(&file, "{}"), Ok(()));
         assert_eq!(fs::read_to_string(&file).unwrap(), "{}");
         let _ = fs::remove_dir_all(&dir);
