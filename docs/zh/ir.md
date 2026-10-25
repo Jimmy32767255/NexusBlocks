@@ -16,7 +16,6 @@
     "locale": "zh-CN",
     "createdAt": "2026-10-23T08:00:00.000Z",
     "updatedAt": "2026-10-23T08:00:00.000Z",
-    "functions": [],
     "scripts": [
       {
         "id": "start_x9",
