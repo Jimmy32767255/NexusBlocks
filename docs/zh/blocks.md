@@ -2,6 +2,10 @@
 
 积木由 `@nexus/engine` 注册表统一管理。一块积木 = 一份声明式 schema（给校验器与编辑器用）+ 一个执行函数（给解释器用）。
 
+## 下标约定
+
+所有位置类参数（列表下标、文本分段下标、循环轮次）都从 **0** 开始：`list.get` / `list.set` 的 0 是第一个元素，`text.splitAt` 的 0 是第一段，`control.repeatWith` 写入的轮次是 `0 .. 次数-1`。理由见[设计决策记录](decisions.md)。
+
 ## 定义
 
 ```ts
@@ -28,7 +32,7 @@ interface BlockDefinition extends BlockSchema {
 | `control.repeat` | 控制 | 重复执行 | `times` 数字、`body` 栈 |
 | `control.forever` | 控制 | 无限循环（靠「跳出循环」或「停止」退出） | `body` 栈 |
 | `control.while` | 控制 | 条件为真时重复 | `condition` 布尔值、`body` 栈 |
-| `control.repeatWith` | 控制 | 重复并计数，当前轮次从 1 开始写入变量 | `times` 数字、`body` 栈，属性 `variable` |
+| `control.repeatWith` | 控制 | 重复并计数，当前轮次从 0 开始写入变量 | `times` 数字、`body` 栈，属性 `variable` |
 | `control.wait` | 控制 | 等待若干秒（可被「停止」中断） | `seconds` 数字 |
 | `control.label` | 控制 | 标记一个跳转目标 | 属性 `name` |
 | `control.goto` | 控制 | 跳转到同一脚本/函数中的标记 | 属性 `name` |
@@ -49,7 +53,7 @@ interface BlockDefinition extends BlockSchema {
 | `math.arithmetic` | 数学 | 四则运算（`+ - * / %`） | 属性 `op`，`a`、`b` 值 |
 | `text.literal` | 文本 | 文本字面量 | 属性 `value` |
 | `text.join` | 文本 | 连接文本（默认 2 段，可扩到 8 段） | `a`、`b`、`c`… 值 |
-| `text.splitAt` | 文本 | 以分隔符拆分后取第 n 段（1 起）；空分隔符报错 | `text`、`separator`、`index` 值 |
+| `text.splitAt` | 文本 | 以分隔符拆分后取下标 n 的段（0 起）；空分隔符报错 | `text`、`separator`、`index` 值 |
 | `text.contains` | 文本 | 判断包含关系 | `text`、`needle` 值 |
 | `time.get_os_time` | 系统 | 当前本地时间（`YYYY-MM-DD HH:mm:ss`） | 无 |
 | `os.exec_command` | 系统 | 用系统 shell 执行命令，打印输出；退出码非 0 报错。需要宿主提供 `os.exec` 能力（桌面版支持，浏览器不支持） | `command` 值 |
@@ -172,7 +176,7 @@ registry.grouped();         // 按类别分组，供工具箱
 - `control.repeat`：先把 `times` 求值为非负整数，再重复执行 `body`。
 - `control.forever`：每轮先 `tick` 再执行 `body`；`BreakSignal` 退出循环；仍受 `stepLimit` 限制，不会把运行器卡死。
 - `control.while`：每轮开始前重新求值 `condition`，为假就结束；条件里的变量或函数调用会随轮次变化。
-- `control.repeatWith`：先固定 `times`，然后第 1..N 轮把轮次写入 `variable`（1 起）；循环结束后变量保留最后一轮的值；`break` 时立即停止并保留当前值。
+- `control.repeatWith`：先固定 `times`，然后第 0..N-1 轮把轮次写入 `variable`（0 起）；循环结束后变量保留最后一轮的值；`break` 时立即停止并保留当前值。
 
 ## 类型转换
 

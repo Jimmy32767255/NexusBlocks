@@ -565,7 +565,7 @@ test("while checks the condition before every round", async () => {
   assert.deepEqual(loggedTexts(events), ["0", "1", "2"]);
 });
 
-test("repeat with counter stores 1..n in the chosen variable", async () => {
+test("repeat with counter stores 0..n-1 in the chosen variable", async () => {
   const project = createProject();
   project.scripts = [
     start([
@@ -589,7 +589,7 @@ test("repeat with counter stores 1..n in the chosen variable", async () => {
   const events: RuntimeEvent[] = [];
   const result = await runProject(project, { onEvent: (event) => events.push(event) });
   assert.equal(result.status, "finished");
-  assert.deepEqual(loggedTexts(events), ["1", "2", "3", "3"]);
+  assert.deepEqual(loggedTexts(events), ["0", "1", "2", "2"]);
 });
 
 test("break leaves a repeat with counter loop", async () => {
@@ -829,7 +829,7 @@ test("text.splitAt returns the requested piece", async () => {
             inputs: {
               text: createBlock("text.literal", { fields: { value: "a,b,c" } }),
               separator: createBlock("text.literal", { fields: { value: "," } }),
-              index: createBlock("math.number", { fields: { value: 2 } }),
+              index: createBlock("math.number", { fields: { value: 1 } }),
             },
           }),
         },
@@ -858,7 +858,7 @@ test("text.splitAt rejects empty separators and missing pieces", async () => {
       createBlock("io.print", {
         inputs: {
           text: createBlock("text.splitAt", {
-            fields: { separator: "", index: 1 },
+            fields: { separator: "", index: 0 },
             inputs: { text: createBlock("text.literal", { fields: { value: "abc" } }) },
           }),
         },
@@ -1081,5 +1081,5 @@ test("the repeat counter and catch target declare variables on demand", async ()
 
   const result = await runProject(project, { onEvent: (event) => events.push(event) });
   assert.equal(result.status, "finished");
-  assert.deepEqual(loggedTexts(events), ["1", "2", "2"]);
+  assert.deepEqual(loggedTexts(events), ["0", "1", "1"]);
 });
