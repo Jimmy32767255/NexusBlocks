@@ -2,122 +2,125 @@
 
 Nexus Blocks 的程序文件使用 `.nblk` 后缀，内容是一段类 Python 的纯文本，而不是 JSON。编辑器保存时写 `.nblk`；打开时优先按 `.nblk` 解析，旧的 `.nexusblocks.json` 仍然可以读取。
 
-```text
-project "Hello, world!"
-locale zh-CN
+关键字使用 UTF-8 中文，方便初学者从图形积木过渡到文本编程。英文写法（`project`、`start:`、`print` 等）仍然可以读入，用来兼容旧文件；保存时统一写中文。
 
-start:
-  print "Hello, world!"
+```text
+项目 "你好，世界"
+语言 zh-CN
+
+开始:
+  打印 "你好，世界！"
 ```
 
 IR 仍是唯一的事实来源：`.nblk` 只是 IR（`project.scripts`）的一种可读表示。解析会生成与图形编辑完全相同的文档，两种视图可以互相转换，语义不变。
 
 ## 基本结构
 
-1. 文件头：`project "项目名"`，可选一行 `locale zh-CN` 或 `locale en`。
-2. 顶层积木：`start:`、`define`、`import`，按书写顺序决定脚本顺序。
+1. 文件头：`项目 "项目名"`，可选一行 `语言 zh-CN` 或 `语言 en`。
+2. 顶层积木：`开始:`、`定义…`、`导入…`，按书写顺序决定脚本顺序。
 3. 缩进表示嵌套，两个空格；空行与 `#` 开头的行会被忽略。
 
-变量没有声明区，用 `create` 语句在运行时创建：
+变量没有声明区，用 `创建变量` 语句在运行时创建：
 
 ```text
-start:
-  create score: number as 0
-  create names: list as ["a", "b"]
-  create info: dict as {"k": 1}
-  create flag as true
+开始:
+  创建变量 score: 数字 为 0
+  创建变量 names: 列表 为 ["a", "b"]
+  创建变量 info: 字典 为 {"k": 1}
+  创建变量 flag 为 真
 ```
 
-类型支持 `any`、`text`、`number`、`boolean`、`list`、`dict`（省略类型即 `any`）；初始值可以是任意表达式，字面量按类型校验。`set` 与读取变量都要求变量已经存在，否则报 `runtime.error.missingVariable`；循环计数器与 `catch ... as` 的目标变量在缺失时会自动创建。
+类型支持 `任意`、`文本`、`数字`、`布尔值`、`列表`、`字典`（省略类型即 `任意`）；初始值可以是任意表达式，字面量按类型校验。`设置` 与读取变量都要求变量已经存在，否则报 `runtime.error.missingVariable`；循环计数器与 `捕获 … 作为` 的目标变量在缺失时会自动创建。
 
 ## 语句
 
 ```text
-start:
-  print "Hello"
-  print score
-  set score to score + 1
-  wait 0.5
-  note "一条注释"
-  throw "boom"
-  exit 0
-  run "echo hi"
+开始:
+  打印 "你好"
+  打印 score
+  设置 score 为 score + 1
+  等待 0.5 秒
+  注释 "一条注释"
+  抛出 "boom"
+  退出程序 0
+  执行命令 "echo hi"
 ```
 
 | 积木 | 文本写法 |
 | --- | --- |
-| 等待 | `wait 0.5` |
-| 输出 | `print expr` |
-| 创建变量 | `create 变量: 类型 as expr` / `create 变量 as expr` |
-| 删除变量 | `delete 变量` |
-| 变量赋值 | `set 变量 to expr` |
-| 抛出 | `throw expr` |
-| 退出程序 | `exit expr` |
-| 执行系统命令 | `run expr` |
-| 注释 | `note "text"` |
-| 标记 | `label name`（名称有空格时写 `label "with space"`） |
-| 跳转 | `goto name` |
-| 跳出循环 | `break` |
-| 返回 | `return expr`（仅函数体） |
-| 未知积木 | `raw {"type": "...", "fields": {...}}` |
+| 等待 | `等待 0.5 秒` |
+| 输出 | `打印 expr` |
+| 创建变量 | `创建变量 变量: 类型 为 expr` / `创建变量 变量 为 expr` |
+| 删除变量 | `删除变量 变量` |
+| 变量赋值 | `设置 变量 为 expr` |
+| 抛出 | `抛出 expr` |
+| 退出程序 | `退出程序 expr` |
+| 执行系统命令 | `执行命令 expr` |
+| 注释 | `注释 "text"` |
+| 标记 | `标记 name`（名称有空格时写 `标记 "with space"`） |
+| 跳转 | `跳转到 name` |
+| 跳出循环 | `跳出循环` |
+| 跳过本次循环 | `跳过` |
+| 返回 | `返回 expr`（仅函数体） |
+| 未知积木 | `原始 {"type": "...", "fields": {...}}` |
 
 ## 控制流
 
 ```text
-  if score > 2:
-    print "big"
-  else if score == 2:
-    print "two"
-  else:
-    print "small"
+  如果 score > 2:
+    打印 "big"
+  否则如果 score == 2:
+    打印 "two"
+  否则:
+    打印 "small"
 
-  repeat 3:
-    print "again"
+  重复 3 次:
+    打印 "again"
 
-  while score < 10:
-    set score to score + 1
+  当 score < 10:
+    设置 score 为 score + 1
 
-  repeat with i times 2:
-    print i
+  重复 使用 i 共 2 次:
+    打印 i
 
-  forever:
-    break
+  无限重复:
+    跳出循环
 ```
 
 ## 错误处理
 
 ```text
-  try:
-    throw "boom"
-  catch:
-    print "caught"
-  catch text as message:
-    print message
+  尝试:
+    抛出 "boom"
+  捕获:
+    打印 "caught"
+  捕获 文本 作为 message:
+    打印 message
 ```
 
-`catch` 可跟类型（`error`/`text`/`number`/`boolean`/`list`/`dict`/`any`）；`as 变量名` 会把错误信息写成文本写入该变量，变量不存在时会自动创建为 `text`。
+`捕获` 可跟类型（`错误`/`文本`/`数字`/`布尔值`/`列表`/`字典`/`任意`）；`作为 变量名` 会把错误信息写成文本写入该变量，变量不存在时会自动创建为 `文本`。
 
 ## 函数
 
 ```text
-define value square(x: number) -> number:
-  return x * x
+定义取值 平方(x: 数字) -> 数字:
+  返回 x * x
 
-define action greet(name: text):
-  print join("Hello, ", name)
+定义操作 问候(name: 文本):
+  打印 连接("你好，", name)
 ```
 
-- `define value` 返回值，可作表达式使用；`-> 类型` 省略时默认 `any`。
-- `define action` 返回 `void`，不能写 `return 值`。
+- `定义取值` 返回值，可作表达式使用；`-> 类型` 省略时默认 `任意`。
+- `定义操作` 返回 `无`，不能写 `返回 值`。
 - 参数在函数体内可直接按名字使用。
-- 调用写法就是普通函数调用：`print square(3)`、`greet("nexus")`；参数作为语句时也可直接写 `greet("nexus")`。
+- 调用写法就是普通函数调用：`打印 平方(3)`、`问候("nexus")`；参数作为语句时也可直接写 `问候("nexus")`。
 
 ## 导入
 
 ```text
-import "lib.nblk"
-from "lib.nblk" import greet
-from "lib.nblk" import greet as hi
+导入 "lib.nblk"
+从 "lib.nblk" 导入 问候
+从 "lib.nblk" 导入 问候 作为 嗨
 ```
 
 路径字符串与文件能力一致：绝对路径、`~/…`、或主目录相对路径。导入只合并函数定义与变量，不执行被导入文件的顶层脚本。
@@ -126,20 +129,20 @@ from "lib.nblk" import greet as hi
 
 支持：
 
-- 字面量：`"text"`、`42`、`-1`、`true`、`false`、`null`、`[1, 2]`、`{"k": 1}`
+- 字面量：`"text"`、`42`、`-1`、`真`、`假`、`空`、`[1, 2]`、`{"k": 1}`
 - 变量名与函数参数名
-- 一元 `-`、`not`
-- 二元 `+ - * / %`、`== != < <= > >=`、`and`、`or`
+- 一元 `-`
+- 二元 `+ - * / %`、`== != < <= > >=`
 - 函数调用：`name(arg1, arg2)`
 - 列表/字典读取：`items[0]`、`dict["key"]`
 - 内置函数式写法：
-  `join(...)`、`toNumber(x)`、`toString(x)`、`length(x)`、`add(list, x)`、`setitem(list, i, x)`、`setkey(dict, k, v)`、`getkey(dict, k)`、`haskey(dict, k)`、`keysof(dict)`、`contains(text, sub)`、`split(text, sep, n)`、`readfile(path)`、`exists(path)`、`listfiles()`、`time()`、`square(x)`
+  `连接(...)`、`转数字(x)`、`转文本(x)`、`长度(x)`、`添加(list, x)`、`设置元素(list, i, x)`、`设置键(dict, k, v)`、`取值(dict, k)`、`有键(dict, k)`、`键列表(dict)`、`包含(text, sub)`、`拆分(text, sep, n)`、`读取文件(path)`、`存在(path)`、`列出文件()`、`当前时间()`、`平方(x)`
 
-未知但带专属文本写法的积木会退回 `raw(...)` / `raw {...}`，便于手动编辑或未来扩展；`raw` 内容必须是合法的积木 JSON。
+未知但带专属文本写法的积木会退回 `原始(...)` / `原始 {...}`，便于手动编辑或未来扩展；`原始` 内容必须是合法的积木 JSON。
 
 ## 与 JSON 的关系
 
 - 打开旧 `.nexusblocks.json` 仍可用。
 - 自动保存（浏览器 `localStorage`）内部仍使用 JSON，属于实现细节；导出/保存文件是 `.nblk`。
 - 每个 `.nblk` 解析后都经过与图形编辑相同的校验（端口类型、函数定义合法等），错误信息带行号；变量是否已创建属于运行时检查，运行到缺失变量的语句时会报 `runtime.error.missingVariable`。
-- 旧版本的 `variables:` 声明区会被忽略并给出警告，按上面的 `create` 写法改写即可。
+- 旧版本的英文关键字全部仍然可以读入；旧版本的 `variables:` 声明区会被忽略并给出警告，按上面的 `创建变量` 写法改写即可。
