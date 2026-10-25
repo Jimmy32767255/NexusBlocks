@@ -137,43 +137,6 @@ export function validateProject(project: Project, schemas: SchemaSource): Diagno
     "scripts",
   );
 
-  project.functions.forEach((fn, fnIndex) => {
-    walkBlocks(
-      fn.body,
-      (node, ctx) => {
-        if (seenIds.has(node.id)) {
-          diagnostics.push({
-            severity: "error",
-            code: "block.duplicateId",
-            message: `Duplicate block id: ${node.id}`,
-            path: ctx.path,
-            blockId: node.id,
-          });
-        }
-        seenIds.add(node.id);
-        const schema = lookup(node.type);
-        if (!schema) {
-          diagnostics.push({
-            severity: "error",
-            code: "block.unknownType",
-            message: `Unknown block type: ${node.type}`,
-            path: ctx.path,
-            blockId: node.id,
-            params: { type: node.type },
-          });
-          return;
-        }
-        checkCatchPlacement(node, ctx.parent, ctx.port, ctx.path, diagnostics);
-        checkKind(node, schema, false, ctx.path, diagnostics);
-        checkFields(node, schema, ctx.path, diagnostics);
-        checkInputs(node, schema, schemas, ctx.path, diagnostics);
-      },
-      null,
-      null,
-      `functions[${fnIndex}].body`,
-    );
-  });
-
   return diagnostics;
 }
 

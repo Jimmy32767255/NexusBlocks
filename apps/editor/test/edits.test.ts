@@ -163,7 +163,7 @@ describe("editor edits", () => {
 
   it("removes call blocks when their function definition is deleted", () => {
     const document = createDocument(createProject());
-    const definition = createBlock("func.define", {
+    const definition = createBlock("func.define_value", {
       fields: { name: "twice", params: "x: number", returnType: "number" },
       inputs: { body: [] },
     });

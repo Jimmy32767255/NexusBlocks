@@ -5,7 +5,6 @@ import {
   IR_VERSION,
   type BlockNode,
   type DebugState,
-  type FunctionDef,
   type NexusDocument,
   type Project,
 } from "./model.ts";
@@ -43,19 +42,8 @@ function orderedProject(project: Project): unknown {
     locale: project.locale,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
-    functions: project.functions.map(orderedFunction),
     scripts: project.scripts.map(orderedBlock),
     metadata: sortRecord(project.metadata),
-  };
-}
-
-function orderedFunction(fn: FunctionDef): unknown {
-  return {
-    id: fn.id,
-    name: fn.name,
-    params: fn.params,
-    returnType: fn.returnType,
-    body: fn.body.map(orderedBlock),
   };
 }
 
@@ -103,7 +91,7 @@ export function parseDocument(input: string | unknown): ParseResult {
       error: `Not a Nexus Blocks document (format=${String(raw.format)})`,
     };
   }
-  if (typeof raw.version !== "number" || raw.version > DOCUMENT_VERSION) {
+  if (raw.version !== DOCUMENT_VERSION) {
     return {
       ok: false,
       error: `Unsupported document version: ${String(raw.version)}`,
@@ -115,7 +103,7 @@ export function parseDocument(input: string | unknown): ParseResult {
   if (projectRaw.format !== IR_FORMAT) {
     return { ok: false, error: `Not a Nexus Blocks program (format=${String(projectRaw.format)})` };
   }
-  if (typeof projectRaw.version !== "number" || projectRaw.version > IR_VERSION) {
+  if (projectRaw.version !== IR_VERSION) {
     return { ok: false, error: `Unsupported program version: ${String(projectRaw.version)}` };
   }
 
@@ -126,8 +114,6 @@ export function parseDocument(input: string | unknown): ParseResult {
 
 function normalizeDocument(raw: Record<string, unknown>, warnings: string[]): NexusDocument {
   const projectRaw = raw.project as Record<string, unknown>;
-  // Version 1 stored canvas positions and viewport; layout is automatic now.
-  if (isRecord(raw.editor)) warnings.push("Dropped legacy canvas layout");
   const project = normalizeProject(projectRaw, warnings);
   const debug = normalizeDebug(raw.debug, warnings);
   return {
@@ -154,26 +140,6 @@ function normalizeDebug(raw: unknown, warnings: string[]): DebugState | undefine
 
 function normalizeProject(raw: Record<string, unknown>, warnings: string[]): Project {
   const now = new Date().toISOString();
-  if (raw.variables !== undefined) {
-    warnings.push("Dropped legacy variable declarations; variables are declared at run time now");
-  }
-
-  const functionsRaw = Array.isArray(raw.functions) ? raw.functions : [];
-  const functions: FunctionDef[] = [];
-  for (const item of functionsRaw) {
-    if (!isRecord(item) || typeof item.id !== "string" || typeof item.name !== "string") {
-      warnings.push("Dropped a malformed function definition");
-      continue;
-    }
-    functions.push({
-      id: item.id,
-      name: item.name,
-      params: Array.isArray(item.params) ? (item.params as FunctionDef["params"]) : [],
-      returnType: (item.returnType as FunctionDef["returnType"]) ?? "any",
-      body: normalizeStack(item.body, warnings),
-    });
-  }
-
   return {
     format: IR_FORMAT,
     version: IR_VERSION,
@@ -182,7 +148,6 @@ function normalizeProject(raw: Record<string, unknown>, warnings: string[]): Pro
     locale: typeof raw.locale === "string" ? raw.locale : "zh-CN",
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : now,
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : now,
-    functions,
     scripts: normalizeStack(raw.scripts, warnings),
     metadata: isRecord(raw.metadata) ? raw.metadata : {},
   };

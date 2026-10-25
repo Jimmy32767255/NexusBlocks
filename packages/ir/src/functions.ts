@@ -9,17 +9,11 @@ import {
 } from "./model.ts";
 import { walkBlocks, walkProject } from "./traverse.ts";
 
-/** Legacy hat that defines a function; read as a value function. */
-export const FUNCTION_DEFINE_TYPE = "func.define" as const;
 /** Hat defining a function that returns a value. */
 export const FUNCTION_DEFINE_VALUE_TYPE = "func.define_value" as const;
 /** Hat defining a function that is used as a statement. */
 export const FUNCTION_DEFINE_ACTION_TYPE = "func.define_action" as const;
-export const FUNCTION_DEFINE_TYPES = [
-  FUNCTION_DEFINE_TYPE,
-  FUNCTION_DEFINE_VALUE_TYPE,
-  FUNCTION_DEFINE_ACTION_TYPE,
-] as const;
+export const FUNCTION_DEFINE_TYPES = [FUNCTION_DEFINE_VALUE_TYPE, FUNCTION_DEFINE_ACTION_TYPE] as const;
 /** Expression/statement prefix for generated function call blocks. */
 export const FUNCTION_CALL_PREFIX = "func.call:" as const;
 /** Calls parsed from text before imports are resolved carry a function name. */
@@ -43,7 +37,7 @@ export interface FunctionDecl {
   name: string;
   params: FunctionParam[];
   returnType: ValueType;
-  /** The `func.define` block, whose `body` port holds the statements. */
+  /** The defining hat block, whose `body` port holds the statements. */
   node: BlockNode;
 }
 
@@ -114,7 +108,7 @@ export function functionDeclFromNode(node: BlockNode): { decl: FunctionDecl; err
   };
 }
 
-/** Functions defined by top-level `func.define` hats, in canvas order. */
+/** Functions defined by top-level definition hats, in script order. */
 export function collectFunctions(scripts: readonly BlockNode[]): FunctionDecl[] {
   return scripts
     .filter((node) => isFunctionDefine(node.type))

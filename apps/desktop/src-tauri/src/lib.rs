@@ -239,7 +239,7 @@ async fn project_save(app: tauri::AppHandle, content: String, suggested_name: St
         .dialog()
         .file()
         .set_file_name(name)
-        .add_filter("Nexus Blocks project", &["nblk", "json"])
+        .add_filter("Nexus Blocks project", &["nblk"])
         .blocking_save_file();
     let Some(picked) = picked else {
         return ok(Value::Null);
@@ -260,7 +260,7 @@ async fn project_open(app: tauri::AppHandle) -> Value {
     let picked = app
         .dialog()
         .file()
-        .add_filter("Nexus Blocks project", &["nblk", "json"])
+        .add_filter("Nexus Blocks project", &["nblk"])
         .blocking_pick_file();
     let Some(picked) = picked else {
         return ok(Value::Null);

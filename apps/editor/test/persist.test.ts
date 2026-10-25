@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { JSDOM } from "jsdom";
-import { createDocument, createProject, serializeDocument } from "@nexus/ir";
+import { createDocument, createHelloWorldScript, createProject, printNblk, serializeDocument } from "@nexus/ir";
 
 const dom = new JSDOM("<!doctype html><html lang=\"en\"><body></body></html>", {
   url: "http://localhost/",
@@ -19,6 +19,7 @@ const { downloadDocument, projectFileName, readDocument } = await import("../src
 function demo() {
   const doc = createDocument(createProject({ name: "demo" }));
   doc.project.name = "demo";
+  doc.project.scripts.push(createHelloWorldScript());
   return doc;
 }
 
@@ -34,28 +35,28 @@ describe("project files", () => {
 
   it("round-trips through readDocument", () => {
     const doc = demo();
-    const result = readDocument(serializeDocument(doc));
+    const result = readDocument(printNblk(doc));
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(result.document.project.name, "demo");
     assert.deepEqual(result.warnings, []);
   });
 
-  it("reads nblk source and still accepts legacy JSON", () => {
-    const nblk = readDocument('project "Text"\n\nstart:\n  print "hi"\n');
+  it("reads nblk source and rejects the old JSON format", () => {
+    const nblk = readDocument('项目 "Text"\n\n开始:\n  打印 "hi"\n');
     assert.equal(nblk.ok, true);
     if (nblk.ok) {
       assert.equal(nblk.document.project.name, "Text");
       assert.equal(nblk.document.project.scripts.length, 1);
     }
     const legacy = readDocument(serializeDocument(demo()));
-    assert.equal(legacy.ok, true);
+    assert.equal(legacy.ok, false);
   });
 
   it("reports invalid files with a line number instead of throwing", () => {
     const json = readDocument("{ not json");
     assert.equal(json.ok, false);
-    const nblk = readDocument('project "Bad"\n\nstart:\n  nope 1\n');
+    const nblk = readDocument('项目 "Bad"\n\n开始:\n  nope 1\n');
     assert.equal(nblk.ok, false);
     if (!nblk.ok) assert.match(nblk.error, /Line 4/);
   });

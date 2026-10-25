@@ -52,18 +52,6 @@ test("return blocks are rejected inside action functions", () => {
   assert.ok(diagnostics.some((d) => d.code === "function.returnInAction"));
 });
 
-test("legacy func.define still reads as a value function", () => {
-  const hat = createBlock("func.define", {
-    id: "f3",
-    fields: { name: "answer", params: "", returnType: "number" },
-    inputs: { body: [createBlock("func.return", { fields: { value: 42 } })] },
-  });
-  const project: Project = createProject({ name: "legacy" });
-  project.scripts.push(hat);
-  const diagnostics = validateProject(project, createProjectRegistry(project));
-  assert.equal(diagnostics.filter((d) => d.severity === "error").length, 0, JSON.stringify(diagnostics));
-});
-
 test("variables can be passed as function arguments", async () => {
   const hat = createBlock("func.define_value", {
     id: "sq",

@@ -24,7 +24,7 @@ Nexus Blocks 是一个**可扩展的图形化编程环境**：用积木搭程序
 - 解释器：可中止、事件流（日志/输出/状态/错误）、全局变量表；不设步数或递归上限。
 - 中英文界面与消息，运行输出也按项目语言显示。
 - **桌面外壳（Tauri 2）**：加载同一份编辑器 bundle，`fs.*` 直接访问本机文件系统（绝对路径、`~/…` 或主目录相对路径）；浏览器版仍保留 localStorage 文件区。
-- **`.nblk` 文本格式**：程序保存为类 Python 的可读文本（不是 JSON），关键字使用 UTF-8 中文（英文写法仍可读入），保留 IR 语义；旧 `.nexusblocks.json` 仍可打开。语法见 [`docs/zh/nblk.md`](docs/zh/nblk.md)。
+- **`.nblk` 文本格式**：程序保存为类 Python 的可读文本（不是 JSON），关键字使用 UTF-8 中文，保留 IR 语义。语法见 [`docs/zh/nblk.md`](docs/zh/nblk.md)。
 - **独立解释器**：`nblk program.nblk` 可在终端运行程序；桌面编辑器普通运行时调用它，调试仍用内置引擎。见 [`docs/zh/cli.md`](docs/zh/cli.md)。
 - `pnpm test` 覆盖 IR、i18n、engine 与编辑器核心逻辑（195 个用例）。
 

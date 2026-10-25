@@ -3,7 +3,6 @@ import {
   parseNblk,
   functionDeclFromNode,
   importSpecOf,
-  parseDocument,
   type ImportSpec,
   type BlockNode,
   type Project,
@@ -82,7 +81,7 @@ export async function resolveImports(
         continue;
       }
 
-      const parsed = spec.path.endsWith(".nblk") ? parseNblk(text) : parseDocument(text);
+      const parsed = parseNblk(text);
       if (!parsed.ok) {
         const detail = parsed.error;
         errors.push({

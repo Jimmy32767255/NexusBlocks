@@ -1,6 +1,5 @@
 import {
   FUNCTION_DEFINE_ACTION_TYPE,
-  FUNCTION_DEFINE_TYPE,
   FUNCTION_DEFINE_VALUE_TYPE,
   FUNCTION_PARAM_TYPE,
   FUNCTION_RETURN_TYPE,
@@ -73,24 +72,6 @@ export const functionBlocks: BlockDefinition[] = [
     ports: [{ name: "body", label: "block.func.define.port.body", kind: "stack" }],
     execute() {
       // Definitions are only run when called.
-    },
-  },
-  {
-    type: FUNCTION_DEFINE_TYPE,
-    kind: "hat",
-    category: "functions",
-    label: "block.func.legacy.label",
-    description: "block.func.legacy.description",
-    output: "void",
-    color: FUNCTIONS,
-    hidden: true,
-    fields: [
-      ...DEFINE_FIELDS,
-      { name: "returnType", kind: "text", label: "block.func.define.field.returnType", default: "any" },
-    ],
-    ports: [{ name: "body", label: "block.func.define.port.body", kind: "stack" }],
-    execute() {
-      // Legacy definitions open as value functions.
     },
   },
   {

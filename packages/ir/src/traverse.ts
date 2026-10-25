@@ -52,9 +52,6 @@ function walkChildren(node: BlockNode, visit: BlockVisitor, path: string): void 
 /** Walk scripts and function bodies. */
 export function walkProject(project: Project, visit: BlockVisitor): void {
   walkBlocks(project.scripts, visit);
-  project.functions.forEach((fn, fnIndex) => {
-    walkBlocks(fn.body, visit, null, null, `functions[${fnIndex}].body`);
-  });
 }
 
 export function collectBlockIds(project: Project): Set<string> {

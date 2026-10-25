@@ -4,7 +4,8 @@ import {
   createBlock,
   createDocument,
   createProject,
-  serializeDocument,
+  parseNblk,
+  printNblk,
   type Project,
 } from "@nexus/ir";
 import { createLocalHost, memoryStorage } from "../src/host.ts";
@@ -15,7 +16,7 @@ import { runProject } from "../src/run.ts";
 function moduleProject(): Project {
   const project = createProject({ name: "lib" });
   project.scripts.push(
-    createBlock("func.define", {
+    createBlock("func.define_value", {
       id: "f-answer",
       fields: { name: "answer", params: "", returnType: "number" },
       inputs: {
@@ -26,7 +27,7 @@ function moduleProject(): Project {
         ],
       },
     }),
-    createBlock("func.define", {
+    createBlock("func.define_value", {
       id: "f-greet",
       fields: { name: "greet", params: "who: text", returnType: "text" },
       inputs: {
@@ -57,48 +58,48 @@ function mainProject(imports: ReturnType<typeof createBlock>[]): Project {
 
 test("imports every function from a file", async () => {
   const module = createDocument(moduleProject());
-  const host = await hostWith({ "lib.json": serializeDocument(module) });
-  const project = mainProject([createBlock("import.all", { fields: { file: "lib.json" } })]);
+  const host = await hostWith({ "lib.nblk": printNblk(module) });
+  const project = mainProject([createBlock("import.all", { fields: { file: "lib.nblk" } })]);
 
   const resolved = await resolveImports(project, { host });
 
   assert.deepEqual(resolved.errors, []);
-  assert.deepEqual(resolved.files, ["lib.json"]);
+  assert.deepEqual(resolved.files, ["lib.nblk"]);
   assert.equal(resolved.functionIds.length, 2);
-  assert.equal(resolved.project.scripts.filter((node) => node.type === "func.define").length, 2);
+  assert.equal(resolved.project.scripts.filter((node) => node.type === "func.define_value").length, 2);
 });
 
 test("named import only takes the requested function", async () => {
   const module = createDocument(moduleProject());
-  const host = await hostWith({ "lib.json": serializeDocument(module) });
+  const host = await hostWith({ "lib.nblk": printNblk(module) });
   const project = mainProject([
-    createBlock("import.named", { fields: { file: "lib.json", name: "greet" } }),
+    createBlock("import.named", { fields: { file: "lib.nblk", name: "greet" } }),
   ]);
 
   const resolved = await resolveImports(project, { host });
 
   assert.deepEqual(resolved.errors, []);
   assert.equal(resolved.functionIds.length, 1);
-  assert.equal(resolved.project.scripts.filter((node) => node.type === "func.define").length, 1);
+  assert.equal(resolved.project.scripts.filter((node) => node.type === "func.define_value").length, 1);
 });
 
 test("alias renames the imported function for the toolbox", async () => {
   const module = createDocument(moduleProject());
-  const host = await hostWith({ "lib.json": serializeDocument(module) });
+  const host = await hostWith({ "lib.nblk": printNblk(module) });
   const project = mainProject([
-    createBlock("import.alias", { fields: { file: "lib.json", name: "greet", alias: "hello" } }),
+    createBlock("import.alias", { fields: { file: "lib.nblk", name: "greet", alias: "hello" } }),
   ]);
 
   const resolved = await resolveImports(project, { host });
-  const definition = resolved.project.scripts.find((node) => node.type === "func.define");
+  const definition = resolved.project.scripts.find((node) => node.type === "func.define_value");
 
   assert.equal(definition?.fields?.name, "hello");
-  assert.equal(createProjectRegistry(resolved.project).has("func.call:f-greet"), true);
+  assert.equal(createProjectRegistry(resolved.project).has(`func.call:${definition!.id}`), true);
 });
 
 test("missing import file becomes a translated error, not a throw", async () => {
   const host = await hostWith({});
-  const project = mainProject([createBlock("import.all", { fields: { file: "nope.json" } })]);
+  const project = mainProject([createBlock("import.all", { fields: { file: "nope.nblk" } })]);
 
   const resolved = await resolveImports(project, { host });
 
@@ -109,15 +110,15 @@ test("missing import file becomes a translated error, not a throw", async () => 
 
 test("missing function is reported", async () => {
   const module = createDocument(moduleProject());
-  const host = await hostWith({ "lib.json": serializeDocument(module) });
+  const host = await hostWith({ "lib.nblk": printNblk(module) });
   const project = mainProject([
-    createBlock("import.named", { fields: { file: "lib.json", name: "nope" } }),
+    createBlock("import.named", { fields: { file: "lib.nblk", name: "nope" } }),
   ]);
 
   const resolved = await resolveImports(project, { host });
 
   assert.equal(resolved.errors[0]?.messageKey, "runtime.error.importMissingFunction");
-  assert.equal(resolved.errors[0]?.params.file, "lib.json");
+  assert.equal(resolved.errors[0]?.params.file, "lib.nblk");
 });
 
 test("transitive imports are merged once", async () => {
@@ -125,38 +126,35 @@ test("transitive imports are merged once", async () => {
   const middle = createDocument(
     (() => {
       const project = createProject({ name: "middle" });
-      project.scripts.push(createBlock("import.all", { fields: { file: "leaf.json" } }));
+      project.scripts.push(createBlock("import.all", { fields: { file: "leaf.nblk" } }));
       return project;
     })(),
   );
   const host = await hostWith({
-    "leaf.json": serializeDocument(leaf),
-    "middle.json": serializeDocument(middle),
+    "leaf.nblk": printNblk(leaf),
+    "middle.nblk": printNblk(middle),
   });
-  const project = mainProject([createBlock("import.all", { fields: { file: "middle.json" } })]);
+  const project = mainProject([createBlock("import.all", { fields: { file: "middle.nblk" } })]);
 
   const resolved = await resolveImports(project, { host });
 
   assert.deepEqual(resolved.errors, []);
-  assert.equal(resolved.project.scripts.filter((node) => node.type === "func.define").length, 2);
+  assert.equal(resolved.project.scripts.filter((node) => node.type === "func.define_value").length, 2);
 });
 
 test("imported functions run through a call block", async () => {
   const module = createDocument(moduleProject());
-  const host = await hostWith({ "lib.json": serializeDocument(module) });
-  const project = createProject({ name: "main" });
-  project.scripts.push(
-    createBlock("import.all", { fields: { file: "lib.json" } }),
-    createBlock("control.start", {
-      inputs: {
-        body: [
-          createBlock("io.print", {
-            inputs: { text: createBlock("func.call:f-greet", { fields: { who: "Nexus" } }) },
-          }),
-        ],
-      },
-    }),
-  );
+  const host = await hostWith({ "lib.nblk": printNblk(module) });
+  const parsed = parseNblk(`项目 "main"
+
+导入 "lib.nblk"
+
+开始:
+  打印 greet("Nexus")
+`);
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  const project = parsed.document.project;
 
   const events: string[] = [];
   const result = await runProject(project, {

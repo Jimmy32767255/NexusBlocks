@@ -28,7 +28,7 @@ describe("nblk cli", () => {
   it("runs a hello world file and prints to stdout", async () => {
     const dir = await workspace();
     const file = path.join(dir, "hello.nblk");
-    await writeFile(file, 'start:\n    print "Hello from nblk"\n');
+    await writeFile(file, '开始:\n    打印 "Hello from nblk"\n');
     const { out, io } = capture();
     const code = await runCli([file, "--lang", "en"], io);
     assert.equal(code, 0);
@@ -39,17 +39,17 @@ describe("nblk cli", () => {
     const dir = await workspace();
     await writeFile(
       path.join(dir, "lib.nblk"),
-      'define value greet(name):\n    return join("Hello, ", name)\n',
+      '定义取值 greet(name):\n    返回 连接("Hello, ", name)\n',
     );
     const file = path.join(dir, "main.nblk");
     await writeFile(
       file,
       [
-        'from "lib.nblk" import greet',
-        "start:",
-        '    print greet("CLI")',
-        '    writefile("out.txt", "written")',
-        '    print readfile("out.txt")',
+        '从 "lib.nblk" 导入 greet',
+        "开始:",
+        '    打印 greet("CLI")',
+        '    写入文件("out.txt", "written")',
+        '    打印 读取文件("out.txt")',
         "",
       ].join("\n"),
     );
@@ -62,7 +62,7 @@ describe("nblk cli", () => {
   it("reports syntax errors with a non-zero exit code", async () => {
     const dir = await workspace();
     const file = path.join(dir, "bad.nblk");
-    await writeFile(file, "start:\n  print(\n");
+    await writeFile(file, "开始:\n  打印(\n");
     const { err, io } = capture();
     const code = await runCli([file, "--lang", "en"], io);
     assert.equal(code, 2);
@@ -72,7 +72,7 @@ describe("nblk cli", () => {
   it("checks a file without running it", async () => {
     const dir = await workspace();
     const file = path.join(dir, "hello.nblk");
-    await writeFile(file, 'start:\n    print "never printed"\n');
+    await writeFile(file, '开始:\n    打印 "never printed"\n');
     const { out, io } = capture();
     assert.equal(await runCli(["--check", file, "--lang", "en"], io), 0);
     assert.equal(out.length, 1);
@@ -88,7 +88,7 @@ describe("nblk cli", () => {
   it("emits JSON events", async () => {
     const dir = await workspace();
     const file = path.join(dir, "json.nblk");
-    await writeFile(file, 'start:\n    print "json line"\n');
+    await writeFile(file, '开始:\n    打印 "json line"\n');
     const { out, io } = capture();
     assert.equal(await runCli([file, "--json", "--lang", "en"], io), 0);
     const events = out.map((line) => JSON.parse(line) as { kind: string });

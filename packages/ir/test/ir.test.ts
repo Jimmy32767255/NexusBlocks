@@ -64,19 +64,14 @@ test("document serialisation round-trips without loss", () => {
   assert.deepEqual(parsed.document, document);
 });
 
-test("drops the old canvas layout when loading version 1", () => {
+test("rejects documents from an older version", () => {
   const legacy = {
     format: "nexus-blocks/document",
     version: 1,
     project: createProject(),
-    editor: { positions: { a: { x: 1, y: 2 } }, viewport: { x: 3, y: 4, zoom: 1 } },
   };
   const parsed = parseDocument(legacy);
-  assert.equal(parsed.ok, true);
-  if (!parsed.ok) return;
-  assert.equal(parsed.document.version, 2);
-  assert.equal("editor" in parsed.document, false);
-  assert.ok(parsed.warnings.length > 0);
+  assert.equal(parsed.ok, false);
 });
 
 test("parse rejects documents from another format", () => {
