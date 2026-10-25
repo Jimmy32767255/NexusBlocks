@@ -26,7 +26,6 @@ export function createProject(options: ProjectOptions = {}): Project {
     locale: options.locale ?? "zh-CN",
     createdAt: now,
     updatedAt: now,
-    functions: [],
     scripts: [],
     metadata: {},
   };

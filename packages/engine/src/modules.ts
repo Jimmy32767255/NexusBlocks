@@ -3,7 +3,6 @@ import {
   parseNblk,
   functionDeclFromNode,
   importSpecOf,
-  parseDocument,
   type ImportSpec,
   type BlockNode,
   type Project,
@@ -39,7 +38,6 @@ interface Pending {
   depth: number;
 }
 
-const DEFAULT_MAX_DEPTH = 8;
 
 /**
  * Read every top-level import of a project (recursively), then append the
@@ -53,7 +51,6 @@ export async function resolveImports(
   options: ResolveOptions,
 ): Promise<ResolvedImports> {
   const host = options.host;
-  const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
   const merged: Project = JSON.parse(JSON.stringify(project)) as Project;
   const errors: ImportError[] = [];
   const files: string[] = [];
@@ -71,14 +68,6 @@ export async function resolveImports(
         errors.push({ messageKey: "runtime.error.importNoFile", params: {}, blockId: spec.blockId });
         continue;
       }
-      if (current.depth >= maxDepth) {
-        errors.push({
-          messageKey: "runtime.error.importDepth",
-          params: { limit: maxDepth, file: spec.path },
-          blockId: spec.blockId,
-        });
-        continue;
-      }
       if (visitedFiles.has(spec.path)) continue;
       visitedFiles.add(spec.path);
 
@@ -92,7 +81,7 @@ export async function resolveImports(
         continue;
       }
 
-      const parsed = spec.path.endsWith(".nblk") ? parseNblk(text) : parseDocument(text);
+      const parsed = parseNblk(text);
       if (!parsed.ok) {
         const detail = parsed.error;
         errors.push({

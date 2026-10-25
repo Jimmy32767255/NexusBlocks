@@ -1,3 +1,7 @@
+/** Leading English keywords that older `.nblk` files used. */
+const ENGLISH_KEYWORD =
+  /^(if|else if|else|repeat|while|forever|print|set|create|delete|wait|label|goto|break|skip|throw|try|catch|exit|return|comment|import|from|define|project|locale|variables|raw)\b/;
+
 /**
  * `.nblk` — a line-oriented, human-readable text format for Nexus Blocks
  * projects.
@@ -28,7 +32,6 @@ import {
   functionNameCallType,
   parseParams,
   FUNCTION_DEFINE_ACTION_TYPE,
-  FUNCTION_DEFINE_TYPE,
   FUNCTION_DEFINE_VALUE_TYPE,
   FUNCTION_PARAM_TYPE,
   FUNCTION_RETURN_TYPE,
@@ -428,14 +431,17 @@ class Parser {
         fail(lineIndex + 1, "Tabs are not allowed for indentation; use spaces");
       }
       const indent = raw.length - raw.trimStart().length;
-      this.lines.push({ indent, text: localizeLine(raw.trim()), number: lineIndex + 1 });
+      const original = raw.trim();
+      if (ENGLISH_KEYWORD.test(original)) {
+        fail(lineIndex + 1, "英文关键字已不再支持，请使用中文关键字");
+      }
+      this.lines.push({ indent, text: localizeLine(original), number: lineIndex + 1 });
     });
     this.project = createProject();
   }
 
   parse(): NexusDocument {
     this.parseHeader();
-    this.skipLegacyVariables();
     while (this.index < this.lines.length) {
       const node = this.parseScript();
       this.project.scripts.push(node);
@@ -468,19 +474,6 @@ class Parser {
     }
   }
 
-  /**
-   * Older files start with a `variables:` section. Variables are declared at
-   * run time now, so the section is dropped with a warning instead of failing.
-   */
-  private skipLegacyVariables(): void {
-    if (this.index >= this.lines.length) return;
-    const line = this.lines[this.index]!;
-    if (line.indent !== 0 || line.text !== "variables:") return;
-    this.index += 1;
-    while (this.index < this.lines.length && this.lines[this.index]!.indent > 0) this.index += 1;
-    this.warnings.push("Ignored the legacy variables section; declare variables at run time instead");
-  }
-
   private parseScript(): BlockNode {
     const line = this.lines[this.index]!;
     if (line.indent !== 0) fail(line.number, "Scripts must start at column 0");
@@ -496,7 +489,7 @@ class Parser {
   }
 
   private parseDefine(line: Line): BlockNode {
-    const match = /^define\s+(value|action|function)\s+([\p{L}_][\p{L}\p{N}_]*)\s*\((.*)\)\s*(?:->\s*([\w-]+))?:$/u.exec(line.text);
+    const match = /^define\s+(value|action)\s+([\p{L}_][\p{L}\p{N}_]*)\s*\((.*)\)\s*(?:->\s*([\w-]+))?:$/u.exec(line.text);
     if (!match) fail(line.number, "Expected `define value name(params) -> type:`");
     this.index += 1;
     const flavor = match[1]!;
@@ -505,8 +498,7 @@ class Parser {
     const returnType = match[4];
     const parsed = parseParams(rawParams);
     if (parsed.errors.length > 0) fail(line.number, parsed.errors[0]!);
-    const type =
-      flavor === "value" ? FUNCTION_DEFINE_VALUE_TYPE : flavor === "action" ? FUNCTION_DEFINE_ACTION_TYPE : FUNCTION_DEFINE_TYPE;
+    const type = flavor === "value" ? FUNCTION_DEFINE_VALUE_TYPE : FUNCTION_DEFINE_ACTION_TYPE;
     const fields: Record<string, FieldValue> = { name, params: formatParams(parsed.params) };
     if (type !== FUNCTION_DEFINE_ACTION_TYPE) {
       if (returnType !== undefined && !VALUE_TYPES.includes(returnType as ValueType)) fail(line.number, `Unknown return type: ${returnType}`);
@@ -1169,14 +1161,12 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
     case "control.start":
       return [`开始:`, ...body("body")];
     case FUNCTION_DEFINE_VALUE_TYPE:
-    case FUNCTION_DEFINE_ACTION_TYPE:
-    case FUNCTION_DEFINE_TYPE: {
+    case FUNCTION_DEFINE_ACTION_TYPE: {
       const name = String(node.fields?.name ?? "function");
       const params = String(node.fields?.params ?? "");
       if (node.type === FUNCTION_DEFINE_ACTION_TYPE) return [`定义操作 ${name}(${paramsToZh(params)}):`, ...body("body")];
-      const keyword = node.type === FUNCTION_DEFINE_TYPE ? "函数" : "取值";
       const returnType = typeToZh(String(node.fields?.returnType ?? "any"));
-      return [`定义${keyword} ${name}(${paramsToZh(params)}) -> ${returnType}:`, ...body("body")];
+      return [`定义取值 ${name}(${paramsToZh(params)}) -> ${returnType}:`, ...body("body")];
     }
     case IMPORT_ALL_TYPE:
       return [`导入 ${JSON.stringify(String(node.fields?.file ?? ""))}`];

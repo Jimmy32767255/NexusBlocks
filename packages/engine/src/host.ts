@@ -52,8 +52,6 @@ export interface KeyValueStorage {
 }
 
 const FILES_KEY = "nexus-blocks:workspace-files";
-export const MAX_FILE_CHARS = 1_000_000;
-const MAX_PATH = 256;
 
 /**
  * Normalise a workspace path: forward slashes, no leading slash, no `..`,
@@ -64,7 +62,6 @@ export function normalizePath(raw: Value | undefined): string {
   const path = text.trim().replace(/\\/g, "/").replace(/^\.?\//, "");
   const invalid =
     path === "" ||
-    path.length > MAX_PATH ||
     /[\u0000-\u001f]/.test(path) ||
     path.split("/").some((segment) => segment === "" || segment === "." || segment === "..");
   if (invalid) throw new HostError("runtime.error.filePath", { path });
@@ -149,9 +146,6 @@ function invokeFileSystem(
     case "fs.write": {
       const path = normalizePath(request.args[0]);
       const content = display(request.args[1] ?? "");
-      if (content.length > MAX_FILE_CHARS) {
-        throw new HostError("runtime.error.fileTooLarge", { limit: MAX_FILE_CHARS });
-      }
       files[path] = content;
       writeFiles(storage, files);
       return null;

@@ -25,7 +25,6 @@ export interface EditorState {
   zoom: number;
 }
 
-const HISTORY_LIMIT = 100;
 
 /**
  * Editor state container. Every mutation goes through `update`, which keeps an
@@ -114,7 +113,6 @@ export class Store {
   /** Record a snapshot taken before a batch of silent updates (e.g. a drag). */
   pushHistory(snapshot: string): void {
     this.undoStack.push(snapshot);
-    if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
     this.redoStack = [];
   }
 

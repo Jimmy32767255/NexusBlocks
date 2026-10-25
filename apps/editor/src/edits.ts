@@ -87,7 +87,6 @@ export function locateBlock(project: Project, id: string): BlockLocation | null 
     found = { stack: context.stack, index: context.index, parent: context.parent, port: context.port };
   };
   walkBlocks(project.scripts, visit);
-  project.functions.forEach((fn) => walkBlocks(fn.body, visit, null, null, "functions"));
   return found;
 }
 
@@ -95,15 +94,7 @@ export function removeBlock(document: NexusDocument, id: string): boolean {
   const { project } = document;
   const target = findBlock(project, id);
   const callType = target && isFunctionDefine(target.type) ? functionCallType(target.id) : null;
-  let removed = removeFromStack(project.scripts, id);
-  if (!removed) {
-    for (const fn of project.functions) {
-      if (removeFromStack(fn.body, id)) {
-        removed = true;
-        break;
-      }
-    }
-  }
+  const removed = removeFromStack(project.scripts, id);
   if (removed) {
     // Deleting a definition must not leave dangling calls behind.
     if (callType) removeCalls(project, callType);

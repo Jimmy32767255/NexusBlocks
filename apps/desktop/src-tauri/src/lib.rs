@@ -15,11 +15,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
-/// Mirrors `MAX_FILE_CHARS` in `@nexus/engine`.
-const MAX_FILE_CHARS: usize = 1_000_000;
-const MAX_PATH_CHARS: usize = 1024;
 /// Output kept from a shell command per stream (UTF-8 bytes).
-const MAX_COMMAND_OUTPUT: usize = 200_000;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,7 +48,7 @@ fn string_arg(args: &[Value], index: usize) -> String {
 /// `~/…` and relative paths are resolved against the user's home directory.
 fn resolve_path(raw: &str, home: &Path) -> Result<PathBuf, &'static str> {
     let text = raw.trim();
-    if text.is_empty() || text.chars().count() > MAX_PATH_CHARS {
+    if text.is_empty() {
         return Err("runtime.error.filePath");
     }
     if text.chars().any(char::is_control) {
@@ -95,18 +91,12 @@ fn capability_invoke(app: tauri::AppHandle, request: HostRequest) -> Value {
                 Err(key) => return fail(key),
             };
             match fs::read_to_string(&path) {
-                Ok(text) if text.chars().count() > MAX_FILE_CHARS => {
-                    fail("runtime.error.fileTooLarge")
-                }
                 Ok(text) => ok(json!(text)),
                 Err(error) => fail(map_io(&error)),
             }
         }
         "fs.write" => {
             let text = string_arg(&request.args, 1);
-            if text.chars().count() > MAX_FILE_CHARS {
-                return fail("runtime.error.fileTooLarge");
-            }
             let path = match resolve_path(&string_arg(&request.args, 0), &home) {
                 Ok(path) => path,
                 Err(key) => return fail(key),
@@ -183,8 +173,8 @@ fn run_shell(command: &str) -> Value {
         .output();
     match output {
         Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout[..output.stdout.len().min(MAX_COMMAND_OUTPUT)]);
-            let stderr = String::from_utf8_lossy(&output.stderr[..output.stderr.len().min(MAX_COMMAND_OUTPUT)]);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
             ok(json!({
                 "stdout": stdout,
                 "stderr": stderr,
@@ -244,15 +234,12 @@ fn write_text(path: &Path, text: &str) -> Result<(), &'static str> {
 /// this is the only way "save" can actually produce a file.
 #[tauri::command]
 async fn project_save(app: tauri::AppHandle, content: String, suggested_name: String) -> Value {
-    if content.chars().count() > MAX_FILE_CHARS {
-        return fail("runtime.error.fileTooLarge");
-    }
     let name = file_name(&suggested_name);
     let picked = app
         .dialog()
         .file()
         .set_file_name(name)
-        .add_filter("Nexus Blocks project", &["nblk", "json"])
+        .add_filter("Nexus Blocks project", &["nblk"])
         .blocking_save_file();
     let Some(picked) = picked else {
         return ok(Value::Null);
@@ -273,7 +260,7 @@ async fn project_open(app: tauri::AppHandle) -> Value {
     let picked = app
         .dialog()
         .file()
-        .add_filter("Nexus Blocks project", &["nblk", "json"])
+        .add_filter("Nexus Blocks project", &["nblk"])
         .blocking_pick_file();
     let Some(picked) = picked else {
         return ok(Value::Null);
@@ -283,7 +270,6 @@ async fn project_open(app: tauri::AppHandle) -> Value {
         Err(_) => return fail("runtime.error.filePath"),
     };
     match fs::read_to_string(&path) {
-        Ok(text) if text.chars().count() > MAX_FILE_CHARS => fail("runtime.error.fileTooLarge"),
         Ok(text) => ok(json!({ "path": path.to_string_lossy(), "content": text })),
         Err(error) => fail(map_io(&error)),
     }
@@ -467,7 +453,5 @@ mod tests {
     fn rejects_empty_or_control_paths() {
         assert_eq!(resolve_path("", &home()), Err("runtime.error.filePath"));
         assert_eq!(resolve_path("a\nb", &home()), Err("runtime.error.filePath"));
-        let long = "a".repeat(MAX_PATH_CHARS + 1);
-        assert_eq!(resolve_path(&long, &home()), Err("runtime.error.filePath"));
     }
 }

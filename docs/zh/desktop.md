@@ -74,9 +74,8 @@ Failed to initialize gtk backend!: BoolError { message: "Failed to initialize GT
 
 其他约束：
 
-- 单个文件读取/写入上限 100 万字符；
 - 写入会先创建父目录，然后写临时文件再 `rename`，失败不会留下半截文件；
-- 路径为空、包含控制字符或超过 1024 字符时报 `runtime.error.filePath`；
+- 路径为空或包含控制字符时报 `runtime.error.filePath`；
 - 文件不存在、无权限分别映射为 `runtime.error.fileNotFound` / `runtime.error.fileDenied`，控制台按当前语言显示。
 
 浏览器版仍然只能访问 `localStorage` 里的扁平文件，不支持目录与绝对路径；桌面版没有这个限制。

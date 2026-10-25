@@ -5,7 +5,6 @@ import {
   createBlock,
   createDocument,
   createProject,
-  FUNCTION_DEFINE_TYPE,
   IMPORT_ALIAS_TYPE,
   IMPORT_ALL_TYPE,
   IMPORT_NAMED_TYPE,
@@ -27,7 +26,7 @@ function body(document: NexusDocument, index = 0): BlockNode[] {
 }
 
 test("parses hello world", () => {
-  const document = parseOk(`project "Hello"\n\nstart:\n  print "Hi"\n`);
+  const document = parseOk(`项目 "Hello"\n\n开始:\n  打印 "Hi"\n`);
   assert.equal(document.project.name, "Hello");
   assert.equal(document.project.scripts.length, 1);
   assert.equal(document.project.scripts[0]!.type, "control.start");
@@ -49,17 +48,17 @@ test("prints and reparses a document idempotently", () => {
 });
 
 test("roundtrips runtime variable declarations with all value types", () => {
-  const source = `project "Vars"
-locale zh-CN
+  const source = `项目 "Vars"
+语言 zh-CN
 
-start:
-  create n: number as 2.5
-  create t: text as "a\\"b"
-  create b: boolean as true
-  create l: list as ["a", 1, false, [2]]
-  create d: dict as {"k": 1, "n": [2, 3]}
-  create e as null
-  print n
+开始:
+  创建变量 n: number 为 2.5
+  创建变量 t: text 为 "a\\"b"
+  创建变量 b: boolean 为 true
+  创建变量 l: list 为 ["a", 1, false, [2]]
+  创建变量 d: dict 为 {"k": 1, "n": [2, 3]}
+  创建变量 e 为 null
+  打印 n
 `;
   const document = parseOk(source);
   const body = (document.project.scripts[0]!.inputs!.body as BlockNode[]);
@@ -80,41 +79,31 @@ start:
   assert.equal(printNblk(parseOk(printed)), printed);
 });
 
-test("drops the legacy variables section with a warning", () => {
-  const result = parseNblk(`project "Legacy"
-
-variables:
-  n: number = 2
-
-start:
-  print "hi"
-`);
-  assert.equal(result.ok, true);
-  if (!result.ok) return;
-  assert.equal(result.document.project.scripts.length, 1);
-  assert.equal(result.warnings.length, 1);
+test("rejects the legacy variables section", () => {
+  const legacy = parseNblk('项目 "Legacy"\n\nvariables:\n  n: number = 2\n\n开始:\n  打印 "hi"\n');
+  assert.equal(legacy.ok, false);
 });
 
 test("parses control flow", () => {
-  const document = parseOk(`project "Flow"
+  const document = parseOk(`项目 "Flow"
 
-start:
-  create score: number as 0
-  create i: number as 0
-  if score > 2:
-    print "big"
-  else if score == 2:
-    print "two"
-  else:
-    print "small"
-  repeat 3:
-    print score
-  while score < 5:
-    set score to score + 1
-  repeat with i times 2:
-    print i
-  forever:
-    break
+开始:
+  创建变量 score: number 为 0
+  创建变量 i: number 为 0
+  如果 score > 2:
+    打印 "big"
+  否则如果 score == 2:
+    打印 "two"
+  否则:
+    打印 "small"
+  重复 3 次:
+    打印 score
+  当 score < 5:
+    设置 score 为 score + 1
+  重复 使用 i 共 2 次:
+    打印 i
+  无限重复:
+    跳出循环
 `);
   const [, , conditional, repeat, loop, repeatWith, forever] = body(document);
   assert.equal(conditional!.type, "control.if");
@@ -129,17 +118,17 @@ start:
 });
 
 test("parses functions, calls and returns", () => {
-  const document = parseOk(`project "Funcs"
+  const document = parseOk(`项目 "Funcs"
 
-start:
-  print square(3)
+开始:
+  打印 square(3)
   greet("nexus")
 
-define value square(x: number) -> number:
-  return x * x
+定义取值 square(x: number) -> number:
+  返回 x * x
 
-define action greet(name: text):
-  print join("Hello, ", name)
+定义操作 greet(name: text):
+  打印 连接("Hello, ", name)
 `);
   const startBody = body(document);
   assert.equal(startBody[0]!.type, "io.print");
@@ -156,16 +145,16 @@ define action greet(name: text):
 });
 
 test("parses try/catch forms", () => {
-  const document = parseOk(`project "Errors"
+  const document = parseOk(`项目 "Errors"
 
-start:
-  create message: text as ""
-  try:
-    throw "boom"
-  catch:
-    print "caught"
-  catch text as message:
-    print message
+开始:
+  创建变量 message: text 为 ""
+  尝试:
+    抛出 "boom"
+  捕获:
+    打印 "caught"
+  捕获 文本 作为 message:
+    打印 message
 `);
   const tryBlock = body(document)[1]!;
   assert.equal(tryBlock.type, "control.try");
@@ -177,14 +166,14 @@ start:
 });
 
 test("parses the three import forms", () => {
-  const document = parseOk(`project "Imports"
+  const document = parseOk(`项目 "Imports"
 
-import "a.nblk"
-from "b.nblk" import greet
-from "c.nblk" import greet as hi
+导入 "a.nblk"
+从 "b.nblk" 导入 greet
+从 "c.nblk" 导入 greet 作为 hi
 
-start:
-  print "x"
+开始:
+  打印 "x"
 `);
   const imports = document.project.scripts.slice(0, 3);
   assert.deepEqual(
@@ -196,10 +185,10 @@ start:
 });
 
 test("falls back to raw blocks and reparses them", () => {
-  const source = `project "Raw"
+  const source = `项目 "Raw"
 
-start:
-  raw {"type":"future.block","fields":{"value":1},"inputs":{"body":[{"id":"x","type":"io.print","fields":{"text":"ok"}}]}}
+开始:
+  原始 {"type":"future.block","fields":{"value":1},"inputs":{"body":[{"id":"x","type":"io.print","fields":{"text":"ok"}}]}}
 `;
   const document = parseOk(source);
   const raw = body(document)[0]!;
@@ -211,15 +200,15 @@ start:
 });
 
 test("keeps loop counters and catch targets as plain names", () => {
-  const document = parseOk(`project "Auto"
+  const document = parseOk(`项目 "Auto"
 
-start:
-  repeat with i times 2:
-    print i
-  try:
-    throw "boom"
-  catch text as message:
-    print message
+开始:
+  重复 使用 i 共 2 次:
+    打印 i
+  尝试:
+    抛出 "boom"
+  捕获 文本 作为 message:
+    打印 message
 `);
   const [repeatWith, tryBlock] = body(document);
   assert.equal(repeatWith!.fields?.variable, "i");
@@ -228,10 +217,10 @@ start:
 });
 
 test("roundtrips raw expression blocks", () => {
-  const document = parseOk(`project "RawExpr"
+  const document = parseOk(`项目 "RawExpr"
 
-start:
-  print raw({"id":"x1","type":"future.expr","fields":{"value":1}})
+开始:
+  打印 原始({"id":"x1","type":"future.expr","fields":{"value":1}})
 `);
   const print = body(document)[0]!;
   const value = print.inputs?.text as BlockNode;
@@ -243,17 +232,17 @@ start:
 });
 
 test("reports readable errors with line numbers", () => {
-  const badIndent = parseNblk(`project "Bad"\n\nstart:\n  print "a"\n    print "b"\n`);
+  const badIndent = parseNblk(`项目 "Bad"\n\n开始:\n  打印 "a"\n    打印 "b"\n`);
   assert.equal(badIndent.ok, false);
   if (!badIndent.ok) assert.equal(badIndent.error.line, 5);
 
-  const unknownBlock = parseNblk(`project "Bad"\n\nstart:\n  whatever 1\n`);
+  const unknownBlock = parseNblk(`项目 "Bad"\n\n开始:\n  未知 1\n`);
   assert.equal(unknownBlock.ok, false);
   if (!unknownBlock.ok) assert.match(unknownBlock.error.message, /Unknown statement/);
 });
 
 test("negates numeric literals inline", () => {
-  const document = parseOk(`project "Neg"\n\nstart:\n  print -2\n`);
+  const document = parseOk(`项目 "Neg"\n\n开始:\n  打印 -2\n`);
   const print = body(document)[0]!;
   const value = print.inputs?.text as BlockNode;
   assert.equal(value.type, "math.number");
@@ -262,7 +251,7 @@ test("negates numeric literals inline", () => {
 
 describe("editor debug metadata", () => {
   it("is preserved by JSON documents but never written into .nblk", () => {
-    const document = parseNblk('project "meta"\nlocale en\n\nstart:\n  print "hi"\n');
+    const document = parseNblk('项目 "meta"\n语言 en\n\n开始:\n  打印 "hi"\n');
     assert.equal(document.ok, true);
     if (!document.ok) return;
     document.document.debug = { breakpoints: [document.document.project.scripts[0]!.id] };
@@ -279,7 +268,7 @@ describe("editor debug metadata", () => {
 
 test("parses and prints label / goto names", () => {
   const document = parseOk(
-    `project "Jumps"\n\nstart:\n  label outer\n  goto outer\n  label "with space"\n  goto "with space"\n`,
+    `项目 "Jumps"\n\n开始:\n  标记 outer\n  跳转到 outer\n  标记 "with space"\n  跳转到 "with space"\n`,
   );
   const items = body(document);
   assert.equal(items[0]!.type, "control.label");
@@ -361,16 +350,14 @@ describe("Chinese keywords", () => {
     assert.match(printed, /^  返回 x \* x$/m);
   });
 
-  test("keeps English input working", () => {
-    const document = parseOk(`project "Legacy"
+  test("rejects English input", () => {
+    const result = parseNblk(`project "Legacy"
 
 start:
   print "hi"
-  if true:
-    print "yes"
 `);
-    assert.equal(body(document)[0]!.type, "io.print");
-    assert.equal(printNblk(document).includes("打印 \"hi\""), true);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error.message, /中文关键字/);
   });
 
   test("does not translate keywords inside strings", () => {

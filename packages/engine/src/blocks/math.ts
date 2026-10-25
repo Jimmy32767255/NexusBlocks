@@ -52,7 +52,6 @@ export const mathBlocks: BlockDefinition[] = [
         label: "block.math.arithmetic.field.count",
         default: 2,
         min: 2,
-        max: 8,
       },
     ],
     ports: [

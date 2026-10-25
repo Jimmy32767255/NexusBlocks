@@ -25,7 +25,6 @@ const IF_ELSEIFS: FieldDef = {
   label: "block.control.if.field.elseIfs",
   default: 0,
   min: 0,
-  max: 4,
 };
 
 const CONTROL = CATEGORY_COLORS.control;
@@ -202,7 +201,7 @@ export const controlBlocks: BlockDefinition[] = [
       const times = Math.max(0, Math.floor(Number(raw) || 0));
       const name = String(node.fields?.variable ?? "").trim();
       if (!name) ctx.fail("runtime.error.missingVariable", { name: "" });
-      for (let count = 1; count <= times; count += 1) {
+      for (let count = 0; count < times; count += 1) {
         if (ctx.hasVariable(name)) ctx.setVariable(name, count);
         else ctx.createVariable(name, count);
         await ctx.tick();

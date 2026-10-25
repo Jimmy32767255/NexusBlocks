@@ -11,7 +11,6 @@ const JOIN_COUNT: FieldDef = {
   label: "block.text.join.field.count",
   default: 2,
   min: 2,
-  max: 8,
 };
 
 function joinPorts(node: BlockNode): PortDef[] {
@@ -72,7 +71,7 @@ export const textBlocks: BlockDefinition[] = [
     ports: [
       { name: "text", label: "block.text.splitAt.port.text", kind: "value", type: "text", default: "" },
       { name: "separator", label: "block.text.splitAt.port.separator", kind: "value", type: "text", default: "," },
-      { name: "index", label: "block.text.splitAt.port.index", kind: "value", type: "number", default: 1 },
+      { name: "index", label: "block.text.splitAt.port.index", kind: "value", type: "number", default: 0 },
     ],
     async evaluate(ctx, node) {
       const text = toDisplayText(await ctx.input(node, "text"));
@@ -80,10 +79,10 @@ export const textBlocks: BlockDefinition[] = [
       const index = Math.floor(Number(await ctx.input(node, "index")) || 0);
       if (separator === "") throw new RuntimeFailure("runtime.error.splitSeparator");
       const parts = text.split(separator);
-      if (index < 1 || index > parts.length) {
+      if (index < 0 || index >= parts.length) {
         throw new RuntimeFailure("runtime.error.splitIndex", { index, length: parts.length });
       }
-      return parts[index - 1] ?? "";
+      return parts[index] ?? "";
     },
   },
   {

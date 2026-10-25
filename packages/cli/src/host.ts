@@ -7,14 +7,11 @@ import {
   CONSOLE_PRINT,
   FS_CAPABILITIES,
   HostError,
-  MAX_FILE_CHARS,
   OS_CAPABILITIES,
   OS_EXEC_CAPABILITY,
 } from "@nexus/engine";
 import type { HostBridge, HostRequest } from "@nexus/engine";
 import type { Value } from "@nexus/ir";
-
-const MAX_COMMAND_OUTPUT = 200_000;
 
 export interface NodeHostOptions {
   /** Base directory for relative paths and imports. */
@@ -64,11 +61,9 @@ async function runShell(command: string, baseDir: string): Promise<Value> {
     let stderr = "";
     child.stdout?.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf8");
-      if (stdout.length > MAX_COMMAND_OUTPUT) stdout = stdout.slice(0, MAX_COMMAND_OUTPUT);
     });
     child.stderr?.on("data", (chunk: Buffer) => {
       stderr += chunk.toString("utf8");
-      if (stderr.length > MAX_COMMAND_OUTPUT) stderr = stderr.slice(0, MAX_COMMAND_OUTPUT);
     });
     child.on("error", (error) => reject(new HostError("runtime.error.commandFailed", { code: 127, message: error.message })));
     child.on("close", (code) => resolve({ stdout, stderr, code: code ?? 0 }));
@@ -107,9 +102,6 @@ export function createNodeHost(options: NodeHostOptions): HostBridge {
           const displayPath = String(request.args[0] ?? "");
           const file = resolveScriptPath(request.args[0], baseDir);
           const content = display(request.args[1] ?? "");
-          if (content.length > MAX_FILE_CHARS) {
-            throw new HostError("runtime.error.fileTooLarge", { limit: MAX_FILE_CHARS });
-          }
           try {
             await fs.mkdir(path.dirname(file), { recursive: true });
             await fs.writeFile(file, content, "utf8");

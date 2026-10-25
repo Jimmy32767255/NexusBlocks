@@ -75,14 +75,6 @@ export interface BlockNode {
  * editor does not create them yet. Keeping the field reserved avoids a file
  * format migration when functions land.
  */
-export interface FunctionDef {
-  id: string;
-  name: string;
-  params: { id: string; name: string; type: ValueType }[];
-  returnType: ValueType;
-  body: BlockNode[];
-}
-
 /**
  * A single executable entry point. Scripts are top-level hat blocks; the hat's
  * stack port holds the body that runs when the hat fires.
@@ -97,7 +89,6 @@ export interface Project {
 
   createdAt: string;
   updatedAt: string;
-  functions: FunctionDef[];
   scripts: BlockNode[];
   /** Extension bag; unknown keys are preserved across save/load. */
   metadata: Record<string, unknown>;

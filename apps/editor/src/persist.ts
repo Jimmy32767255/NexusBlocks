@@ -84,12 +84,8 @@ export function pickDocument(accept = ".nblk,.json,text/plain,application/json")
   });
 }
 
-/** Read a document from raw text: `.nblk` first, legacy JSON as fallback. */
+/** Read a document from `.nblk` text. JSON project files are no longer accepted. */
 export function readDocument(text: string): OpenResult {
-  if (text.trimStart().startsWith("{")) {
-    const parsed = parseDocument(text);
-    return parsed.ok ? { ok: true, document: parsed.document, warnings: parsed.warnings } : parsed;
-  }
   const parsed = parseNblk(text);
   if (parsed.ok) return { ok: true, document: parsed.document, warnings: parsed.warnings };
   return { ok: false, error: `Line ${parsed.error.line}: ${parsed.error.message}` };

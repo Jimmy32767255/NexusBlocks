@@ -149,23 +149,6 @@ test("division by zero reports a translatable error", async () => {
   assert.equal(result.error?.messageKey, "runtime.error.divisionByZero");
 });
 
-test("the step limit stops runaway loops", async () => {
-  const project = projectWith(
-    start([
-      createBlock("control.repeat", {
-        inputs: {
-          times: createBlock("math.number", { fields: { value: 1000 } }),
-          body: [createBlock("io.print", { fields: { text: "again" } })],
-        },
-      }),
-    ]),
-  );
-
-  const result = await runProject(project, { stepLimit: 40 });
-  assert.equal(result.status, "error");
-  assert.equal(result.error?.messageKey, "runtime.error.stepLimit");
-});
-
 test("aborting the signal stops the program", async () => {
   const project = projectWith(
     start([
@@ -467,18 +450,6 @@ test("parameter blocks outside their function are rejected", async () => {
   assert.equal(result.error?.messageKey, "diag.function.unknownParam");
 });
 
-test("runaway recursion reports the call depth limit", async () => {
-  const recursive = defineFunction("loop", "", "void", [
-    callFunctionBlock(createBlock("control.start")),
-  ]);
-  // The body calls itself; the program calls it once from the start hat.
-  (recursive.inputs!.body as BlockNode[])[0] = callFunctionBlock(recursive);
-  const project = projectWith(recursive, start([callFunctionBlock(recursive)]));
-  const result = await runProject(project);
-  assert.equal(result.status, "error");
-  assert.equal(result.error?.messageKey, "runtime.error.callDepth");
-});
-
 test("break leaves the innermost loop", async () => {
   const project = projectWith(
     start([
@@ -519,7 +490,7 @@ test("forever repeats until a break leaves the loop", async () => {
     ]),
   );
   const events: RuntimeEvent[] = [];
-  const result = await runProject(project, { onEvent: (event) => events.push(event), stepLimit: 1000 });
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
   assert.equal(result.status, "finished");
   assert.deepEqual(loggedTexts(events), ["tick", "after"]);
 });
@@ -560,12 +531,12 @@ test("while checks the condition before every round", async () => {
     ]),
   ];
   const events: RuntimeEvent[] = [];
-  const result = await runProject(project, { onEvent: (event) => events.push(event), stepLimit: 1000 });
+  const result = await runProject(project, { onEvent: (event) => events.push(event) });
   assert.equal(result.status, "finished");
   assert.deepEqual(loggedTexts(events), ["0", "1", "2"]);
 });
 
-test("repeat with counter stores 1..n in the chosen variable", async () => {
+test("repeat with counter stores 0..n-1 in the chosen variable", async () => {
   const project = createProject();
   project.scripts = [
     start([
@@ -589,7 +560,7 @@ test("repeat with counter stores 1..n in the chosen variable", async () => {
   const events: RuntimeEvent[] = [];
   const result = await runProject(project, { onEvent: (event) => events.push(event) });
   assert.equal(result.status, "finished");
-  assert.deepEqual(loggedTexts(events), ["1", "2", "3", "3"]);
+  assert.deepEqual(loggedTexts(events), ["0", "1", "2", "2"]);
 });
 
 test("break leaves a repeat with counter loop", async () => {
@@ -805,21 +776,6 @@ test("if blocks run the matching else-if branch", async () => {
   assert.deepEqual(loggedTexts(events), ["two"]);
 });
 
-test("count fields outside their bounds fail validation", async () => {
-  const project = projectWith(
-    start([
-      createBlock("io.print", {
-        inputs: {
-          text: createBlock("text.join", { fields: { count: 99 } }),
-        },
-      }),
-    ]),
-  );
-  const result = await runProject(project);
-  assert.equal(result.status, "error");
-  assert.equal(result.error?.messageKey, "diag.block.invalidNumber");
-});
-
 test("text.splitAt returns the requested piece", async () => {
   const project = projectWith(
     start([
@@ -829,7 +785,7 @@ test("text.splitAt returns the requested piece", async () => {
             inputs: {
               text: createBlock("text.literal", { fields: { value: "a,b,c" } }),
               separator: createBlock("text.literal", { fields: { value: "," } }),
-              index: createBlock("math.number", { fields: { value: 2 } }),
+              index: createBlock("math.number", { fields: { value: 1 } }),
             },
           }),
         },
@@ -858,7 +814,7 @@ test("text.splitAt rejects empty separators and missing pieces", async () => {
       createBlock("io.print", {
         inputs: {
           text: createBlock("text.splitAt", {
-            fields: { separator: "", index: 1 },
+            fields: { separator: "", index: 0 },
             inputs: { text: createBlock("text.literal", { fields: { value: "abc" } }) },
           }),
         },
@@ -1081,5 +1037,5 @@ test("the repeat counter and catch target declare variables on demand", async ()
 
   const result = await runProject(project, { onEvent: (event) => events.push(event) });
   assert.equal(result.status, "finished");
-  assert.deepEqual(loggedTexts(events), ["1", "2", "2"]);
+  assert.deepEqual(loggedTexts(events), ["0", "1", "1"]);
 });
