@@ -1,4 +1,5 @@
-import { toDisplayText } from "@nexus/ir";
+import { toDisplayText, type Value } from "@nexus/ir";
+import { RuntimeFailure } from "../errors.ts";
 import type { BlockDefinition } from "../types.ts";
 import { CATEGORY_COLORS } from "./control.ts";
 
@@ -6,6 +7,21 @@ const CONVERT = CATEGORY_COLORS.convert;
 
 /** Full-string decimal numbers only: optional sign, digits, fraction, exponent. */
 const NUMBER_PATTERN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+function typeNameOf(value: Value): string {
+  if (value === null || value === undefined) return "无";
+  if (Array.isArray(value)) return "列表";
+  switch (typeof value) {
+    case "number":
+      return "数字";
+    case "boolean":
+      return "布尔值";
+    case "string":
+      return "文本";
+    default:
+      return "字典";
+  }
+}
 
 export const convertBlocks: BlockDefinition[] = [
   {
@@ -30,6 +46,20 @@ export const convertBlocks: BlockDefinition[] = [
     },
   },
   {
+    type: "convert.typeOf",
+    kind: "expression",
+    category: "convert",
+    label: "block.convert.typeOf.label",
+    description: "block.convert.typeOf.description",
+    output: "text",
+    color: CONVERT,
+    fields: [],
+    ports: [{ name: "value", label: "block.convert.typeOf.port.value", kind: "value", type: "any", default: "" }],
+    async evaluate(ctx, node) {
+      return typeNameOf(await ctx.input(node, "value"));
+    },
+  },
+  {
     type: "convert.toBoolean",
     kind: "expression",
     category: "convert",
@@ -47,6 +77,25 @@ export const convertBlocks: BlockDefinition[] = [
       if (text === "true") return true;
       if (text === "false") return false;
       return ctx.fail("runtime.error.toBoolean", { value: String(raw) });
+    },
+  },
+  {
+    type: "convert.parseJson",
+    kind: "expression",
+    category: "convert",
+    label: "block.convert.parseJson.label",
+    description: "block.convert.parseJson.description",
+    output: "any",
+    color: CONVERT,
+    fields: [],
+    ports: [{ name: "text", label: "block.convert.parseJson.port.text", kind: "value", type: "text", default: "" }],
+    async evaluate(ctx, node) {
+      const raw = toDisplayText(await ctx.input(node, "text"));
+      try {
+        return JSON.parse(raw) as Value;
+      } catch {
+        throw new RuntimeFailure("runtime.error.badJson", { value: raw });
+      }
     },
   },
   {

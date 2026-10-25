@@ -21,6 +21,7 @@ export interface InterpreterOptions {
   host: HostBridge;
   emit: (event: RuntimeEvent) => void;
   signal: AbortSignal;
+  args?: readonly string[];
   yieldEvery?: number;
   /** Localised text for caught runtime failures; defaults to the message key. */
   describeFailure?: (failure: RuntimeFailure) => string;
@@ -46,9 +47,14 @@ export class Interpreter implements ExecutionContext {
   private readonly emit: (event: RuntimeEvent) => void;
   private readonly debug: DebugHooks | undefined;
   private readonly yieldEvery: number;
+  readonly args: readonly string[];
+
   private readonly variables = new Map<string, Value>();
   private readonly functions = new Map<string, FunctionDecl>();
   private readonly frames: Map<string, Value>[] = [];
+
+  /** One local table per running function call, so recursion keeps its own state. */
+  private readonly locals: Map<string, Value>[] = [];
 
   private steps = 0;
   private currentBlockId: string | undefined;
@@ -62,6 +68,7 @@ export class Interpreter implements ExecutionContext {
     this.debug = options.debug;
     this.signal = options.signal;
     this.yieldEvery = Math.max(1, options.yieldEvery ?? DEFAULT_YIELD_EVERY);
+    this.args = options.args ?? [];
 
     for (const decl of collectFunctions(project.scripts)) {
       this.functions.set(decl.id, decl);
@@ -197,6 +204,7 @@ export class Interpreter implements ExecutionContext {
       frame.set(param.name, this.coerce(args[index] ?? defaultValue(param.type), param.type, decl.node.id));
     });
     this.frames.push(frame);
+    this.locals.push(new Map());
     try {
       await this.runFrame((decl.node.inputs?.body as BlockNode[] | undefined) ?? []);
     } catch (error) {
@@ -207,11 +215,14 @@ export class Interpreter implements ExecutionContext {
       throw error;
     } finally {
       this.frames.pop();
+      this.locals.pop();
     }
     return defaultValue(decl.returnType);
   }
 
   getVariable(name: string): Value {
+    const local = this.locals[this.locals.length - 1];
+    if (local?.has(name)) return local.get(name) ?? null;
     if (!this.variables.has(name)) {
       this.fail("runtime.error.missingVariable", { name });
     }
@@ -219,10 +230,16 @@ export class Interpreter implements ExecutionContext {
   }
 
   hasVariable(name: string): boolean {
-    return this.variables.has(name);
+    const local = this.locals[this.locals.length - 1];
+    return Boolean(local?.has(name)) || this.variables.has(name);
   }
 
   setVariable(name: string, value: Value): void {
+    const local = this.locals[this.locals.length - 1];
+    if (local?.has(name)) {
+      local.set(name, value);
+      return;
+    }
     if (!this.variables.has(name)) {
       this.fail("runtime.error.missingVariable", { name });
     }
@@ -232,6 +249,21 @@ export class Interpreter implements ExecutionContext {
   createVariable(name: string, value: Value): void {
     if (this.variables.has(name)) this.fail("runtime.error.variableExists", { name });
     this.variables.set(name, value);
+  }
+
+  createLocalVariable(name: string, value: Value): void {
+    const local = this.locals[this.locals.length - 1];
+    if (!local) this.fail("runtime.error.localOutsideFunction", { name });
+    const frame = this.frames[this.frames.length - 1];
+    if (frame?.has(name)) this.fail("runtime.error.variableExists", { name });
+    local.set(name, value);
+  }
+
+  setLocalVariable(name: string, value: Value): void {
+    const local = this.locals[this.locals.length - 1];
+    if (!local) this.fail("runtime.error.localOutsideFunction", { name });
+    if (!local.has(name)) this.fail("runtime.error.missingVariable", { name });
+    local.set(name, value);
   }
 
   deleteVariable(name: string): void {

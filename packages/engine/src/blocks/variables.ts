@@ -58,6 +58,58 @@ export const variableBlocks: BlockDefinition[] = [
     },
   },
   {
+    type: "var.createLocal",
+    kind: "statement",
+    category: "variables",
+    label: "block.var.createLocal.label",
+    description: "block.var.createLocal.description",
+    output: "void",
+    color: VARIABLES,
+    fields: [
+      { name: "name", kind: "text", label: "block.var.createLocal.field.name", default: "", required: true },
+      {
+        name: "type",
+        kind: "select",
+        label: "block.var.createLocal.field.type",
+        default: "any",
+        options: ["any", "text", "number", "boolean", "list", "dict"].map((value) => ({ value, label: value })),
+      },
+    ],
+    ports: [{ name: "value", label: "block.var.createLocal.port.value", kind: "value", type: "any", default: "" }],
+    async execute(ctx, node) {
+      const name = String(node.fields?.name ?? "").trim();
+      if (!name) ctx.fail("runtime.error.invalidVariableName", { name: "" });
+      const type = String(node.fields?.type ?? "any") as ValueType;
+      const value = ctx.coerce(await ctx.input(node, "value"), type, node.id);
+      ctx.createLocalVariable(name, value);
+    },
+  },
+  {
+    type: "var.setLocal",
+    kind: "statement",
+    category: "variables",
+    label: "block.var.setLocal.label",
+    description: "block.var.setLocal.description",
+    output: "void",
+    color: VARIABLES,
+    fields: [
+      {
+        name: "variable",
+        kind: "variable",
+        label: "block.var.setLocal.field.variable",
+        default: "",
+        required: true,
+      },
+    ],
+    ports: [{ name: "value", label: "block.var.setLocal.port.value", kind: "value", type: "any", default: "" }],
+    async execute(ctx, node) {
+      const name = String(node.fields?.variable ?? "").trim();
+      if (!name) ctx.fail("runtime.error.missingVariable", { name: "" });
+      const value = await ctx.input(node, "value");
+      ctx.setLocalVariable(name, value);
+    },
+  },
+  {
     type: "var.delete",
     kind: "statement",
     category: "variables",

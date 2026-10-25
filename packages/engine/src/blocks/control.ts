@@ -1,4 +1,4 @@
-import { countField, toDisplayText, typeOf, type FieldDef, type PortDef } from "@nexus/ir";
+import { countField, toDisplayText, typeOf, type FieldDef, type PortDef, type Value } from "@nexus/ir";
 import { BreakSignal, GotoSignal, RuntimeFailure, StopSignal, ThrowSignal } from "../errors.ts";
 import type { BlockDefinition } from "../types.ts";
 
@@ -204,6 +204,48 @@ export const controlBlocks: BlockDefinition[] = [
       for (let count = 0; count < times; count += 1) {
         if (ctx.hasVariable(name)) ctx.setVariable(name, count);
         else ctx.createVariable(name, count);
+        await ctx.tick();
+        try {
+          await ctx.run(ctx.stack(node, "body"));
+        } catch (error) {
+          if (error instanceof BreakSignal) break;
+          throw error;
+        }
+      }
+    },
+  },
+  {
+    type: "control.forEach",
+    kind: "statement",
+    category: "control",
+    label: "block.control.forEach.label",
+    description: "block.control.forEach.description",
+    output: "void",
+    color: CONTROL,
+    fields: [
+      {
+        name: "variable",
+        kind: "variable",
+        label: "block.control.forEach.field.variable",
+        default: "",
+        required: true,
+      },
+    ],
+    ports: [
+      { name: "items", label: "block.control.forEach.port.items", kind: "value", type: "list" },
+      { name: "body", label: "block.control.forEach.port.body", kind: "stack" },
+    ],
+    async execute(ctx, node) {
+      const value = await ctx.input(node, "items");
+      if (!Array.isArray(value)) {
+        ctx.fail("runtime.error.badType", { from: typeof value, to: "list" });
+      }
+      const items: Value[] = value as Value[];
+      const name = String(node.fields?.variable ?? "").trim();
+      if (!name) ctx.fail("runtime.error.missingVariable", { name: "" });
+      for (const item of items) {
+        if (ctx.hasVariable(name)) ctx.setVariable(name, item);
+        else ctx.createVariable(name, item);
         await ctx.tick();
         try {
           await ctx.run(ctx.stack(node, "body"));

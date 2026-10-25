@@ -24,4 +24,18 @@ export const systemBlocks: BlockDefinition[] = [
       ctx.exit(Math.trunc(code));
     },
   },
+  {
+    type: "sys.args",
+    kind: "expression",
+    category: "system",
+    label: "block.sys.args.label",
+    description: "block.sys.args.description",
+    output: "list",
+    color: SYSTEM,
+    fields: [],
+    ports: [],
+    evaluate(ctx) {
+      return [...ctx.args];
+    },
+  },
 ];

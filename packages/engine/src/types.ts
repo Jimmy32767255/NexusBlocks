@@ -27,6 +27,8 @@ export interface ExecutionContext {
   readonly project: Project;
   readonly host: HostBridge;
   readonly signal: AbortSignal;
+  /** Extra command line arguments after the script file; empty in the editor. */
+  readonly args: readonly string[];
 
   /** Evaluate a nested expression block. */
   evaluate(node: BlockNode): Promise<Value>;
@@ -44,6 +46,10 @@ export interface ExecutionContext {
   hasVariable(name: string): boolean;
   setVariable(name: string, value: Value): void;
   createVariable(name: string, value: Value): void;
+  /** Create a variable in the current function call; fails outside a function. */
+  createLocalVariable(name: string, value: Value): void;
+  /** Update an existing local variable of the current function call. */
+  setLocalVariable(name: string, value: Value): void;
   deleteVariable(name: string): void;
   /** Read a parameter of the function currently running. */
   getParam(name: string): Value;
@@ -125,6 +131,8 @@ export interface DebugRuntimeView {
 }
 
 export interface RunOptions {
+  /** Arguments a script sees through `sys.args`; defaults to none. */
+  args?: readonly string[];
   onEvent?: (event: RuntimeEvent) => void;
   signal?: AbortSignal;
   /** Block set to execute; defaults to the core blocks. */

@@ -133,4 +133,23 @@ export const listBlocks: BlockDefinition[] = [
       items[index] = await ctx.input(node, "value");
     },
   },
+  {
+    type: "list.remove",
+    kind: "statement",
+    category: "data",
+    label: "block.list.remove.label",
+    description: "block.list.remove.description",
+    output: "void",
+    color: DATA,
+    fields: [],
+    ports: [
+      { name: "items", label: "block.list.remove.port.items", kind: "value", type: "list" },
+      { name: "index", label: "block.list.remove.port.index", kind: "value", type: "number", default: 0 },
+    ],
+    async execute(ctx, node) {
+      const items = asList(ctx, await ctx.input(node, "items"));
+      const index = asIndex(ctx, await ctx.input(node, "index"), items.length);
+      items.splice(index, 1);
+    },
+  },
 ];

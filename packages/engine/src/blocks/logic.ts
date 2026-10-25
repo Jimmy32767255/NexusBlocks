@@ -62,6 +62,42 @@ export const logicBlocks: BlockDefinition[] = [
     },
   },
   {
+    type: "logic.and",
+    kind: "expression",
+    category: "logic",
+    label: "block.logic.and.label",
+    description: "block.logic.and.description",
+    output: "boolean",
+    color: LOGIC,
+    fields: [],
+    ports: [
+      { name: "a", label: "block.logic.and.port.a", kind: "value", type: "boolean", default: true },
+      { name: "b", label: "block.logic.and.port.b", kind: "value", type: "boolean", default: true },
+    ],
+    async evaluate(ctx, node) {
+      if (!truthy(await ctx.input(node, "a"))) return false;
+      return truthy(await ctx.input(node, "b"));
+    },
+  },
+  {
+    type: "logic.or",
+    kind: "expression",
+    category: "logic",
+    label: "block.logic.or.label",
+    description: "block.logic.or.description",
+    output: "boolean",
+    color: LOGIC,
+    fields: [],
+    ports: [
+      { name: "a", label: "block.logic.or.port.a", kind: "value", type: "boolean", default: false },
+      { name: "b", label: "block.logic.or.port.b", kind: "value", type: "boolean", default: false },
+    ],
+    async evaluate(ctx, node) {
+      if (truthy(await ctx.input(node, "a"))) return true;
+      return truthy(await ctx.input(node, "b"));
+    },
+  },
+  {
     type: "logic.boolean",
     kind: "expression",
     category: "logic",

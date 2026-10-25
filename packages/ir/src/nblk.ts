@@ -87,6 +87,12 @@ interface CallPending {
   name: string;
   args: Expr[];
   line: number;
+  /**
+   * Parameters in scope where the call was written. Calls are resolved after
+   * the whole file is parsed, when the live parameter set is already empty, so
+   * each call has to remember its own scope.
+   */
+  params: ReadonlySet<string>;
 }
 
 type Expr =
@@ -197,7 +203,7 @@ class ExprParser {
   }
 
   parse(): Expr {
-    const expression = this.parseComparison();
+    const expression = this.parseOr();
     if (this.peek().kind !== "end") {
       throw new NblkFailure(0, `Unexpected token: ${this.peek().text}`);
     }
@@ -224,6 +230,24 @@ class ExprParser {
 
   private expect(text: string): void {
     if (!this.accept(text)) throw new NblkFailure(0, `Expected ${text}`);
+  }
+
+  private parseOr(): Expr {
+    let left = this.parseAnd();
+    while (this.peek().kind === "name" && (this.peek().text === "或者" || this.peek().text === "or")) {
+      this.take();
+      left = { kind: "call", name: "or", args: [left, this.parseAnd()] };
+    }
+    return left;
+  }
+
+  private parseAnd(): Expr {
+    let left = this.parseComparison();
+    while (this.peek().kind === "name" && (this.peek().text === "并且" || this.peek().text === "and")) {
+      this.take();
+      left = { kind: "call", name: "and", args: [left, this.parseComparison()] };
+    }
+    return left;
   }
 
   private parseComparison(): Expr {
@@ -265,7 +289,7 @@ class ExprParser {
     let target = this.parsePrimary();
     for (;;) {
       if (this.accept("[")) {
-        const index = this.parseComparison();
+        const index = this.parseOr();
         this.expect("]");
         target = { kind: "index", target, index };
         continue;
@@ -290,7 +314,7 @@ class ExprParser {
       return { kind: "name", name: token.text };
     }
     if (token.kind === "punctuation" && token.text === "(") {
-      const inner = this.parseComparison();
+      const inner = this.parseOr();
       this.expect(")");
       return inner;
     }
@@ -298,7 +322,7 @@ class ExprParser {
       const items: Expr[] = [];
       if (!this.accept("]")) {
         for (;;) {
-          items.push(this.parseComparison());
+          items.push(this.parseOr());
           if (!this.accept(",")) break;
           if (this.accept("]")) break;
         }
@@ -315,7 +339,7 @@ class ExprParser {
           if (keyToken.kind === "string" || keyToken.kind === "name") key = String(keyToken.value ?? keyToken.text);
           else throw new NblkFailure(0, "Expected an object key");
           this.expect(":");
-          entries.push({ key, value: this.parseComparison() });
+          entries.push({ key, value: this.parseOr() });
           if (!this.accept(",")) break;
           if (this.accept("}")) break;
         }
@@ -330,7 +354,7 @@ class ExprParser {
     const args: Expr[] = [];
     if (this.accept(")")) return args;
     for (;;) {
-      args.push(this.parseComparison());
+      args.push(this.parseOr());
       if (!this.accept(",")) break;
     }
     this.expect(")");
@@ -659,6 +683,14 @@ class Parser {
       };
       return node;
     }
+    const eachMatch = /^for each\s+([\p{L}_][\p{L}\p{N}_]*)\s+in\s+(.+):$/u.exec(text);
+    if (eachMatch) {
+      this.index += 1;
+      const node = createBlock("control.forEach", { fields: { variable: eachMatch[1]! } });
+      this.assign(node, "items", parseExpression(eachMatch[2]!, line.number));
+      this.parseBody(node, "body", indent);
+      return node;
+    }
     if (text.startsWith("while ") && text.endsWith(":")) {
       this.index += 1;
       const node = createBlock("control.while");
@@ -726,6 +758,16 @@ class Parser {
       if (typeof value !== "string") fail(line.number, "A note needs a string");
       return createBlock("comment.note", { fields: { text: value } });
     }
+    if (text.startsWith("create local ")) {
+      const created = /^create local\s+([\p{L}_][\p{L}\p{N}_]*)(?:\s*:\s*([\w-]+))?\s+as\s+(.+)$/u.exec(text);
+      if (!created) fail(line.number, "Expected `create local name as value` or `create local name: type as value`");
+      this.index += 1;
+      const type = created[2] ?? "any";
+      if (!VALUE_TYPES.includes(type as ValueType)) fail(line.number, `Unknown type: ${type}`);
+      const node = createBlock("var.createLocal", { fields: { name: created[1]!, type } });
+      this.assign(node, "value", parseExpression(created[3]!, line.number));
+      return node;
+    }
     if (text.startsWith("create ")) {
       const created = /^create\s+([\p{L}_][\p{L}\p{N}_]*)(?:\s*:\s*([\w-]+))?\s+as\s+(.+)$/u.exec(text);
       if (!created) fail(line.number, "Expected `create name as value` or `create name: type as value`");
@@ -740,6 +782,14 @@ class Parser {
       const name = this.parseName(text.slice(7), line.number);
       this.index += 1;
       return createBlock("var.delete", { fields: { name } });
+    }
+    if (text.startsWith("set local ")) {
+      const assignment = /^set local\s+([\p{L}_][\p{L}\p{N}_]*)\s+to\s+(.+)$/u.exec(text);
+      if (!assignment) fail(line.number, "Expected `set local name to value`");
+      this.index += 1;
+      const node = createBlock("var.setLocal", { fields: { variable: assignment[1]! } });
+      this.assign(node, "value", parseExpression(assignment[2]!, line.number));
+      return node;
     }
     if (text.startsWith("set ")) {
       const assignment = /^set\s+([\p{L}_][\p{L}\p{N}_]*)\s+to\s+(.+)$/u.exec(text);
@@ -777,6 +827,15 @@ class Parser {
       this.assign(node, "value", args[2]!);
       return node;
     }
+    if (text.startsWith("remove(") && text.endsWith(")")) {
+      this.index += 1;
+      const args = parseArguments(text.slice("remove(".length, -1), line.number);
+      if (args.length !== 2) fail(line.number, "remove takes two arguments");
+      const node = createBlock("list.remove");
+      this.assign(node, "items", args[0]!);
+      this.assign(node, "index", args[1]!);
+      return node;
+    }
     if (text.startsWith("add(") && text.endsWith(")")) {
       this.index += 1;
       const args = parseArguments(text.slice("add(".length, -1), line.number);
@@ -800,13 +859,13 @@ class Parser {
       this.index += 1;
       const args = parseArguments(call[2]!, line.number);
       const node = createBlock(`func.call:${call[1]}`);
-      this.pending.set(node.id, { name: call[1]!, args, line: line.number });
+      this.pending.set(node.id, { name: call[1]!, args, line: line.number, params: new Set(this.params) });
       return node;
     }
     fail(line.number, `Unknown statement: ${text.split(/\s+/)[0]}`);
   }
 
-  private assign(node: BlockNode, port: string, expression: Expr): void {
+  private assign(node: BlockNode, port: string, expression: Expr, scope: ReadonlySet<string> = this.params): void {
     if (expression.kind === "literal") {
       const value = expression.value;
       if (value === null) return;
@@ -817,33 +876,40 @@ class Parser {
       node.fields = { ...(node.fields ?? {}), [port]: value };
       return;
     }
-    node.inputs = { ...(node.inputs ?? {}), [port]: this.toNode(expression) };
+    node.inputs = { ...(node.inputs ?? {}), [port]: this.toNode(expression, scope) };
   }
 
-  private toNode(expression: Expr): BlockNode {
+  private toNode(expression: Expr, scope: ReadonlySet<string> = this.params): BlockNode {
     switch (expression.kind) {
       case "literal":
         throw new NblkFailure(0, "Internal: literal cannot be a block");
       case "name": {
-        if (this.params.has(expression.name)) return createBlock(FUNCTION_PARAM_TYPE, { fields: { name: expression.name } });
+        if (scope.has(expression.name)) return createBlock(FUNCTION_PARAM_TYPE, { fields: { name: expression.name } });
         return createBlock("var.get", { fields: { variable: expression.name } });
       }
       case "index": {
+        // `dict["key"]` uses a text key; everything else indexes a list.
+        if (expression.index.kind === "literal" && typeof expression.index.value === "string") {
+          const node = createBlock("dict.get");
+          this.assign(node, "dict", expression.target, scope);
+          this.assign(node, "key", expression.index, scope);
+          return node;
+        }
         const node = createBlock("list.get");
-        this.assign(node, "items", expression.target);
-        this.assign(node, "index", expression.index);
+        this.assign(node, "items", expression.target, scope);
+        this.assign(node, "index", expression.index, scope);
         return node;
       }
       case "binary": {
         if (COMPARISONS.includes(expression.op as (typeof COMPARISONS)[number])) {
           const node = createBlock("logic.compare", { fields: { op: expression.op } });
-          this.assign(node, "a", expression.left);
-          this.assign(node, "b", expression.right);
+          this.assign(node, "a", expression.left, scope);
+          this.assign(node, "b", expression.right, scope);
           return node;
         }
         const node = createBlock("math.arithmetic", { fields: { op: expression.op } });
-        this.assign(node, "a", expression.left);
-        this.assign(node, "b", expression.right);
+        this.assign(node, "a", expression.left, scope);
+        this.assign(node, "b", expression.right, scope);
         return node;
       }
       case "unary": {
@@ -851,8 +917,8 @@ class Parser {
           return createBlock("math.number", { fields: { value: -expression.value.value } });
         }
         const node = createBlock("math.arithmetic", { fields: { op: "*" } });
-        this.assign(node, "a", expression.value);
-        this.assign(node, "b", { kind: "literal", value: -1 });
+        this.assign(node, "a", expression.value, scope);
+        this.assign(node, "b", { kind: "literal", value: -1 }, scope);
         return node;
       }
       case "list":
@@ -860,20 +926,20 @@ class Parser {
       case "dict":
         return createBlock("dict.literal", { fields: { items: JSON.stringify(valueOfExpr(expression)) } });
       case "call":
-        return this.callNode(expression);
+        return this.callNode(expression, scope);
       default:
         throw new Error("Unhandled expression");
     }
   }
 
-  private callNode(expression: Extract<Expr, { kind: "call" }>): BlockNode {
+  private callNode(expression: Extract<Expr, { kind: "call" }>, scope: ReadonlySet<string> = this.params): BlockNode {
     const { name, args } = expression;
     const arg = (index: number): Expr | undefined => args[index];
     const build = (type: string, fields: Record<string, FieldValue> | undefined, ports: string[]): BlockNode => {
       const node = createBlock(type, fields ? { fields } : {});
       ports.forEach((port, index) => {
         const value = arg(index);
-        if (value) this.assign(node, port, value);
+        if (value) this.assign(node, port, value, scope);
       });
       return node;
     };
@@ -887,7 +953,7 @@ class Parser {
       }
       case "join": {
         const node = createBlock("text.join", { fields: { count: Math.max(1, args.length) } });
-        args.forEach((value, index) => this.assign(node, String.fromCharCode(97 + index), value));
+        args.forEach((value, index) => this.assign(node, String.fromCharCode(97 + index), value, scope));
         return node;
       }
       case "contains":
@@ -916,9 +982,35 @@ class Parser {
         return build("file.list", undefined, []);
       case "time":
         return createBlock("time.get_os_time");
+      case "parsejson":
+        return build("convert.parseJson", undefined, ["text"]);
+      case "typeof":
+        return build("convert.typeOf", undefined, ["value"]);
+      case "toBoolean":
+        return build("convert.toBoolean", undefined, ["value"]);
+      case "args":
+        return createBlock("sys.args");
+      case "and":
+        return build("logic.and", undefined, ["a", "b"]);
+      case "or":
+        return build("logic.or", undefined, ["a", "b"]);
+      case "textlength":
+        return build("text.length", undefined, ["text"]);
+      case "charat":
+        return build("text.charAt", undefined, ["text", "index"]);
+      case "substring":
+        return build("text.slice", undefined, ["text", "start", "length"]);
+      case "indexof":
+        return build("text.indexOf", undefined, ["text", "needle"]);
+      case "splitlist":
+        return build("text.split", undefined, ["text", "separator"]);
+      case "charcode":
+        return build("text.codePoint", undefined, ["text"]);
+      case "fromcharcode":
+        return build("text.fromCodePoint", undefined, ["code"]);
       default: {
         const node = createBlock(`func.call:${name}`);
-        this.pending.set(node.id, { name, args, line: 0 });
+        this.pending.set(node.id, { name, args, line: 0, params: new Set(scope) });
         return node;
       }
     }
@@ -941,7 +1033,7 @@ class Parser {
         });
         if (!node) continue;
         node.type = functionNameCallType(pending.name);
-        pending.args.forEach((value, index) => this.assign(node!, `arg${index}`, value));
+        pending.args.forEach((value, index) => this.assign(node!, `arg${index}`, value, pending.params));
         continue;
       }
       if (pending.args.length > decl.params.length) {
@@ -954,7 +1046,7 @@ class Parser {
       if (!node) continue;
       node.type = functionCallType(decl.id);
       pending.args.forEach((value, index) => {
-        this.assign(node!, decl.params[index]!.name, value);
+        this.assign(node!, decl.params[index]!.name, value, pending.params);
       });
     }
   }
@@ -1071,6 +1163,34 @@ function expressionText(node: BlockNode, context: PrintContext): string {
   if (node.type === "text.splitAt") {
     return `拆分(${portValue(node, "text", "text", context)}, ${portValue(node, "separator", "text", context)}, ${portValue(node, "index", "number", context)})`;
   }
+  if (node.type === "convert.parseJson") {
+    return `解析JSON(${portValue(node, "text", "text", context)})`;
+  }
+  if (node.type === "convert.typeOf") {
+    return `类型(${portValue(node, "value", "any", context)})`;
+  }
+  if (node.type === "sys.args") return "参数()";
+  if (node.type === "logic.and") {
+    return `并且(${portValue(node, "a", "boolean", context)}, ${portValue(node, "b", "boolean", context)})`;
+  }
+  if (node.type === "logic.or") {
+    return `或者(${portValue(node, "a", "boolean", context)}, ${portValue(node, "b", "boolean", context)})`;
+  }
+  if (node.type === "text.length") return `文本长度(${portValue(node, "text", "text", context)})`;
+  if (node.type === "text.charAt") {
+    return `取字符(${portValue(node, "text", "text", context)}, ${portValue(node, "index", "number", context)})`;
+  }
+  if (node.type === "text.slice") {
+    return `子串(${portValue(node, "text", "text", context)}, ${portValue(node, "start", "number", context)}, ${portValue(node, "length", "number", context)})`;
+  }
+  if (node.type === "text.indexOf") {
+    return `查找(${portValue(node, "text", "text", context)}, ${portValue(node, "needle", "text", context)})`;
+  }
+  if (node.type === "text.split") {
+    return `拆分为列表(${portValue(node, "text", "text", context)}, ${portValue(node, "separator", "text", context)})`;
+  }
+  if (node.type === "text.codePoint") return `字符码(${portValue(node, "text", "text", context)})`;
+  if (node.type === "text.fromCodePoint") return `码转字符(${portValue(node, "code", "number", context)})`;
   if (node.type === "text.join") {
     const count = Math.max(1, Number(node.fields?.count ?? 2));
     const parts: string[] = [];
@@ -1248,6 +1368,22 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
       const suffix = type === "any" ? "" : `: ${typeToZh(type)}`;
       return [`创建变量 ${String(node.fields?.name ?? "name")}${suffix} 为 ${portValue(node, "value", "any", context)}`];
     }
+    case "control.forEach":
+      return [
+        `对每项 ${variableNameOf(node, "variable")} 在 ${portValue(node, "items", "list", context)}:`,
+        ...body("body"),
+      ];
+    case "list.remove":
+      return [
+        `移除(${portValue(node, "items", "list", context)}, ${portValue(node, "index", "number", context)})`,
+      ];
+    case "var.createLocal": {
+      const type = String(node.fields?.type ?? "any");
+      const suffix = type === "any" ? "" : `: ${typeToZh(type)}`;
+      return [`创建局部变量 ${String(node.fields?.name ?? "name")}${suffix} 为 ${portValue(node, "value", "any", context)}`];
+    }
+    case "var.setLocal":
+      return [`设置局部变量 ${variableNameOf(node, "variable")} 为 ${portValue(node, "value", "any", context)}`];
     case "var.delete":
       return [`删除变量 ${String(node.fields?.name ?? "name")}`];
     case "var.set":

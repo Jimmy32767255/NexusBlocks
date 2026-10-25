@@ -37,6 +37,22 @@ export function typeFromZh(name: string): ValueType | undefined {
 
 /** Expression-level builtin names and their Chinese spelling. */
 export const ZH_CALLS: [zh: string, en: string][] = [
+  // Text primitives come first: `文本长度(` contains `长度(`, so the longer
+  // spelling must be rewritten before the shorter alias can match.
+  ["解析JSON", "parsejson"],
+  ["类型", "typeof"],
+  ["转布尔", "toBoolean"],
+  ["参数", "args"],
+  ["移除", "remove"],
+  ["并且", "and"],
+  ["或者", "or"],
+  ["文本长度", "textlength"],
+  ["取字符", "charat"],
+  ["子串", "substring"],
+  ["查找", "indexof"],
+  ["拆分为列表", "splitlist"],
+  ["字符码", "charcode"],
+  ["码转字符", "fromcharcode"],
   ["连接", "join"],
   ["包含", "contains"],
   ["拆分", "split"],
@@ -99,10 +115,25 @@ function mapOutsideStrings(text: string, map: (chunk: string) => string): string
   return out;
 }
 
+function escapePattern(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Rewrite Chinese builtin calls to their canonical names.
+ *
+ * A call only counts when the name starts a word: `节点类型(` must stay a user
+ * function, not turn into `节点typeof(`.
+ */
 function replaceWords(text: string, pairs: [zh: string, en: string][], suffix = false): string {
   let out = text;
   for (const [zh, en] of pairs) {
-    out = suffix ? out.split(`${zh}(`).join(`${en}(`) : out.split(zh).join(en);
+    if (!suffix) {
+      out = out.split(zh).join(en);
+      continue;
+    }
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}_])${escapePattern(zh)}\\(`, "gu");
+    out = out.replace(pattern, `${en}(`);
   }
   return out;
 }
@@ -137,6 +168,7 @@ function localizeStatement(body: string): string {
     [/^否则如果[ \t]+(.+):$/u, (m) => `else if ${m[1]}:`],
     [/^否则:$/u, () => "else:"],
     [/^如果[ \t]+(.+):$/u, (m) => `if ${m[1]}:`],
+    [/^对每项[ \t]+([\p{L}_][\p{L}\p{N}_]*)[ \t]+在[ \t]+(.+):$/u, (m) => `for each ${m[1]} in ${m[2]}:`],
     [/^当[ \t]+(.+):$/u, (m) => `while ${m[1]}:`],
     [/^重复[ \t]+使用[ \t]+([\p{L}_][\p{L}\p{N}_]*)[ \t]+共[ \t]+(.+)[ \t]+次:$/u, (m) =>
       `repeat with ${m[1]} times ${m[2]}:`],
@@ -148,9 +180,12 @@ function localizeStatement(body: string): string {
     [/^执行命令[ \t]+(.+)$/u, (m) => `run ${m[1]}`],
     [/^返回(?:[ \t]+(.+))?$/u, (m) => `return${m[1] ? ` ${m[1]}` : ""}`],
     [/^注释[ \t]+(.+)$/u, (m) => `note ${m[1]}`],
+    [/^创建局部变量[ \t]+([\p{L}_][\p{L}\p{N}_]*)(?:[ \t]*:[ \t]*([^\s]+))?[ \t]+为[ \t]+(.+)$/u, (m) =>
+      `create local ${m[1]}${m[2] ? `: ${zhTypes(m[2])}` : ""} as ${m[3]}`],
     [/^创建变量[ \t]+([\p{L}_][\p{L}\p{N}_]*)(?:[ \t]*:[ \t]*([^\s]+))?[ \t]+为[ \t]+(.+)$/u, (m) =>
       `create ${m[1]}${m[2] ? `: ${zhTypes(m[2])}` : ""} as ${m[3]}`],
     [/^删除变量[ \t]+(.+)$/u, (m) => `delete ${m[1]}`],
+    [/^设置局部变量[ \t]+([\p{L}_][\p{L}\p{N}_]*)[ \t]+为[ \t]+(.+)$/u, (m) => `set local ${m[1]} to ${m[2]}`],
     [/^设置[ \t]+([\p{L}_][\p{L}\p{N}_]*)[ \t]+为[ \t]+(.+)$/u, (m) => `set ${m[1]} to ${m[2]}`],
     [/^原始[ \t]+(.+)$/u, (m) => `raw ${m[1]}`],
   ];
@@ -167,11 +202,41 @@ function localizeStatement(body: string): string {
  */
 function localizeSignature(text: string): string {
   const arrow = text.lastIndexOf("->");
-  if (arrow === -1) return zhTypes(text);
-  return `${zhTypes(text.slice(0, arrow))}${text.slice(arrow)}`.replace(/->\s*([\p{L}\p{N}_-]+)/u, (whole, type: string) => {
-    const localized = typeFromZh(type);
-    return localized ? `-> ${localized}` : whole;
-  });
+  const head = (arrow === -1 ? text : text.slice(0, arrow)).trimEnd();
+  const open = head.indexOf("(");
+  const close = head.lastIndexOf(")");
+  if (open === -1 || close < open) {
+    const ret = arrow === -1 ? "" : ` -> ${zhTypes(text.slice(arrow + 2).trim())}`;
+    return `${head}${ret}`;
+  }
+  const params = splitTopLevel(head.slice(open + 1, close))
+    .map((param) => {
+      const colon = param.indexOf(":");
+      if (colon === -1) return param.trim();
+      return `${param.slice(0, colon).trim()}: ${zhTypes(param.slice(colon + 1).trim())}`;
+    })
+    .filter((param) => param !== "");
+  const ret = arrow === -1 ? "" : ` -> ${zhTypes(text.slice(arrow + 2).trim())}`;
+  const tail = head.slice(close + 1);
+  return `${head.slice(0, open).trim()}(${params.join(", ")})${tail}${ret}`;
+}
+
+/** Split a parameter list on commas that are not nested inside brackets. */
+function splitTopLevel(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]!;
+    if (char === "(" || char === "[" || char === "{") depth += 1;
+    else if (char === ")" || char === "]" || char === "}") depth -= 1;
+    else if (char === "," && depth === 0) {
+      parts.push(text.slice(start, index));
+      start = index + 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts;
 }
 
 /**
@@ -192,11 +257,12 @@ function localizeTail(body: string): string {
   return mapOutsideStrings(body, (chunk) => replaceLiterals(replaceWords(chunk, ZH_CALLS, true)));
 }
 
-/** Replace Chinese type names in a fragment. */
+/** Replace Chinese type names in a fragment, never inside identifiers. */
 function zhTypes(text: string): string {
   let out = text;
   for (const [zh, type] of ZH_TO_TYPE) {
-    out = out.split(zh).join(type);
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}_])${escapePattern(zh)}(?![\\p{L}\\p{N}_])`, "gu");
+    out = out.replace(pattern, type);
   }
   return out;
 }

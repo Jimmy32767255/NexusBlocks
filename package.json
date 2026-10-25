@@ -14,6 +14,8 @@
     "preview": "pnpm --filter @nexus/editor preview",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"packages/*/test/**/*.test.ts\" \"apps/*/test/**/*.test.ts\"",
+    "bootstrap:check": "node tools/bootstrap-check.mjs",
+    "bootstrap:self": "node tools/bootstrap-check.mjs --self",
     "desktop": "pnpm --filter @nexus/desktop dev",
     "desktop:build": "pnpm --filter @nexus/desktop build",
     "package": "node scripts/package.mjs",

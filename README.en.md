@@ -18,7 +18,7 @@ Working today:
 
 - A complete visual editor: toolbox, drag & drop with snapping, nested blocks, canvas pan/zoom, inspector, toolbox hover cards with block details, a read-only variables panel, console, problems panel, undo/redo, and local autosave.
 - **Debugging**: pause/resume, single-step execution, per-statement breakpoints, and trace mode with live variable values. Debug state lives in the editor and is never written to `.nblk` files.
-- 56 built-in blocks across control/IO/comments/logic/math/text/variables, plus waiting, breaking out of loops, error handling (throw/try/catch), lists and dictionaries, function definitions/parameters, and local file I/O. Every function definition also yields a dynamic call block.
+- 76 built-in blocks across control/IO/comments/logic/math/text/variables, plus waiting, breaking out of loops, error handling (throw/try/catch), lists and dictionaries, function definitions/parameters, and local file I/O. Text works on Unicode code points: length, character access, substrings, search, splitting and code point conversion. Functions get local variables and recursion, plus for-each loops, and/or, JSON parsing and command line arguments. Every function definition also yields a dynamic call block.
 - Variables are declared at run time with the create/delete blocks; there is no predefined variable list, so `.nblk` files need no declarations either.
 - An interpreter with a step limit, cancellation, event stream (logs, output, status, errors), and a global variable table.
 - English and Chinese UI, runtime messages, and program output in the project locale.
