@@ -129,8 +129,6 @@ export interface RunOptions {
   signal?: AbortSignal;
   /** Block set to execute; defaults to the core blocks. */
   registry?: BlockRegistry;
-  /** Hard step budget, protects the UI from accidental infinite loops. */
-  stepLimit?: number;
   /** Replace the default local host (tests, desktop shell). */
   host?: HostBridge;
   /** Skip import resolution (the caller already merged imported functions). */

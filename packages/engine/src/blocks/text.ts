@@ -11,7 +11,6 @@ const JOIN_COUNT: FieldDef = {
   label: "block.text.join.field.count",
   default: 2,
   min: 2,
-  max: 8,
 };
 
 function joinPorts(node: BlockNode): PortDef[] {

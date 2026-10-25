@@ -28,7 +28,6 @@ export const FUNCTION_NAME_CALL_PREFIX = "func.call:name:" as const;
 export const FUNCTION_PARAM_TYPE = "func.param" as const;
 /** Statement that leaves the current function with a value. */
 export const FUNCTION_RETURN_TYPE = "func.return" as const;
-export const MAX_PARAMS = 8;
 
 export interface FunctionParam {
   name: string;
@@ -83,10 +82,6 @@ export function parseParams(text: string): { params: FunctionParam[]; errors: st
       type = candidate as ValueType;
     }
     params.push({ name, type });
-    if (params.length > MAX_PARAMS) {
-      errors.push(`Too many parameters (maximum ${MAX_PARAMS})`);
-      break;
-    }
   }
   return errors.length > 0 ? { params: [], errors } : { params, errors };
 }

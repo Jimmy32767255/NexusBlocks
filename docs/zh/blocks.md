@@ -106,7 +106,7 @@ interface ExecutionContext {
 }
 ```
 
-约定：积木**不要**直接碰 `document`、DOM、文件系统或网络；所有副作用都通过 `ctx.host.invoke({ capability, args, blockId })`。这样宿主可以做权限控制，测试也可以注入假宿主。
+约定：积木**不要**直接碰 `document`、DOM、文件系统或网络；所有副作用都通过 `ctx.host.invoke({ capability, args, blockId })`。这样同一份程序可以跑在不同宿主上，测试也可以注入假宿主。
 
 ## 等待
 
@@ -133,7 +133,7 @@ interface ExecutionContext {
 1. 从「函数」类别拖出 `func.define_value`（取值函数，在属性面板再选 `returnType`）或 `func.define_action`（操作函数，不返回值），填 `name`、`params`（如 `x: number, label: text`）。
 2. 函数体直接嵌在它的 `body` 栈里；用 `func.param` 读取参数。取值函数里用 `func.return` 返回值（不写则返回返回类型的默认值）；操作函数里不允许 `func.return`，校验报 `function.returnInAction`。
 3. 定义块以**积木 id** 标识函数；调用块类型是 `func.call:<id>`，由 `createProjectRegistry(project)` 根据当前定义动态生成，因此重命名函数后调用块标签会自动更新。
-4. 调用块的参数端口可以连接任意取值积木，包括变量（`var.get`）；运行时按参数声明的类型强制转换，所以把变量传入 `x: number` 时取的是变量当时的值。参数只在该函数体内可见（无闭包），嵌套调用上限 64 层，超出报 `runtime.error.callDepth`。
+4. 调用块的参数端口可以连接任意取值积木，包括变量（`var.get`）；运行时按参数声明的类型强制转换，所以把变量传入 `x: number` 时取的是变量当时的值。参数只在该函数体内可见（无闭包）。
 5. 删除函数定义时，编辑器会同时移除所有调用块，避免留下悬空引用。
 
 `runProject` 默认用 `createProjectRegistry(project)` 构建注册表；`defaultRegistry` 只含核心积木（不含调用块）。
@@ -174,7 +174,7 @@ registry.grouped();         // 按类别分组，供工具箱
 ## 循环语义
 
 - `control.repeat`：先把 `times` 求值为非负整数，再重复执行 `body`。
-- `control.forever`：每轮先 `tick` 再执行 `body`；`BreakSignal` 退出循环；仍受 `stepLimit` 限制，不会把运行器卡死。
+- `control.forever`：每轮先 `tick` 再执行 `body`；`BreakSignal` 退出循环；没有步数上限，死循环会一直跑，直到用户按「停止」。
 - `control.while`：每轮开始前重新求值 `condition`，为假就结束；条件里的变量或函数调用会随轮次变化。
 - `control.repeatWith`：先固定 `times`，然后第 0..N-1 轮把轮次写入 `variable`（0 起）；循环结束后变量保留最后一轮的值；`break` 时立即停止并保留当前值。
 
@@ -219,7 +219,7 @@ registry.grouped();         // 按类别分组，供工具箱
 文件积木不直接碰磁盘，而是调用宿主能力 `fs.read` / `fs.write` / `fs.exists` / `fs.delete` / `fs.list`：
 
 - **浏览器/编辑器**：宿主把文件存在 `localStorage` 的 `nexus-blocks:workspace-files` 里（注入 `storage` 才启用这组能力），刷新页面后文件仍在；路径是扁平名字，不支持目录。
-- **路径规则**：统一用 `/`，禁止绝对路径、空段、`.`、`..` 和控制字符（`normalizePath`），违规报 `runtime.error.filePath`；单个文件上限 100 万字符。
+- **路径规则**：浏览器工作区是扁平键空间，路径统一用 `/`，不允许空段、`.`、`..` 和控制字符（`normalizePath`），违规报 `runtime.error.filePath`；桌面与 CLI 使用真实文件系统，没有这些限制。
 - **桌面壳**：Tauri 宿主实现同名能力，直接读写本机文件系统，`fs.*` 不做根目录限制；语言层不用改。
 
 读取不存在的文件报 `runtime.error.fileNotFound`，删除同样。

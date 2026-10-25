@@ -25,7 +25,6 @@ const IF_ELSEIFS: FieldDef = {
   label: "block.control.if.field.elseIfs",
   default: 0,
   min: 0,
-  max: 4,
 };
 
 const CONTROL = CATEGORY_COLORS.control;

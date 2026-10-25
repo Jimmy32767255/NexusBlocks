@@ -21,7 +21,6 @@ export interface InterpreterOptions {
   host: HostBridge;
   emit: (event: RuntimeEvent) => void;
   signal: AbortSignal;
-  stepLimit?: number;
   yieldEvery?: number;
   /** Localised text for caught runtime failures; defaults to the message key. */
   describeFailure?: (failure: RuntimeFailure) => string;
@@ -29,9 +28,7 @@ export interface InterpreterOptions {
   debug?: DebugHooks;
 }
 
-export const DEFAULT_STEP_LIMIT = 100_000;
 export const DEFAULT_YIELD_EVERY = 256;
-export const DEFAULT_CALL_DEPTH = 64;
 
 /**
  * Tree-walking interpreter. It owns no globals: variables live per run, and
@@ -48,7 +45,6 @@ export class Interpreter implements ExecutionContext {
   private readonly registry: BlockRegistry;
   private readonly emit: (event: RuntimeEvent) => void;
   private readonly debug: DebugHooks | undefined;
-  private readonly stepLimit: number;
   private readonly yieldEvery: number;
   private readonly variables = new Map<string, Value>();
   private readonly functions = new Map<string, FunctionDecl>();
@@ -65,7 +61,6 @@ export class Interpreter implements ExecutionContext {
     this.describeFailureText = options.describeFailure ?? ((failure) => failure.messageKey);
     this.debug = options.debug;
     this.signal = options.signal;
-    this.stepLimit = options.stepLimit ?? DEFAULT_STEP_LIMIT;
     this.yieldEvery = Math.max(1, options.yieldEvery ?? DEFAULT_YIELD_EVERY);
 
     for (const decl of collectFunctions(project.scripts)) {
@@ -197,9 +192,6 @@ export class Interpreter implements ExecutionContext {
   async callFunction(id: string, args: Value[]): Promise<Value> {
     const decl = this.functions.get(id);
     if (!decl) this.fail("runtime.error.unknownFunction", { name: id });
-    if (this.frames.length >= DEFAULT_CALL_DEPTH) {
-      this.fail("runtime.error.callDepth", { limit: DEFAULT_CALL_DEPTH });
-    }
     const frame = new Map<string, Value>();
     decl.params.forEach((param, index) => {
       frame.set(param.name, this.coerce(args[index] ?? defaultValue(param.type), param.type, decl.node.id));
@@ -291,9 +283,6 @@ export class Interpreter implements ExecutionContext {
 
   async tick(): Promise<void> {
     this.steps += 1;
-    if (this.steps > this.stepLimit) {
-      this.fail("runtime.error.stepLimit", { limit: this.stepLimit });
-    }
     if (this.signal.aborted) throw new StopSignal();
     if (this.steps % this.yieldEvery === 0) {
       await new Promise((resolve) => setTimeout(resolve, 0));

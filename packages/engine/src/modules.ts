@@ -39,7 +39,6 @@ interface Pending {
   depth: number;
 }
 
-const DEFAULT_MAX_DEPTH = 8;
 
 /**
  * Read every top-level import of a project (recursively), then append the
@@ -53,7 +52,6 @@ export async function resolveImports(
   options: ResolveOptions,
 ): Promise<ResolvedImports> {
   const host = options.host;
-  const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
   const merged: Project = JSON.parse(JSON.stringify(project)) as Project;
   const errors: ImportError[] = [];
   const files: string[] = [];
@@ -69,14 +67,6 @@ export async function resolveImports(
       if (!spec) continue;
       if (!spec.path) {
         errors.push({ messageKey: "runtime.error.importNoFile", params: {}, blockId: spec.blockId });
-        continue;
-      }
-      if (current.depth >= maxDepth) {
-        errors.push({
-          messageKey: "runtime.error.importDepth",
-          params: { limit: maxDepth, file: spec.path },
-          blockId: spec.blockId,
-        });
         continue;
       }
       if (visitedFiles.has(spec.path)) continue;
