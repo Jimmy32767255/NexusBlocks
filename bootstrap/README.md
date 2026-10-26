@@ -61,12 +61,21 @@ node packages/cli/src/bin.ts bootstrap/nblk1.nblk bootstrap/nblk1.ir.json bootst
 - 值与类型：直接使用语言自带的列表/字典，`类型()` 区分六种值类型。
 - 函数：按 `func.call:<id>` 查函数表，实参按 `参数表` 取端口。
 
+## 定位
+
+自举实现是**语义见证与参考实现**：它证明这门语言的运行时与解析语义可以被它自己表达，
+并由 `bootstrap-check --self` 的七项组合持续和原生引擎对齐。默认实现仍是 TypeScript 引擎
+（CLI 与编辑器都走它），因为自举版本慢两个数量级，切换没有用户收益。
+
 ## 已知限制
 
 - 不执行 `导入`（IR 里的 import 块被忽略）；导入由原生前端在导出 IR 前解析。
 - 不支持 `执行命令`（`os.exec_command`），按错误处理。
-- 性能：单层解释约 1M 步/秒；固定点（nblk1 解释自己、再解释 demo）经 CLI 约数秒。
-- 三层嵌套 `nblk1(nblk1(nblk1(demo)))` 也能跑出正确结果，但需要 1.33 亿步、约 2 分 20 秒，
+- 性能：单层解释约 2.8M 步/秒；固定点（nblk1 解释自己、再解释 demo）经 CLI 约数秒。
+  引擎每 1024 步才让出一次事件循环（`setImmediate`/`MessageChannel`，不是被钳制到 1ms 的
+  `setTimeout`），并按节点缓存块定义、按静态块类型缓存端口元数据，函数体的标签索引也只建一次
+  （`返回` 用非 `Error` 的信号，避免每次返回都抓栈）；nblk1 则把 `端口`/字段读取内联、按热度重排分派。
+- 三层嵌套 `nblk1(nblk1(nblk1(demo)))` 也能跑出正确结果，约 2.53 亿步、2 分 4 秒，
   只作压力测试，不进 CI。
 
 ## nblk2 —— 源码前端（自举的第二块拼图）
@@ -101,7 +110,7 @@ nblk1 解释自己、nblk1 解释 nblk2（source-under-IR）、以及 nblk2 编�
 - `导入` 相对主文件目录解析，暂不支持子目录内的相对路径。
 - 文本里的 `跳过` 与原生一致，是空语句（`control.pass`），不是 `continue`。
 - `nblk2` 的源码级自解释：nblk2（原生）编译 nblk2.nblk 约 1 分钟完成解析；让 **nblk1** 去解释
-  nblk2 再编译 nblk2.nblk 仍超过 5 分钟（纯性能问题，非语义问题）。`nblk1` 解释 nblk2 编译
+  nblk2 再编译 nblk2.nblk 仍需数分钟（纯性能问题，非语义问题）。`nblk1` 解释 nblk2 编译
   `bootstrap/tests/data.nblk` 已与原生一致（`--self` 中的 source-under-IR 项）。
 - `tools/ir-dump.mjs` 默认用真实文件系统解析 `导入`，导出自包含的项目 IR；`--no-imports` 只导出单个文件。
 - 参数传递：`nblk1` 提供 `执行项目带参数(项目, 参数列表)`，把参数显式传给被解释程序；

@@ -28,9 +28,17 @@
   返回 取值(nblk1_节点类型_节点, "type")
 
 定义取值 端口(nblk1_端口_节点, nblk1_端口_名字, nblk1_端口_环境) -> 任意:
-  如果 有(nblk1_端口_节点, "inputs") 并且 有(取值(nblk1_端口_节点, "inputs"), nblk1_端口_名字):
-    返回 求值(取值(取值(nblk1_端口_节点, "inputs"), nblk1_端口_名字), nblk1_端口_环境)
-  返回 字段(nblk1_端口_节点, nblk1_端口_名字)
+  创建局部变量 nblk1_端口_表 为 空
+  如果 有键(nblk1_端口_节点, "inputs"):
+    设置局部变量 nblk1_端口_表 为 取值(nblk1_端口_节点, "inputs")
+  如果 类型(nblk1_端口_表) == "字典" 并且 有键(nblk1_端口_表, nblk1_端口_名字):
+    返回 求值(取值(nblk1_端口_表, nblk1_端口_名字), nblk1_端口_环境)
+  创建局部变量 nblk1_端口_字段表 为 空
+  如果 有键(nblk1_端口_节点, "fields"):
+    设置局部变量 nblk1_端口_字段表 为 取值(nblk1_端口_节点, "fields")
+  如果 类型(nblk1_端口_字段表) == "字典" 并且 有键(nblk1_端口_字段表, nblk1_端口_名字):
+    返回 取值(nblk1_端口_字段表, nblk1_端口_名字)
+  返回 空
 
 定义取值 真值(nblk1_真值_值) -> 布尔值:
   如果 nblk1_真值_值 == 空:
@@ -142,12 +150,24 @@
 定义取值 求值(nblk1_求值_节点, nblk1_求值_环境) -> 任意:
   如果 类型(nblk1_求值_节点) != "字典":
     返回 nblk1_求值_节点
-  创建局部变量 nblk1_求值_种 为 节点类型(nblk1_求值_节点)
+  创建局部变量 nblk1_求值_种 为 取值(nblk1_求值_节点, "type")
   如果 nblk1_求值_种 == "":
     返回 nblk1_求值_节点
-
+  如果 nblk1_求值_种 == "var.get":
+    返回 读变量(取值(取值(nblk1_求值_节点, "fields"), "variable"), nblk1_求值_环境)
   如果 nblk1_求值_种 == "math.number":
-    返回 字段(nblk1_求值_节点, "value")
+    返回 取值(取值(nblk1_求值_节点, "fields"), "value")
+  如果 nblk1_求值_种 == "func.param":
+    返回 读变量(取值(取值(nblk1_求值_节点, "fields"), "name"), nblk1_求值_环境)
+  如果 nblk1_求值_种 == "math.arithmetic":
+    创建局部变量 nblk1_求值_数 为 取值(取值(nblk1_求值_节点, "fields"), "count")
+    创建局部变量 nblk1_求值_甲 为 端口(nblk1_求值_节点, "a", nblk1_求值_环境)
+    如果 nblk1_求值_数 == 1:
+      返回 0 - 转数字(nblk1_求值_甲)
+    返回 算(取值(取值(nblk1_求值_节点, "fields"), "op"), 转数字(nblk1_求值_甲), 转数字(端口(nblk1_求值_节点, "b", nblk1_求值_环境)))
+  如果 nblk1_求值_种 == "logic.compare":
+    返回 比较(取值(取值(nblk1_求值_节点, "fields"), "op"), 端口(nblk1_求值_节点, "a", nblk1_求值_环境), 端口(nblk1_求值_节点, "b", nblk1_求值_环境))
+
   如果 nblk1_求值_种 == "text.literal":
     返回 字段(nblk1_求值_节点, "value")
   如果 nblk1_求值_种 == "logic.boolean":
@@ -160,14 +180,17 @@
     返回 解析JSON(字段(nblk1_求值_节点, "items"))
   如果 nblk1_求值_种 == "dict.literal":
     返回 解析JSON(字段(nblk1_求值_节点, "items"))
-  如果 nblk1_求值_种 == "var.get":
-    返回 读变量(字段(nblk1_求值_节点, "variable"), nblk1_求值_环境)
-  如果 nblk1_求值_种 == "func.param":
-    返回 读变量(字段(nblk1_求值_节点, "name"), nblk1_求值_环境)
   如果 nblk1_求值_种 == "sys.args":
     返回 nblk1_g_程序参数
   如果 nblk1_求值_种 == "time.get_os_time":
     返回 当前时间()
+
+  如果 文本长度(nblk1_求值_种) > 10 并且 子串(nblk1_求值_种, 0, 10) == "func.call:":
+    如果 子串(nblk1_求值_种, 10, 5) == "name:":
+      创建局部变量 nblk1_求值_名 为 子串(nblk1_求值_种, 15, 文本长度(nblk1_求值_种) - 15)
+      创建局部变量 nblk1_求值_id 为 按名找函数(nblk1_求值_名)
+      返回 调用函数(nblk1_求值_id, 取实参按名(nblk1_求值_节点, 取值(nblk1_g_参数表, nblk1_求值_id), nblk1_求值_环境), nblk1_求值_环境)
+    返回 调用函数(子串(nblk1_求值_种, 10, 文本长度(nblk1_求值_种) - 10), 取实参(nblk1_求值_节点, nblk1_求值_环境), nblk1_求值_环境)
 
   如果 nblk1_求值_种 == "list.length":
     返回 长度(端口(nblk1_求值_节点, "items", nblk1_求值_环境))
@@ -234,29 +257,13 @@
     如果 真值(端口(nblk1_求值_节点, "a", nblk1_求值_环境)):
       返回 真
     返回 真值(端口(nblk1_求值_节点, "b", nblk1_求值_环境))
-  如果 nblk1_求值_种 == "logic.compare":
-    返回 比较(字段(nblk1_求值_节点, "op"), 端口(nblk1_求值_节点, "a", nblk1_求值_环境), 端口(nblk1_求值_节点, "b", nblk1_求值_环境))
 
-  如果 nblk1_求值_种 == "math.arithmetic":
-    创建局部变量 nblk1_求值_数 为 字段(nblk1_求值_节点, "count")
-    创建局部变量 nblk1_求值_甲 为 端口(nblk1_求值_节点, "a", nblk1_求值_环境)
-    如果 nblk1_求值_数 == 1:
-      返回 0 - 转数字(nblk1_求值_甲)
-    返回 算(字段(nblk1_求值_节点, "op"), 转数字(nblk1_求值_甲), 转数字(端口(nblk1_求值_节点, "b", nblk1_求值_环境)))
   如果 nblk1_求值_种 == "math.abs":
     创建局部变量 nblk1_求值_值 为 端口(nblk1_求值_节点, "value", nblk1_求值_环境)
     如果 nblk1_求值_值 < 0:
       返回 0 - nblk1_求值_值
     返回 nblk1_求值_值
 
-  如果 nblk1_求值_种 == "func.call":
-    返回 空
-  如果 子串(nblk1_求值_种, 0, 15) == "func.call:name:":
-    创建局部变量 nblk1_求值_名 为 子串(nblk1_求值_种, 15, 文本长度(nblk1_求值_种) - 15)
-    创建局部变量 nblk1_求值_id 为 按名找函数(nblk1_求值_名)
-    返回 调用函数(nblk1_求值_id, 取实参按名(nblk1_求值_节点, 取值(nblk1_g_参数表, nblk1_求值_id), nblk1_求值_环境), nblk1_求值_环境)
-  如果 子串(nblk1_求值_种, 0, 10) == "func.call:":
-    返回 调用函数(子串(nblk1_求值_种, 10, 文本长度(nblk1_求值_种) - 10), 取实参(nblk1_求值_节点, nblk1_求值_环境), nblk1_求值_环境)
 
   如果 nblk1_求值_种 == "file.read":
     返回 读取文件(端口(nblk1_求值_节点, "path", nblk1_求值_环境))
@@ -365,9 +372,10 @@
 
 定义取值 执行语句(nblk1_执行语句_节点, nblk1_执行语句_环境) -> 任意:
   设置 nblk1_g_步数 为 nblk1_g_步数 + 1
-  如果 nblk1_g_步数 > nblk1_g_步数上限:
+  如果 nblk1_g_步数 % 2048 == 0 并且 nblk1_g_步数 > nblk1_g_步数上限:
     抛出 "nblk1: 执行步数超过上限"
-  创建局部变量 nblk1_执行语句_种 为 节点类型(nblk1_执行语句_节点)
+  创建局部变量 nblk1_执行语句_种 为 取值(nblk1_执行语句_节点, "type")
+
 
   如果 nblk1_执行语句_种 == "control.pass" 或者 nblk1_执行语句_种 == "comment.note":
     返回 空
@@ -375,16 +383,16 @@
     打印 转文本(端口(nblk1_执行语句_节点, "text", nblk1_执行语句_环境))
     返回 空
   如果 nblk1_执行语句_种 == "var.create":
-    建全局(字段(nblk1_执行语句_节点, "name"), 端口(nblk1_执行语句_节点, "value", nblk1_执行语句_环境), nblk1_执行语句_环境)
+    建全局(取值(取值(nblk1_执行语句_节点, "fields"), "name"), 端口(nblk1_执行语句_节点, "value", nblk1_执行语句_环境), nblk1_执行语句_环境)
     返回 空
   如果 nblk1_执行语句_种 == "var.createLocal":
-    建局部(字段(nblk1_执行语句_节点, "name"), 端口(nblk1_执行语句_节点, "value", nblk1_执行语句_环境), nblk1_执行语句_环境)
+    建局部(取值(取值(nblk1_执行语句_节点, "fields"), "name"), 端口(nblk1_执行语句_节点, "value", nblk1_执行语句_环境), nblk1_执行语句_环境)
     返回 空
   如果 nblk1_执行语句_种 == "var.set":
-    写变量(字段(nblk1_执行语句_节点, "variable"), 端口(nblk1_执行语句_节点, "value", nblk1_执行语句_环境), nblk1_执行语句_环境)
+    写变量(取值(取值(nblk1_执行语句_节点, "fields"), "variable"), 端口(nblk1_执行语句_节点, "value", nblk1_执行语句_环境), nblk1_执行语句_环境)
     返回 空
   如果 nblk1_执行语句_种 == "var.setLocal":
-    写变量(字段(nblk1_执行语句_节点, "variable"), 端口(nblk1_执行语句_节点, "value", nblk1_执行语句_环境), nblk1_执行语句_环境)
+    写变量(取值(取值(nblk1_执行语句_节点, "fields"), "variable"), 端口(nblk1_执行语句_节点, "value", nblk1_执行语句_环境), nblk1_执行语句_环境)
     返回 空
   如果 nblk1_执行语句_种 == "var.delete":
     返回 空

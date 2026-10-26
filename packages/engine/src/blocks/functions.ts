@@ -13,13 +13,15 @@ import { CATEGORY_COLORS } from "./control.ts";
 
 const FUNCTIONS = CATEGORY_COLORS.functions;
 
-/** Leave the current function, carrying an optional result. */
-export class ReturnSignal extends Error {
+/**
+ * Leave the current function, carrying an optional result. Deliberately not an
+ * `Error`: `返回` runs in hot loops, and capturing a stack trace per return
+ * dominated the profile.
+ */
+export class ReturnSignal {
   readonly value: Value;
 
   constructor(value: Value) {
-    super("return");
-    this.name = "ReturnSignal";
     this.value = value;
   }
 }
