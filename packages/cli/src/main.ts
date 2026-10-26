@@ -21,6 +21,7 @@ export interface CliOptions {
 
 interface ParsedArgs {
   file: string | null;
+  args: string[];
   check: boolean;
   json: boolean;
   locale: string | null;
@@ -32,6 +33,7 @@ interface ParsedArgs {
 function parseArgs(argv: readonly string[]): ParsedArgs {
   const parsed: ParsedArgs = {
     file: null,
+    args: [],
     check: false,
     json: false,
     locale: null,
@@ -43,7 +45,12 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
     const arg = argv[index]!;
     if (arg === "--") {
       const rest = argv.slice(index + 1);
-      if (rest.length > 0 && parsed.file === null) parsed.file = rest[0]!;
+      if (parsed.file === null && rest.length > 0) {
+        parsed.file = rest[0]!;
+        parsed.args = rest.slice(1);
+      } else {
+        parsed.args = rest;
+      }
       break;
     }
     if (arg === "-h" || arg === "--help") parsed.help = true;
@@ -60,7 +67,7 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
     } else if (arg.startsWith("--lang=")) parsed.locale = arg.slice("--lang=".length);
     else if (arg.startsWith("-") && arg !== "-") parsed.errors.push(`cli.unknownOption\u0000${arg}`);
     else if (parsed.file === null) parsed.file = arg;
-    else parsed.errors.push("cli.multipleFiles");
+    else parsed.args.push(arg);
   }
   return parsed;
 }
@@ -167,6 +174,10 @@ export async function runCli(argv: readonly string[], io: CliIo, options: CliOpt
 
   const result = await runProject(project, {
     host,
+    args: parsed.args,
+    // The CLI has no UI to keep responsive: yielding every few thousand steps
+    // keeps Ctrl+C timely while avoiding a timer round-trip per 256 steps.
+    yieldEvery: 65536,
     signal: controller.signal,
     onEvent(event) {
       if (event.kind === "log") {

@@ -108,6 +108,7 @@ export async function runProject(project: Project, options: RunOptions = {}): Pr
     host,
     emit,
     signal: controller.signal,
+    args: options.args ?? [],
     yieldEvery: options.yieldEvery,
     describeFailure: options.describeFailure,
     ...(options.debug ? { debug: options.debug } : {}),

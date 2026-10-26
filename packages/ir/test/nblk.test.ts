@@ -47,6 +47,26 @@ test("prints and reparses a document idempotently", () => {
   assert.match(first, /打印 "Hello, world!"/);
 });
 
+test("keeps parameter names that collide with Chinese type names", () => {
+  const source = `项目 "Signature"
+语言 zh-CN
+
+定义取值 解析(文本: 文本, 数字: 数字) -> 文本:
+  返回 连接(文本, 转文本(数字))
+
+开始:
+  打印 解析("a", 1)
+`;
+  const document = parseOk(source);
+  const definition = document.project.scripts[0]!;
+  assert.equal(definition.fields?.params, "文本: text, 数字: number");
+  const start = document.project.scripts.find((node) => node.type === "control.start")!;
+  const body = start.inputs!.body as BlockNode[];
+  const call = body[0]!.inputs!.text as BlockNode;
+  assert.deepEqual(Object.keys(call.fields ?? {}), ["文本", "数字"]);
+  assert.equal(printNblk(parseOk(printNblk(document))), printNblk(document));
+});
+
 test("roundtrips runtime variable declarations with all value types", () => {
   const source = `项目 "Vars"
 语言 zh-CN
@@ -142,6 +162,112 @@ test("parses functions, calls and returns", () => {
   assert.equal(((definition.inputs?.body as BlockNode[]) ?? [])[0]!.type, "func.return");
   const greet = document.project.scripts[2]!;
   assert.equal(greet.type, "func.define_action");
+});
+
+test("keeps parameter references inside call arguments", () => {
+  const source = `项目 "Recursion"
+语言 zh-CN
+
+定义取值 阶乘(n: 数字) -> 数字:
+  如果 n <= 1:
+    返回 1
+  返回 n * 阶乘(n - 1)
+
+开始:
+  打印 阶乘(6)
+`;
+  const document = parseOk(source);
+  const definition = document.project.scripts[0]!;
+  const ret = (definition.inputs!.body as BlockNode[])[1]!;
+  assert.equal(ret.type, "func.return");
+  const product = ret.inputs!.value as BlockNode;
+  const recursive = product.inputs!.b as BlockNode;
+  assert.match(recursive.type, /^func\.call:/);
+  const argument = recursive.inputs?.n as BlockNode;
+  assert.equal(argument.type, "math.arithmetic");
+  const reference = argument.inputs!.a as BlockNode;
+  assert.equal(reference.type, "func.param");
+  assert.equal(reference.fields?.name, "n");
+
+  const printed = printNblk(document);
+  assert.match(printed, /返回 n \* 阶乘\(n - 1\)/);
+  const reparsed = parseOk(printed);
+  const againBody = reparsed.project.scripts[0]!.inputs!.body as BlockNode[];
+  const againCall = (againBody[1]!.inputs!.value as BlockNode).inputs!.b as BlockNode;
+  const againArgument = againCall.inputs!.n as BlockNode;
+  assert.equal(againArgument.type, "math.arithmetic");
+  const againReference = againArgument.inputs!.a as BlockNode;
+  assert.equal(againReference.type, "func.param");
+  assert.equal(againReference.fields?.name, "n");
+  assert.equal(printNblk(reparsed), printed);
+});
+
+test("parses local variables, for each and data helpers", () => {
+  const source = String.raw`项目 "More"
+语言 zh-CN
+
+定义取值 总和(xs: 列表) -> 数字:
+  创建局部变量 total 为 0
+  对每项 x 在 xs:
+    设置局部变量 total 为 total + x
+  返回 total
+
+开始:
+  创建变量 data 为 解析JSON("{\"a\": [1, 2]}")
+  打印 data["a"][1]
+  移除(data["a"], 0)
+  打印 参数()
+`;
+  const document = parseOk(source);
+  const definition = document.project.scripts.find((script) => script.type === "func.define_value")!;
+  const defBody = definition.inputs!.body as BlockNode[];
+  assert.equal(defBody[0]!.type, "var.createLocal");
+  assert.equal(defBody[1]!.type, "control.forEach");
+  assert.equal(defBody[2]!.type, "func.return");
+  assert.equal((defBody[1]!.inputs!.body as BlockNode[])[0]!.type, "var.setLocal");
+
+  const startBody = (document.project.scripts.find((script) => script.type === "control.start")!.inputs!
+    .body as BlockNode[]);
+  assert.equal((startBody[0]!.inputs!.value as BlockNode).type, "convert.parseJson");
+  assert.ok(startBody.find((node) => node.type === "list.remove"));
+  assert.equal(startBody[3]!.type, "io.print");
+  assert.equal((startBody[3]!.inputs!.text as BlockNode).type, "sys.args");
+
+  const printed = printNblk(document);
+  assert.match(printed, /创建局部变量 total 为 0/);
+  assert.match(printed, /对每项 x 在 xs:/);
+  assert.match(printed, /移除\(取值\(data, "a"\), 0\)/);
+  assert.equal(printNblk(parseOk(printed)), printed);
+});
+
+test("parses and prints text primitives", () => {
+  const document = parseOk(`项目 "Texts"
+语言 zh-CN
+
+开始:
+  打印 文本长度("abc")
+  打印 取字符("abc", 1)
+  打印 子串("abc", 1, 2)
+  打印 查找("abc", "b")
+  打印 拆分为列表("a,b", ",")
+  打印 字符码("a")
+  打印 码转字符(97)
+`);
+  const types = body(document).map((node) => (node.inputs!.text as BlockNode).type);
+  assert.deepEqual(types, [
+    "text.length",
+    "text.charAt",
+    "text.slice",
+    "text.indexOf",
+    "text.split",
+    "text.codePoint",
+    "text.fromCodePoint",
+  ]);
+  const printed = printNblk(document);
+  for (const call of ["文本长度", "取字符", "子串", "查找", "拆分为列表", "字符码", "码转字符"]) {
+    assert.match(printed, new RegExp(`${call}\\(`));
+  }
+  assert.equal(printNblk(parseOk(printed)), printed);
 });
 
 test("parses try/catch forms", () => {
@@ -332,6 +458,20 @@ describe("Chinese keywords", () => {
     assert.match(printed, /^开始:$/m);
     assert.match(printed, /^  打印 连接\("a", "b"\)$/m);
     assert.match(printed, /^  创建变量 标志 为 真$/m);
+    assert.equal(printNblk(parseOk(printed)), printed);
+  });
+
+  test("prints set-arguments statements", () => {
+    const document = parseOk(`项目 "Args"
+
+开始:
+  设置参数 参数()
+`);
+    const body = document.project.scripts[0]!.inputs?.body as BlockNode[];
+    assert.equal(body[0]!.type, "sys.setArgs");
+    assert.equal((body[0]!.inputs?.args as BlockNode).type, "sys.args");
+    const printed = printNblk(document);
+    assert.match(printed, /^  设置参数 参数\(\)$/m);
     assert.equal(printNblk(parseOk(printed)), printed);
   });
 

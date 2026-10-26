@@ -33,12 +33,14 @@ interface BlockDefinition extends BlockSchema {
 | `control.forever` | 控制 | 无限循环（靠「跳出循环」或「停止」退出） | `body` 栈 |
 | `control.while` | 控制 | 条件为真时重复 | `condition` 布尔值、`body` 栈 |
 | `control.repeatWith` | 控制 | 重复并计数，当前轮次从 0 开始写入变量 | `times` 数字、`body` 栈，属性 `variable` |
+| `control.forEach` | 控制 | 对列表的每一项运行一次循环体，当前项写入变量 | `items` 列表、`body` 栈，属性 `variable` |
 | `control.wait` | 控制 | 等待若干秒（可被「停止」中断） | `seconds` 数字 |
 | `control.label` | 控制 | 标记一个跳转目标 | 属性 `name` |
 | `control.goto` | 控制 | 跳转到同一脚本/函数中的标记 | 属性 `name` |
 | `control.pass` | 控制 | 空语句，什么也不做 | — |
 | `comment.note` | 注释 | 注释语句，运行时不产生任何效果 | 属性 `text` |
 | `sys.exit` | 系统 | 立即结束整个程序 | `code` 数字状态码 |
+| `sys.args` | 系统 | 命令行运行时的程序参数列表 | 无 |
 | `control.throw` | 控制 | 抛出异常 | `value` 任意值 |
 | `control.try` | 控制 | 尝试/捕获容器 | `body`、`catches` 栈 |
 | `control.catch` | 控制 | 捕获任意异常（只能放在 try 的 catches） | `body` 栈 |
@@ -47,7 +49,9 @@ interface BlockDefinition extends BlockSchema {
 | `io.print` | 输出 | 打印到控制台 | `text` 任意值 |
 | `convert.toNumber` | 转换 | 把整段文本转成数值；含非数字内容报错 | `text` 文本 |
 | `convert.toString` | 转换 | 把值转成字符串 | `value` 任意值 |
+| `convert.parseJson` | 转换 | 把 JSON 文本解析成值；语法错误报 `runtime.error.badJson` | `text` 文本 |
 | `logic.boolean` | 逻辑 | 布尔字面量 | 属性 `value` |
+| `logic.and` / `logic.or` | 逻辑 | 并且 / 或者，短路求值 | `a`、`b` 布尔值 |
 | `logic.compare` | 逻辑 | 比较运算（`== != < <= > >=`） | 属性 `op`，`a`、`b` 值 |
 | `math.number` | 数学 | 数字字面量 | 属性 `value` |
 | `math.arithmetic` | 数学 | 四则运算（`+ - * / %`） | 属性 `op`，`a`、`b` 值 |
@@ -55,6 +59,13 @@ interface BlockDefinition extends BlockSchema {
 | `text.join` | 文本 | 连接文本（默认 2 段，可扩到 8 段） | `a`、`b`、`c`… 值 |
 | `text.splitAt` | 文本 | 以分隔符拆分后取下标 n 的段（0 起）；空分隔符报错 | `text`、`separator`、`index` 值 |
 | `text.contains` | 文本 | 判断包含关系 | `text`、`needle` 值 |
+| `text.length` | 文本 | 文本的字符数（按 Unicode 码点计） | `text` 值 |
+| `text.charAt` | 文本 | 取下标处的字符（0 起，按码点计）；越界报错 | `text`、`index` 值 |
+| `text.slice` | 文本 | 从起点取指定长度的子串，超出末尾自动截断；起点越界报错 | `text`、`start`、`length` 值 |
+| `text.indexOf` | 文本 | 子串第一次出现的字符下标，找不到为 -1 | `text`、`needle` 值 |
+| `text.split` | 文本 | 以分隔符拆成列表（保留空段）；空分隔符报错 | `text`、`separator` 值 |
+| `text.codePoint` | 文本 | 第一个字符的 Unicode 码点；空文本报错 | `text` 值 |
+| `text.fromCodePoint` | 文本 | 把 Unicode 码点转成字符；非法码点报错 | `code` 值 |
 | `time.get_os_time` | 系统 | 当前本地时间（`YYYY-MM-DD HH:mm:ss`） | 无 |
 | `os.exec_command` | 系统 | 用系统 shell 执行命令，打印输出；退出码非 0 报错。需要宿主提供 `os.exec` 能力（桌面版支持，浏览器不支持） | `command` 值 |
 | `var.create` | 变量 | 运行时创建变量，类型 `any`/`text`/`number`/`boolean`/`list`/`dict`，初始值按类型校验 | 属性 `name`、`type`，`value` 值 |
@@ -63,7 +74,7 @@ interface BlockDefinition extends BlockSchema {
 | `var.get` | 变量 | 读取变量（变量必须已创建） | 属性 `variable` |
 | `list.literal` | 列表与字典 | JSON 列表字面量 | 属性 `items`，如 `[1, 2, 3]` |
 | `list.length` / `list.get` | 列表与字典 | 长度 / 按 0 起始下标取值 | `items` 列表，`index` 数字 |
-| `list.add` / `list.set` | 列表与字典 | 末尾追加 / 替换某项 | `items`、`index`、`value` |
+| `list.add` / `list.set` / `list.remove` | 列表与字典 | 末尾追加 / 替换某项 / 删除某项 | `items`、`index`、`value` |
 | `dict.literal` | 列表与字典 | JSON 字典字面量 | 属性 `items`，如 `{"name": "Ada"}` |
 | `dict.get` / `dict.has` | 列表与字典 | 按键取值 / 判断键存在 | `dict`、`key` |
 | `dict.keys` / `dict.set` | 列表与字典 | 所有键（列表）/ 按键写入 | `dict`、`key`、`value` |
@@ -116,7 +127,7 @@ interface ExecutionContext {
 
 - 值就是纯 JSON：`Value[]` 与 `{ [key: string]: Value }`，可以跨进程传输、直接序列化。
 - 字面量积木把文本字段按 JSON 解析；格式不符会抛出可翻译错误 `runtime.error.badJson`。
-- `list.add`、`list.set`、`dict.set` 就地修改容器（引用语义）；需要保留旧值应先复制。下标越界会抛 `runtime.error.badIndex`。
+- `list.add`、`list.set`、`list.remove`、`dict.set` 就地修改容器（引用语义）；需要保留旧值应先复制。下标越界会抛 `runtime.error.badIndex`；`list.remove` 删除后，后面的元素前移。
 - 变量可以用「创建变量」声明为 `list` / `dict` 类型，`var.get` 返回的就是同一个容器。
 
 ## 积木形状

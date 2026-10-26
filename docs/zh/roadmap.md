@@ -28,7 +28,8 @@
 
 ## v0.4 — 更多语言能力
 
-- `for each` 遍历列表/字典、`list.remove`、`dict.remove`
+- ✅ `for each` 遍历列表（`对每项 x 在 列表:`）、`list.remove`（`移除(list, i)`)
+- ⬜ `dict.remove`、遍历字典
 - 自定义事件（broadcast / when I receive）
 - 导出为可读文本（IR → 缩进式伪代码），验证「一份语义多种视图」
 
@@ -45,6 +46,18 @@
 
 - 插件清单（manifest）：额外积木、额外能力、额外语言包、图标主题
 - 发布/安装流程（本地目录、后续 registry）
+
+## v0.7 — 自举
+
+- ✅ 文本原语：`文本长度` / `取字符` / `子串` / `查找` / `拆分为列表` / `字符码` / `码转字符`，全部按 Unicode 码点
+- ✅ 解析器：函数调用实参保留参数作用域，带参数的递归调用可写、`printNblk` → `parseNblk` 保真
+- ✅ 函数局部变量（`创建局部变量` / `设置局部变量`），递归各层独立
+- ✅ `并且` / `或者`（短路）、`对每项`、`移除`、`解析JSON`、`参数()`（命令行参数）
+- ✅ nblk1：`bootstrap/nblk1.nblk` 是 IR 解释器，`bootstrap/tests/*.nblk` 与原生引擎逐行一致（`pnpm bootstrap:check`）
+- ✅ nblk2：`bootstrap/nblk2.nblk` 自带词法/表达式/语句/函数/`导入` 前端，把 `.nblk` 源码编译成项目 IR 后交给 nblk1 运行；`bootstrap/tests/*.nblk` 经它运行与原生一致，并能编译 nblk1 再跑 demo（`bootstrap-check --self` 覆盖）
+- ✅ L2：nblk1 解释 nblk1 自身并继续解释 demo，输出与直接解释逐行一致（`pnpm bootstrap:self`）；为此把解释器标识符按 `nblk1_` 前缀分函数命名，避免自举时与程序变量同名覆盖；三层嵌套（1.33 亿步、约 2 分 20 秒）亦输出正确
+- ⬜ 源码级固定点：nblk2 能解析自身（约 1 分钟），但执行内层程序时报 `runtime.error.badType`，需要把多层解释的运行时状态（函数表 / 参数表 / 程序参数）彻底隔离
+- ⬜ 视性能决定是否把默认实现切换为自举版本
 
 ## v1.0 — 稳定
 

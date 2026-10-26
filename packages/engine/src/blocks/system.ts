@@ -24,4 +24,37 @@ export const systemBlocks: BlockDefinition[] = [
       ctx.exit(Math.trunc(code));
     },
   },
+  {
+    type: "sys.args",
+    kind: "expression",
+    category: "system",
+    label: "block.sys.args.label",
+    description: "block.sys.args.description",
+    output: "list",
+    color: SYSTEM,
+    fields: [],
+    ports: [],
+    evaluate(ctx) {
+      return [...ctx.args];
+    },
+  },
+  {
+    type: "sys.setArgs",
+    kind: "statement",
+    category: "system",
+    label: "block.sys.setArgs.label",
+    description: "block.sys.setArgs.description",
+    output: "void",
+    color: SYSTEM,
+    fields: [],
+    ports: [{ name: "args", label: "block.sys.setArgs.port.args", kind: "value", type: "list" }],
+    async execute(ctx, node) {
+      const raw = await ctx.input(node, "args");
+      if (!Array.isArray(raw)) {
+        ctx.fail("runtime.error.badType", { from: typeof raw, to: "list" });
+        return;
+      }
+      ctx.setArgs(raw.map((item) => String(item)));
+    },
+  },
 ];

@@ -14,3 +14,11 @@ apps/desktop/src-tauri/gen/
 .DS_Store
 *.log
 *.local
+
+# scratch runs and generated IR dumps
+.tmp-check/
+bootstrap/**/*.ir.json
+
+# AI
+.trae
+.dsh

@@ -1,0 +1,967 @@
+项目 "nblk2"
+语言 zh-CN
+
+# nblk2：.nblk 文本前端。把源码解析成项目 IR，再交给 nblk1 的运行时执行。
+导入 "nblk1.nblk"
+
+# ---- 小工具 ----
+
+定义取值 nblk2_非(nblk2_非_值) -> 布尔值:
+  如果 nblk2_非_值:
+    返回 假
+  返回 真
+
+定义取值 nblk2_以(nblk2_以_文本, nblk2_以_前缀) -> 布尔值:
+  如果 文本长度(nblk2_以_文本) < 文本长度(nblk2_以_前缀):
+    返回 假
+  返回 子串(nblk2_以_文本, 0, 文本长度(nblk2_以_前缀)) == nblk2_以_前缀
+
+定义取值 nblk2_去尾(nblk2_去尾_文本, nblk2_去尾_尾) -> 文本:
+  如果 文本长度(nblk2_去尾_文本) < 文本长度(nblk2_去尾_尾):
+    返回 nblk2_去尾_文本
+  创建局部变量 nblk2_去尾_起 为 文本长度(nblk2_去尾_文本) - 文本长度(nblk2_去尾_尾)
+  如果 子串(nblk2_去尾_文本, nblk2_去尾_起, 文本长度(nblk2_去尾_尾)) == nblk2_去尾_尾:
+    返回 子串(nblk2_去尾_文本, 0, nblk2_去尾_起)
+  返回 nblk2_去尾_文本
+
+定义取值 nblk2_段(nblk2_段_文本, nblk2_段_前缀) -> 文本:
+  返回 子串(nblk2_段_文本, 文本长度(nblk2_段_前缀), 文本长度(nblk2_段_文本) - 文本长度(nblk2_段_前缀))
+
+定义取值 nblk2_左修剪(nblk2_左修剪_文本) -> 文本:
+  创建局部变量 nblk2_左修剪_i 为 0
+  当 nblk2_左修剪_i < 文本长度(nblk2_左修剪_文本) 并且 取字符(nblk2_左修剪_文本, nblk2_左修剪_i) == " ":
+    设置局部变量 nblk2_左修剪_i 为 nblk2_左修剪_i + 1
+  返回 子串(nblk2_左修剪_文本, nblk2_左修剪_i, 文本长度(nblk2_左修剪_文本) - nblk2_左修剪_i)
+
+定义取值 nblk2_去空(nblk2_去空_文本) -> 文本:
+  返回 nblk2_右修剪(nblk2_左修剪(nblk2_去空_文本))
+
+定义取值 nblk2_右修剪(nblk2_右修剪_文本) -> 文本:
+  创建局部变量 nblk2_右修剪_i 为 文本长度(nblk2_右修剪_文本)
+  当 nblk2_右修剪_i > 0:
+    如果 取字符(nblk2_右修剪_文本, nblk2_右修剪_i - 1) != " ":
+      返回 子串(nblk2_右修剪_文本, 0, nblk2_右修剪_i)
+    设置局部变量 nblk2_右修剪_i 为 nblk2_右修剪_i - 1
+  返回 ""
+
+定义取值 nblk2_缩进(nblk2_缩进_文本) -> 数字:
+  创建局部变量 nblk2_缩进_i 为 0
+  当 nblk2_缩进_i < 文本长度(nblk2_缩进_文本):
+    如果 取字符(nblk2_缩进_文本, nblk2_缩进_i) != " ":
+      返回 nblk2_缩进_i
+    设置局部变量 nblk2_缩进_i 为 nblk2_缩进_i + 1
+  返回 nblk2_缩进_i
+
+定义取值 nblk2_去注释(nblk2_去注释_文本) -> 文本:
+  创建局部变量 nblk2_去注释_引 为 假
+  创建局部变量 nblk2_去注释_i 为 0
+  当 nblk2_去注释_i < 文本长度(nblk2_去注释_文本):
+    创建局部变量 nblk2_去注释_c 为 取字符(nblk2_去注释_文本, nblk2_去注释_i)
+    如果 nblk2_去注释_c == "\\" 并且 nblk2_去注释_引:
+      设置局部变量 nblk2_去注释_i 为 nblk2_去注释_i + 2
+    否则如果 nblk2_去注释_c == "\"":
+      设置局部变量 nblk2_去注释_引 为 nblk2_非(nblk2_去注释_引)
+      设置局部变量 nblk2_去注释_i 为 nblk2_去注释_i + 1
+    否则如果 nblk2_去注释_c == "#" 并且 nblk2_非(nblk2_去注释_引):
+      返回 子串(nblk2_去注释_文本, 0, nblk2_去注释_i)
+    否则:
+      设置局部变量 nblk2_去注释_i 为 nblk2_去注释_i + 1
+  返回 nblk2_去注释_文本
+
+定义取值 nblk2_在列表(nblk2_在列表_表, nblk2_在列表_值) -> 布尔值:
+  重复 使用 nblk2_在列表_i 共 长度(nblk2_在列表_表) 次:
+    如果 取元素(nblk2_在列表_表, nblk2_在列表_i) == nblk2_在列表_值:
+      返回 真
+  返回 假
+
+定义取值 nblk2_末查找(nblk2_末查找_文本, nblk2_末查找_针) -> 数字:
+  创建局部变量 nblk2_末查找_i 为 文本长度(nblk2_末查找_文本) - 文本长度(nblk2_末查找_针)
+  当 nblk2_末查找_i >= 0:
+    如果 子串(nblk2_末查找_文本, nblk2_末查找_i, 文本长度(nblk2_末查找_针)) == nblk2_末查找_针:
+      返回 nblk2_末查找_i
+    设置局部变量 nblk2_末查找_i 为 nblk2_末查找_i - 1
+  返回 -1
+
+定义取值 nblk2_目录(nblk2_目录_路径) -> 文本:
+  创建局部变量 nblk2_目录_i 为 nblk2_末查找(nblk2_目录_路径, "/")
+  如果 nblk2_目录_i < 0:
+    返回 "."
+  返回 子串(nblk2_目录_路径, 0, nblk2_目录_i)
+
+定义取值 nblk2_类型英(nblk2_类型英_名) -> 文本:
+  如果 nblk2_类型英_名 == "文本" 或者 nblk2_类型英_名 == "text":
+    返回 "text"
+  如果 nblk2_类型英_名 == "数字" 或者 nblk2_类型英_名 == "number":
+    返回 "number"
+  如果 nblk2_类型英_名 == "布尔值" 或者 nblk2_类型英_名 == "boolean":
+    返回 "boolean"
+  如果 nblk2_类型英_名 == "列表" 或者 nblk2_类型英_名 == "list":
+    返回 "list"
+  如果 nblk2_类型英_名 == "字典" 或者 nblk2_类型英_名 == "dict":
+    返回 "dict"
+  返回 "any"
+
+# ---- 行与词 ----
+
+定义取值 nblk2_拆行(nblk2_拆行_源) -> 列表:
+  创建局部变量 nblk2_拆行_行们 为 []
+  创建局部变量 nblk2_拆行_段们 为 拆分为列表(nblk2_拆行_源, "\n")
+  重复 使用 nblk2_拆行_i 共 长度(nblk2_拆行_段们) 次:
+    创建局部变量 nblk2_拆行_原文 为 取元素(nblk2_拆行_段们, nblk2_拆行_i)
+    如果 文本长度(nblk2_拆行_原文) > 0 并且 取字符(nblk2_拆行_原文, 文本长度(nblk2_拆行_原文) - 1) == 码转字符(13):
+      设置局部变量 nblk2_拆行_原文 为 子串(nblk2_拆行_原文, 0, 文本长度(nblk2_拆行_原文) - 1)
+    创建局部变量 nblk2_拆行_文 为 nblk2_右修剪(nblk2_去注释(nblk2_拆行_原文))
+    如果 nblk2_拆行_文 != "":
+      创建局部变量 nblk2_拆行_行 为 {}
+      创建局部变量 nblk2_拆行_缩 为 nblk2_缩进(nblk2_拆行_文)
+      设置键(nblk2_拆行_行, "缩", nblk2_拆行_缩)
+      设置键(nblk2_拆行_行, "文", 子串(nblk2_拆行_文, nblk2_拆行_缩, 文本长度(nblk2_拆行_文) - nblk2_拆行_缩))
+      添加(nblk2_拆行_行们, nblk2_拆行_行)
+  返回 nblk2_拆行_行们
+
+
+定义取值 nblk2_扫(nblk2_扫_文本) -> 列表:
+  创建局部变量 nblk2_扫_词们 为 []
+  创建局部变量 nblk2_扫_i 为 0
+  当 nblk2_扫_i < 文本长度(nblk2_扫_文本):
+    创建局部变量 nblk2_扫_c 为 取字符(nblk2_扫_文本, nblk2_扫_i)
+    如果 nblk2_扫_c == " " 或者 nblk2_扫_c == "\t":
+      设置局部变量 nblk2_扫_i 为 nblk2_扫_i + 1
+    否则如果 nblk2_扫_c == "\"":
+      创建局部变量 nblk2_扫_j 为 nblk2_扫_i + 1
+      创建局部变量 nblk2_扫_值 为 ""
+      创建局部变量 nblk2_扫_闭 为 假
+      当 nblk2_扫_j < 文本长度(nblk2_扫_文本) 并且 nblk2_非(nblk2_扫_闭):
+        创建局部变量 nblk2_扫_x 为 取字符(nblk2_扫_文本, nblk2_扫_j)
+        如果 nblk2_扫_x == "\"":
+          设置局部变量 nblk2_扫_闭 为 真
+          设置局部变量 nblk2_扫_j 为 nblk2_扫_j + 1
+        否则如果 nblk2_扫_x == "\\":
+          设置局部变量 nblk2_扫_j 为 nblk2_扫_j + 1
+          创建局部变量 nblk2_扫_e 为 取字符(nblk2_扫_文本, nblk2_扫_j)
+          如果 nblk2_扫_e == "n":
+            设置局部变量 nblk2_扫_值 为 连接(nblk2_扫_值, 码转字符(10))
+          否则如果 nblk2_扫_e == "t":
+            设置局部变量 nblk2_扫_值 为 连接(nblk2_扫_值, 码转字符(9))
+          否则:
+            设置局部变量 nblk2_扫_值 为 连接(nblk2_扫_值, nblk2_扫_e)
+          设置局部变量 nblk2_扫_j 为 nblk2_扫_j + 1
+        否则:
+          设置局部变量 nblk2_扫_值 为 连接(nblk2_扫_值, nblk2_扫_x)
+          设置局部变量 nblk2_扫_j 为 nblk2_扫_j + 1
+      如果 nblk2_非(nblk2_扫_闭):
+        抛出 连接("nblk2: 字符串没有闭合: ", nblk2_扫_文本)
+      创建局部变量 nblk2_扫_串 为 {}
+      设置键(nblk2_扫_串, "类", "文")
+      设置键(nblk2_扫_串, "值", nblk2_扫_值)
+      添加(nblk2_扫_词们, nblk2_扫_串)
+      设置局部变量 nblk2_扫_i 为 nblk2_扫_j
+    否则如果 包含("0123456789", nblk2_扫_c):
+      创建局部变量 nblk2_扫_j 为 nblk2_扫_i
+      当 nblk2_扫_j < 文本长度(nblk2_扫_文本):
+        创建局部变量 nblk2_扫_d 为 取字符(nblk2_扫_文本, nblk2_扫_j)
+        如果 包含("0123456789.", nblk2_扫_d):
+          设置局部变量 nblk2_扫_j 为 nblk2_扫_j + 1
+        否则:
+          跳出循环
+      创建局部变量 nblk2_扫_数 为 {}
+      设置键(nblk2_扫_数, "类", "数")
+      设置键(nblk2_扫_数, "值", 转数字(子串(nblk2_扫_文本, nblk2_扫_i, nblk2_扫_j - nblk2_扫_i)))
+      添加(nblk2_扫_词们, nblk2_扫_数)
+      设置局部变量 nblk2_扫_i 为 nblk2_扫_j
+    否则如果 包含("()[]{},.:+-*/%<>=!", nblk2_扫_c):
+      创建局部变量 nblk2_扫_双 为 子串(nblk2_扫_文本, nblk2_扫_i, 2)
+      创建局部变量 nblk2_扫_符 为 {}
+      如果 文本长度(nblk2_扫_双) == 2 并且 (nblk2_扫_双 == "==" 或者 nblk2_扫_双 == "!=" 或者 nblk2_扫_双 == "<=" 或者 nblk2_扫_双 == ">="):
+        设置键(nblk2_扫_符, "类", "符")
+        设置键(nblk2_扫_符, "值", nblk2_扫_双)
+        设置局部变量 nblk2_扫_i 为 nblk2_扫_i + 2
+      否则:
+        设置键(nblk2_扫_符, "类", "符")
+        设置键(nblk2_扫_符, "值", nblk2_扫_c)
+        设置局部变量 nblk2_扫_i 为 nblk2_扫_i + 1
+      添加(nblk2_扫_词们, nblk2_扫_符)
+    否则:
+      创建局部变量 nblk2_扫_j 为 nblk2_扫_i
+      当 nblk2_扫_j < 文本长度(nblk2_扫_文本):
+        创建局部变量 nblk2_扫_d 为 取字符(nblk2_扫_文本, nblk2_扫_j)
+        如果 包含(" \t()[]{},.:+-*/%<>=!\"#", nblk2_扫_d):
+          跳出循环
+        设置局部变量 nblk2_扫_j 为 nblk2_扫_j + 1
+      创建局部变量 nblk2_扫_名 为 {}
+      设置键(nblk2_扫_名, "类", "名")
+      设置键(nblk2_扫_名, "值", 子串(nblk2_扫_文本, nblk2_扫_i, nblk2_扫_j - nblk2_扫_i))
+      添加(nblk2_扫_词们, nblk2_扫_名)
+      设置局部变量 nblk2_扫_i 为 nblk2_扫_j
+  返回 nblk2_扫_词们
+
+# ---- 节点构造 ----
+
+定义取值 nblk2_新号() -> 文本:
+  设置 nblk2_g_号 为 nblk2_g_号 + 1
+  返回 连接("b_", 转文本(nblk2_g_号))
+
+定义取值 nblk2_节点(nblk2_节点_种) -> 字典:
+  创建局部变量 nblk2_节点_n 为 {}
+  设置键(nblk2_节点_n, "id", nblk2_新号())
+  设置键(nblk2_节点_n, "type", nblk2_节点_种)
+  返回 nblk2_节点_n
+
+定义取值 nblk2_表(nblk2_表_n, nblk2_表_键) -> 字典:
+  如果 有键(nblk2_表_n, nblk2_表_键):
+    返回 取值(nblk2_表_n, nblk2_表_键)
+  创建局部变量 nblk2_表_新 为 {}
+  设置键(nblk2_表_n, nblk2_表_键, nblk2_表_新)
+  返回 nblk2_表_新
+
+定义操作 nblk2_字段设(nblk2_字段设_n, nblk2_字段设_键, nblk2_字段设_值):
+  设置键(nblk2_表(nblk2_字段设_n, "fields"), nblk2_字段设_键, nblk2_字段设_值)
+
+定义操作 nblk2_入口设(nblk2_入口设_n, nblk2_入口设_键, nblk2_入口设_值):
+  设置键(nblk2_表(nblk2_入口设_n, "inputs"), nblk2_入口设_键, nblk2_入口设_值)
+
+定义取值 nblk2_常量(nblk2_常量_n) -> 布尔值:
+  如果 类型(nblk2_常量_n) != "字典":
+    返回 假
+  创建局部变量 nblk2_常量_种 为 取值(nblk2_常量_n, "type")
+  返回 nblk2_常量_种 == "math.number" 或者 nblk2_常量_种 == "text.literal" 或者 nblk2_常量_种 == "logic.boolean" 或者 nblk2_常量_种 == "value.literal"
+
+定义操作 nblk2_端口设(nblk2_端口设_n, nblk2_端口设_键, nblk2_端口设_值):
+  如果 nblk2_端口设_值 != 空:
+    如果 nblk2_常量(nblk2_端口设_值):
+      nblk2_字段设(nblk2_端口设_n, nblk2_端口设_键, 取值(nblk2_表(nblk2_端口设_值, "fields"), "value"))
+    否则:
+      nblk2_入口设(nblk2_端口设_n, nblk2_端口设_键, nblk2_端口设_值)
+
+定义取值 nblk2_数节点(nblk2_数节点_值) -> 字典:
+  创建局部变量 nblk2_数节点_n 为 nblk2_节点("math.number")
+  nblk2_字段设(nblk2_数节点_n, "value", nblk2_数节点_值)
+  返回 nblk2_数节点_n
+
+定义取值 nblk2_文节点(nblk2_文节点_值) -> 字典:
+  创建局部变量 nblk2_文节点_n 为 nblk2_节点("text.literal")
+  nblk2_字段设(nblk2_文节点_n, "value", nblk2_文节点_值)
+  返回 nblk2_文节点_n
+
+定义取值 nblk2_布节点(nblk2_布节点_值) -> 字典:
+  创建局部变量 nblk2_布节点_n 为 nblk2_节点("logic.boolean")
+  nblk2_字段设(nblk2_布节点_n, "value", nblk2_布节点_值)
+  返回 nblk2_布节点_n
+
+定义取值 nblk2_二元(nblk2_二元_种, nblk2_二元_运算, nblk2_二元_左, nblk2_二元_右) -> 字典:
+  创建局部变量 nblk2_二元_n 为 nblk2_节点(nblk2_二元_种)
+  如果 nblk2_二元_运算 != "":
+    nblk2_字段设(nblk2_二元_n, "op", nblk2_二元_运算)
+  nblk2_端口设(nblk2_二元_n, "a", nblk2_二元_左)
+  nblk2_端口设(nblk2_二元_n, "b", nblk2_二元_右)
+  返回 nblk2_二元_n
+
+定义取值 nblk2_转义(nblk2_转义_文) -> 文本:
+  创建局部变量 nblk2_转义_出 为 ""
+  重复 使用 nblk2_转义_i 共 文本长度(nblk2_转义_文) 次:
+    创建局部变量 nblk2_转义_c 为 取字符(nblk2_转义_文, nblk2_转义_i)
+    如果 nblk2_转义_c == 码转字符(34):
+      设置局部变量 nblk2_转义_出 为 连接(nblk2_转义_出, 连接(码转字符(92), 码转字符(34)))
+    否则如果 nblk2_转义_c == 码转字符(92):
+      设置局部变量 nblk2_转义_出 为 连接(nblk2_转义_出, 连接(码转字符(92), 码转字符(92)))
+    否则如果 nblk2_转义_c == 码转字符(10):
+      设置局部变量 nblk2_转义_出 为 连接(nblk2_转义_出, 连接(码转字符(92), 码转字符(110)))
+    否则如果 nblk2_转义_c == 码转字符(9):
+      设置局部变量 nblk2_转义_出 为 连接(nblk2_转义_出, 连接(码转字符(92), 码转字符(116)))
+    否则:
+      设置局部变量 nblk2_转义_出 为 连接(nblk2_转义_出, nblk2_转义_c)
+  返回 nblk2_转义_出
+
+定义取值 nblk2_编码(nblk2_编码_值) -> 文本:
+  创建局部变量 nblk2_编码_类 为 类型(nblk2_编码_值)
+  如果 nblk2_编码_类 == "文本":
+    返回 连接("\"", 连接(nblk2_转义(nblk2_编码_值), "\""))
+  如果 nblk2_编码_类 == "数字":
+    返回 转文本(nblk2_编码_值)
+  如果 nblk2_编码_类 == "布尔值":
+    如果 nblk2_编码_值:
+      返回 "true"
+    返回 "false"
+  如果 nblk2_编码_类 == "列表":
+    创建局部变量 nblk2_编码_出 为 "["
+    重复 使用 nblk2_编码_i 共 长度(nblk2_编码_值) 次:
+      如果 nblk2_编码_i > 0:
+        设置局部变量 nblk2_编码_出 为 连接(nblk2_编码_出, ",")
+      设置局部变量 nblk2_编码_出 为 连接(nblk2_编码_出, nblk2_编码(取元素(nblk2_编码_值, nblk2_编码_i)))
+    返回 连接(nblk2_编码_出, "]")
+  如果 nblk2_编码_类 == "字典":
+    创建局部变量 nblk2_编码_出 为 "{"
+    创建局部变量 nblk2_编码_键们 为 键列表(nblk2_编码_值)
+    重复 使用 nblk2_编码_i 共 长度(nblk2_编码_键们) 次:
+      如果 nblk2_编码_i > 0:
+        设置局部变量 nblk2_编码_出 为 连接(nblk2_编码_出, ",")
+      创建局部变量 nblk2_编码_键 为 取元素(nblk2_编码_键们, nblk2_编码_i)
+      设置局部变量 nblk2_编码_出 为 连接(nblk2_编码_出, 连接("\"", 连接(nblk2_转义(nblk2_编码_键), "\"")))
+      设置局部变量 nblk2_编码_出 为 连接(nblk2_编码_出, ":")
+      设置局部变量 nblk2_编码_出 为 连接(nblk2_编码_出, nblk2_编码(取值(nblk2_编码_值, nblk2_编码_键)))
+    返回 连接(nblk2_编码_出, "}")
+  返回 "null"
+
+# ---- 表达式 ----
+
+定义取值 nblk2_看(nblk2_看_态) -> 任意:
+  如果 nblk2_看_态["序"] < 长度(nblk2_看_态["词"]):
+    返回 取元素(nblk2_看_态["词"], nblk2_看_态["序"])
+  返回 空
+
+定义取值 nblk2_吃(nblk2_吃_态) -> 任意:
+  创建局部变量 nblk2_吃_词 为 nblk2_看(nblk2_吃_态)
+  设置键(nblk2_吃_态, "序", nblk2_吃_态["序"] + 1)
+  返回 nblk2_吃_词
+
+定义操作 nblk2_跳过词(nblk2_跳过词_态):
+  创建局部变量 nblk2_跳过词_丢 为 nblk2_吃(nblk2_跳过词_态)
+
+定义取值 nblk2_是符(nblk2_是符_态, nblk2_是符_符) -> 布尔值:
+  创建局部变量 nblk2_是符_词 为 nblk2_看(nblk2_是符_态)
+  如果 nblk2_是符_词 == 空:
+    返回 假
+  返回 nblk2_是符_词["类"] == "符" 并且 nblk2_是符_词["值"] == nblk2_是符_符
+
+定义取值 nblk2_是名(nblk2_是名_态, nblk2_是名_名) -> 布尔值:
+  创建局部变量 nblk2_是名_词 为 nblk2_看(nblk2_是名_态)
+  如果 nblk2_是名_词 == 空:
+    返回 假
+  返回 nblk2_是名_词["类"] == "名" 并且 nblk2_是名_词["值"] == nblk2_是名_名
+
+定义操作 nblk2_期待(nblk2_期待_态, nblk2_期待_符):
+  如果 nblk2_非(nblk2_是符(nblk2_期待_态, nblk2_期待_符)):
+    抛出 连接("nblk2: 期待 ", nblk2_期待_符)
+  nblk2_跳过词(nblk2_期待_态)
+
+定义取值 nblk2_建调用(nblk2_建调用_名, nblk2_建调用_参们) -> 字典:
+  如果 有键(nblk2_g_内置, nblk2_建调用_名):
+    创建局部变量 nblk2_建调用_定 为 取值(nblk2_g_内置, nblk2_建调用_名)
+    创建局部变量 nblk2_建调用_n 为 nblk2_节点(取元素(nblk2_建调用_定, 0))
+    如果 nblk2_建调用_名 == "连接":
+      nblk2_字段设(nblk2_建调用_n, "count", 长度(nblk2_建调用_参们))
+      nblk2_端口设(nblk2_建调用_n, "a", 取元素(nblk2_建调用_参们, 0))
+      nblk2_端口设(nblk2_建调用_n, "b", 取元素(nblk2_建调用_参们, 1))
+      如果 长度(nblk2_建调用_参们) > 2:
+        nblk2_端口设(nblk2_建调用_n, "c", 取元素(nblk2_建调用_参们, 2))
+    否则:
+      创建局部变量 nblk2_建调用_端 为 取元素(nblk2_建调用_定, 1)
+      重复 使用 nblk2_建调用_i 共 长度(nblk2_建调用_参们) 次:
+        nblk2_端口设(nblk2_建调用_n, 取元素(nblk2_建调用_端, nblk2_建调用_i), 取元素(nblk2_建调用_参们, nblk2_建调用_i))
+    返回 nblk2_建调用_n
+  如果 有键(nblk2_g_函数, nblk2_建调用_名):
+    创建局部变量 nblk2_建调用_声 为 取值(nblk2_g_函数, nblk2_建调用_名)
+    创建局部变量 nblk2_建调用_n 为 nblk2_节点(连接("func.call:", 取值(nblk2_建调用_声, "id")))
+    创建局部变量 nblk2_建调用_参名 为 取值(nblk2_建调用_声, "params")
+    重复 使用 nblk2_建调用_i 共 长度(nblk2_建调用_参们) 次:
+      如果 nblk2_建调用_i < 长度(nblk2_建调用_参名):
+        nblk2_端口设(nblk2_建调用_n, 取元素(nblk2_建调用_参名, nblk2_建调用_i), 取元素(nblk2_建调用_参们, nblk2_建调用_i))
+    返回 nblk2_建调用_n
+  创建局部变量 nblk2_建调用_n 为 nblk2_节点(连接("func.call:name:", nblk2_建调用_名))
+  重复 使用 nblk2_建调用_i 共 长度(nblk2_建调用_参们) 次:
+    nblk2_端口设(nblk2_建调用_n, 连接("arg", 转文本(nblk2_建调用_i)), 取元素(nblk2_建调用_参们, nblk2_建调用_i))
+  返回 nblk2_建调用_n
+
+定义取值 nblk2_解析调(nblk2_解析调_态, nblk2_解析调_名, nblk2_解析调_域) -> 字典:
+  创建局部变量 nblk2_解析调_参 为 []
+  如果 nblk2_非(nblk2_是符(nblk2_解析调_态, ")")):
+    创建局部变量 nblk2_解析调_续 为 真
+    当 nblk2_解析调_续:
+      添加(nblk2_解析调_参, nblk2_解析或(nblk2_解析调_态, nblk2_解析调_域))
+      如果 nblk2_是符(nblk2_解析调_态, ","):
+        nblk2_跳过词(nblk2_解析调_态)
+      否则:
+        设置局部变量 nblk2_解析调_续 为 假
+  nblk2_期待(nblk2_解析调_态, ")")
+  返回 nblk2_建调用(nblk2_解析调_名, nblk2_解析调_参)
+
+定义取值 nblk2_解析原子(nblk2_解析原子_态, nblk2_解析原子_域) -> 任意:
+  创建局部变量 nblk2_解析原子_词 为 nblk2_吃(nblk2_解析原子_态)
+  如果 nblk2_解析原子_词 == 空:
+    抛出 "nblk2: 表达式意外结束"
+  创建局部变量 nblk2_解析原子_类 为 nblk2_解析原子_词["类"]
+  创建局部变量 nblk2_解析原子_值 为 nblk2_解析原子_词["值"]
+  如果 nblk2_解析原子_类 == "数":
+    返回 nblk2_数节点(nblk2_解析原子_值)
+  如果 nblk2_解析原子_类 == "文":
+    返回 nblk2_文节点(nblk2_解析原子_值)
+  如果 nblk2_解析原子_类 == "名":
+    如果 nblk2_解析原子_值 == "真":
+      返回 nblk2_布节点(真)
+    如果 nblk2_解析原子_值 == "假":
+      返回 nblk2_布节点(假)
+    如果 nblk2_解析原子_值 == "空":
+      返回 nblk2_文节点("")
+    如果 nblk2_是符(nblk2_解析原子_态, "("):
+      nblk2_跳过词(nblk2_解析原子_态)
+      返回 nblk2_解析调(nblk2_解析原子_态, nblk2_解析原子_值, nblk2_解析原子_域)
+    如果 nblk2_在列表(nblk2_解析原子_域, nblk2_解析原子_值):
+      创建局部变量 nblk2_解析原子_n 为 nblk2_节点("func.param")
+      nblk2_字段设(nblk2_解析原子_n, "name", nblk2_解析原子_值)
+      返回 nblk2_解析原子_n
+    创建局部变量 nblk2_解析原子_v 为 nblk2_节点("var.get")
+    nblk2_字段设(nblk2_解析原子_v, "variable", nblk2_解析原子_值)
+    返回 nblk2_解析原子_v
+  如果 nblk2_解析原子_值 == "(":
+    创建局部变量 nblk2_解析原子_内 为 nblk2_解析或(nblk2_解析原子_态, nblk2_解析原子_域)
+    nblk2_期待(nblk2_解析原子_态, ")")
+    返回 nblk2_解析原子_内
+  如果 nblk2_解析原子_值 == "[":
+    创建局部变量 nblk2_解析原子_表 为 nblk2_字面值(nblk2_解析原子_态, "[")
+    创建局部变量 nblk2_解析原子_n 为 nblk2_节点("list.literal")
+    nblk2_字段设(nblk2_解析原子_n, "items", nblk2_编码(nblk2_解析原子_表))
+    返回 nblk2_解析原子_n
+  如果 nblk2_解析原子_值 == "{":
+    创建局部变量 nblk2_解析原子_表 为 nblk2_字面值(nblk2_解析原子_态, "{")
+    创建局部变量 nblk2_解析原子_n 为 nblk2_节点("dict.literal")
+    nblk2_字段设(nblk2_解析原子_n, "items", nblk2_编码(nblk2_解析原子_表))
+    返回 nblk2_解析原子_n
+  抛出 连接("nblk2: 无法解析的表达式项 ", 转文本(nblk2_解析原子_值))
+
+定义取值 nblk2_字面值(nblk2_字面值_态, nblk2_字面值_开) -> 任意:
+  创建局部变量 nblk2_字面值_闭 为 "]"
+  如果 nblk2_字面值_开 == "{":
+    设置局部变量 nblk2_字面值_闭 为 "}"
+  如果 nblk2_字面值_开 == "[":
+    创建局部变量 nblk2_字面值_表 为 []
+    如果 nblk2_非(nblk2_是符(nblk2_字面值_态, nblk2_字面值_闭)):
+      创建局部变量 nblk2_字面值_续 为 真
+      当 nblk2_字面值_续:
+        添加(nblk2_字面值_表, nblk2_字面项(nblk2_字面值_态))
+        如果 nblk2_是符(nblk2_字面值_态, ","):
+          nblk2_跳过词(nblk2_字面值_态)
+        否则:
+          设置局部变量 nblk2_字面值_续 为 假
+    nblk2_期待(nblk2_字面值_态, nblk2_字面值_闭)
+    返回 nblk2_字面值_表
+  创建局部变量 nblk2_字面值_表 为 {}
+  如果 nblk2_非(nblk2_是符(nblk2_字面值_态, nblk2_字面值_闭)):
+    创建局部变量 nblk2_字面值_续 为 真
+    当 nblk2_字面值_续:
+      创建局部变量 nblk2_字面值_键 为 nblk2_吃(nblk2_字面值_态)
+      如果 nblk2_字面值_键["类"] != "文" 并且 nblk2_字面值_键["类"] != "名":
+        抛出 "nblk2: 字典的键必须是文本"
+      nblk2_期待(nblk2_字面值_态, ":")
+      设置键(nblk2_字面值_表, 转文本(nblk2_字面值_键["值"]), nblk2_字面项(nblk2_字面值_态))
+      如果 nblk2_是符(nblk2_字面值_态, ","):
+        nblk2_跳过词(nblk2_字面值_态)
+      否则:
+        设置局部变量 nblk2_字面值_续 为 假
+  nblk2_期待(nblk2_字面值_态, nblk2_字面值_闭)
+  返回 nblk2_字面值_表
+
+定义取值 nblk2_字面项(nblk2_字面项_态) -> 任意:
+  创建局部变量 nblk2_字面项_词 为 nblk2_吃(nblk2_字面项_态)
+  如果 nblk2_字面项_词 == 空:
+    抛出 "nblk2: 字面量意外结束"
+  如果 nblk2_字面项_词["类"] == "数":
+    返回 nblk2_字面项_词["值"]
+  如果 nblk2_字面项_词["类"] == "文":
+    返回 nblk2_字面项_词["值"]
+  如果 nblk2_字面项_词["类"] == "名":
+    如果 nblk2_字面项_词["值"] == "真":
+      返回 真
+    如果 nblk2_字面项_词["值"] == "假":
+      返回 假
+    如果 nblk2_字面项_词["值"] == "空":
+      返回 空
+  如果 nblk2_字面项_词["值"] == "[":
+    返回 nblk2_字面值(nblk2_字面项_态, "[")
+  如果 nblk2_字面项_词["值"] == "{":
+    返回 nblk2_字面值(nblk2_字面项_态, "{")
+  抛出 "nblk2: 字面量只接受常量"
+
+定义取值 nblk2_解析后缀(nblk2_解析后缀_态, nblk2_解析后缀_域) -> 字典:
+  创建局部变量 nblk2_解析后缀_n 为 nblk2_解析原子(nblk2_解析后缀_态, nblk2_解析后缀_域)
+  当 nblk2_是符(nblk2_解析后缀_态, "["):
+    nblk2_跳过词(nblk2_解析后缀_态)
+    创建局部变量 nblk2_解析后缀_键 为 nblk2_解析或(nblk2_解析后缀_态, nblk2_解析后缀_域)
+    nblk2_期待(nblk2_解析后缀_态, "]")
+    创建局部变量 nblk2_解析后缀_新 为 {}
+    如果 nblk2_常量(nblk2_解析后缀_键) 并且 类型(取值(nblk2_表(nblk2_解析后缀_键, "fields"), "value")) == "文本":
+      设置局部变量 nblk2_解析后缀_新 为 nblk2_节点("dict.get")
+      nblk2_端口设(nblk2_解析后缀_新, "dict", nblk2_解析后缀_n)
+      nblk2_端口设(nblk2_解析后缀_新, "key", nblk2_解析后缀_键)
+    否则:
+      设置局部变量 nblk2_解析后缀_新 为 nblk2_节点("list.get")
+      nblk2_端口设(nblk2_解析后缀_新, "items", nblk2_解析后缀_n)
+      nblk2_端口设(nblk2_解析后缀_新, "index", nblk2_解析后缀_键)
+    设置局部变量 nblk2_解析后缀_n 为 nblk2_解析后缀_新
+  返回 nblk2_解析后缀_n
+
+定义取值 nblk2_解析一元(nblk2_解析一元_态, nblk2_解析一元_域) -> 字典:
+  如果 nblk2_是符(nblk2_解析一元_态, "-"):
+    nblk2_跳过词(nblk2_解析一元_态)
+    创建局部变量 nblk2_解析一元_v 为 nblk2_解析一元(nblk2_解析一元_态, nblk2_解析一元_域)
+    如果 nblk2_常量(nblk2_解析一元_v):
+      返回 nblk2_数节点(0 - 取值(nblk2_表(nblk2_解析一元_v, "fields"), "value"))
+    返回 nblk2_二元("math.arithmetic", "*", nblk2_解析一元_v, nblk2_数节点(-1))
+  返回 nblk2_解析后缀(nblk2_解析一元_态, nblk2_解析一元_域)
+
+定义取值 nblk2_解析乘(nblk2_解析乘_态, nblk2_解析乘_域) -> 字典:
+  创建局部变量 nblk2_解析乘_左 为 nblk2_解析一元(nblk2_解析乘_态, nblk2_解析乘_域)
+  创建局部变量 nblk2_解析乘_续 为 真
+  当 nblk2_解析乘_续:
+    如果 nblk2_是符(nblk2_解析乘_态, "*") 或者 nblk2_是符(nblk2_解析乘_态, "/") 或者 nblk2_是符(nblk2_解析乘_态, "%"):
+      创建局部变量 nblk2_解析乘_运 为 取值(nblk2_吃(nblk2_解析乘_态), "值")
+      设置局部变量 nblk2_解析乘_左 为 nblk2_二元("math.arithmetic", nblk2_解析乘_运, nblk2_解析乘_左, nblk2_解析一元(nblk2_解析乘_态, nblk2_解析乘_域))
+    否则:
+      设置局部变量 nblk2_解析乘_续 为 假
+  返回 nblk2_解析乘_左
+
+定义取值 nblk2_解析加(nblk2_解析加_态, nblk2_解析加_域) -> 字典:
+  创建局部变量 nblk2_解析加_左 为 nblk2_解析乘(nblk2_解析加_态, nblk2_解析加_域)
+  创建局部变量 nblk2_解析加_续 为 真
+  当 nblk2_解析加_续:
+    如果 nblk2_是符(nblk2_解析加_态, "+") 或者 nblk2_是符(nblk2_解析加_态, "-"):
+      创建局部变量 nblk2_解析加_运 为 取值(nblk2_吃(nblk2_解析加_态), "值")
+      设置局部变量 nblk2_解析加_左 为 nblk2_二元("math.arithmetic", nblk2_解析加_运, nblk2_解析加_左, nblk2_解析乘(nblk2_解析加_态, nblk2_解析加_域))
+    否则:
+      设置局部变量 nblk2_解析加_续 为 假
+  返回 nblk2_解析加_左
+
+定义取值 nblk2_解析比较(nblk2_解析比较_态, nblk2_解析比较_域) -> 字典:
+  创建局部变量 nblk2_解析比较_左 为 nblk2_解析加(nblk2_解析比较_态, nblk2_解析比较_域)
+  创建局部变量 nblk2_解析比较_词 为 nblk2_看(nblk2_解析比较_态)
+  如果 nblk2_解析比较_词 == 空:
+    返回 nblk2_解析比较_左
+  如果 nblk2_解析比较_词["类"] != "符":
+    返回 nblk2_解析比较_左
+  创建局部变量 nblk2_解析比较_运 为 nblk2_解析比较_词["值"]
+  如果 nblk2_非(nblk2_解析比较_运 == "==" 或者 nblk2_解析比较_运 == "!=" 或者 nblk2_解析比较_运 == "<" 或者 nblk2_解析比较_运 == "<=" 或者 nblk2_解析比较_运 == ">" 或者 nblk2_解析比较_运 == ">="):
+    返回 nblk2_解析比较_左
+  nblk2_跳过词(nblk2_解析比较_态)
+  返回 nblk2_二元("logic.compare", nblk2_解析比较_运, nblk2_解析比较_左, nblk2_解析加(nblk2_解析比较_态, nblk2_解析比较_域))
+
+定义取值 nblk2_解析与(nblk2_解析与_态, nblk2_解析与_域) -> 字典:
+  创建局部变量 nblk2_解析与_左 为 nblk2_解析比较(nblk2_解析与_态, nblk2_解析与_域)
+  当 nblk2_是名(nblk2_解析与_态, "并且"):
+    nblk2_跳过词(nblk2_解析与_态)
+    设置局部变量 nblk2_解析与_左 为 nblk2_二元("logic.and", "", nblk2_解析与_左, nblk2_解析比较(nblk2_解析与_态, nblk2_解析与_域))
+  返回 nblk2_解析与_左
+
+定义取值 nblk2_解析或(nblk2_解析或_态, nblk2_解析或_域) -> 字典:
+  创建局部变量 nblk2_解析或_左 为 nblk2_解析与(nblk2_解析或_态, nblk2_解析或_域)
+  当 nblk2_是名(nblk2_解析或_态, "或者"):
+    nblk2_跳过词(nblk2_解析或_态)
+    设置局部变量 nblk2_解析或_左 为 nblk2_二元("logic.or", "", nblk2_解析或_左, nblk2_解析与(nblk2_解析或_态, nblk2_解析或_域))
+  返回 nblk2_解析或_左
+
+# ---- 语句 ----
+
+定义取值 nblk2_条件文本(nblk2_条件文本_文, nblk2_条件文本_前) -> 文本:
+  返回 nblk2_去尾(nblk2_段(nblk2_条件文本_文, nblk2_条件文本_前), ":")
+
+定义取值 nblk2_解析块(nblk2_解析块_态, nblk2_解析块_父缩, nblk2_解析块_域) -> 列表:
+  创建局部变量 nblk2_解析块_出 为 []
+  当 nblk2_解析块_态["序"] < 长度(nblk2_解析块_态["行"]):
+    创建局部变量 nblk2_解析块_行 为 取元素(nblk2_解析块_态["行"], nblk2_解析块_态["序"])
+    如果 nblk2_解析块_行["缩"] <= nblk2_解析块_父缩:
+      返回 nblk2_解析块_出
+    如果 nblk2_解析块_行["缩"] != nblk2_解析块_父缩 + 2:
+      抛出 连接("nblk2: 缩进错误（第 ", 连接(转文本(nblk2_解析块_态["序"] + 1), " 行）"))
+    添加(nblk2_解析块_出, nblk2_解析语句(nblk2_解析块_态, nblk2_解析块_行["缩"], nblk2_解析块_域))
+  返回 nblk2_解析块_出
+
+定义取值 nblk2_当前行(nblk2_当前行_态) -> 任意:
+  如果 nblk2_当前行_态["序"] < 长度(nblk2_当前行_态["行"]):
+    返回 取元素(nblk2_当前行_态["行"], nblk2_当前行_态["序"])
+  返回 空
+
+定义取值 nblk2_解析如果(nblk2_解析如果_态, nblk2_解析如果_缩, nblk2_解析如果_文, nblk2_解析如果_域) -> 字典:
+  创建局部变量 nblk2_解析如果_n 为 nblk2_节点("control.if")
+  nblk2_端口设(nblk2_解析如果_n, "condition", nblk2_解析表达式(nblk2_条件文本(nblk2_解析如果_文, "如果 "), nblk2_解析如果_域))
+  nblk2_入口设(nblk2_解析如果_n, "then", nblk2_解析块(nblk2_解析如果_态, nblk2_解析如果_缩, nblk2_解析如果_域))
+  创建局部变量 nblk2_解析如果_数 为 0
+  当 nblk2_非(nblk2_当前行(nblk2_解析如果_态) == 空):
+    创建局部变量 nblk2_解析如果_行 为 nblk2_当前行(nblk2_解析如果_态)
+    如果 nblk2_解析如果_行["缩"] != nblk2_解析如果_缩:
+      跳出循环
+    创建局部变量 nblk2_解析如果_t 为 nblk2_解析如果_行["文"]
+    如果 nblk2_以(nblk2_解析如果_t, "否则如果 "):
+      设置局部变量 nblk2_解析如果_数 为 nblk2_解析如果_数 + 1
+      设置键(nblk2_解析如果_态, "序", nblk2_解析如果_态["序"] + 1)
+      nblk2_端口设(nblk2_解析如果_n, 连接("elseIf", 转文本(nblk2_解析如果_数)), nblk2_解析表达式(nblk2_条件文本(nblk2_解析如果_t, "否则如果 "), nblk2_解析如果_域))
+      nblk2_入口设(nblk2_解析如果_n, 连接("elseIf", 连接(转文本(nblk2_解析如果_数), "Body")), nblk2_解析块(nblk2_解析如果_态, nblk2_解析如果_缩, nblk2_解析如果_域))
+    否则如果 nblk2_解析如果_t == "否则:":
+      设置键(nblk2_解析如果_态, "序", nblk2_解析如果_态["序"] + 1)
+      nblk2_入口设(nblk2_解析如果_n, "else", nblk2_解析块(nblk2_解析如果_态, nblk2_解析如果_缩, nblk2_解析如果_域))
+      跳出循环
+    否则:
+      跳出循环
+  返回 nblk2_解析如果_n
+
+定义取值 nblk2_解析语句(nblk2_解析语句_态, nblk2_解析语句_缩, nblk2_解析语句_域) -> 字典:
+  创建局部变量 nblk2_解析语句_行 为 取元素(nblk2_解析语句_态["行"], nblk2_解析语句_态["序"])
+  设置键(nblk2_解析语句_态, "序", nblk2_解析语句_态["序"] + 1)
+  创建局部变量 nblk2_解析语句_t 为 nblk2_解析语句_行["文"]
+
+  如果 nblk2_以(nblk2_解析语句_t, "如果 "):
+    返回 nblk2_解析如果(nblk2_解析语句_态, nblk2_解析语句_缩, nblk2_解析语句_t, nblk2_解析语句_域)
+
+  如果 nblk2_以(nblk2_解析语句_t, "当 "):
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("control.while")
+    nblk2_端口设(nblk2_解析语句_n, "condition", nblk2_解析表达式(nblk2_条件文本(nblk2_解析语句_t, "当 "), nblk2_解析语句_域))
+    nblk2_入口设(nblk2_解析语句_n, "body", nblk2_解析块(nblk2_解析语句_态, nblk2_解析语句_缩, nblk2_解析语句_域))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_以(nblk2_解析语句_t, "重复 使用 "):
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("control.repeatWith")
+    创建局部变量 nblk2_解析语句_内 为 nblk2_去尾(nblk2_段(nblk2_解析语句_t, "重复 使用 "), ":")
+    创建局部变量 nblk2_解析语句_i 为 查找(nblk2_解析语句_内, " 共 ")
+    nblk2_字段设(nblk2_解析语句_n, "variable", 子串(nblk2_解析语句_内, 0, nblk2_解析语句_i))
+    创建局部变量 nblk2_解析语句_次 为 nblk2_去尾(子串(nblk2_解析语句_内, nblk2_解析语句_i + 3, 文本长度(nblk2_解析语句_内) - nblk2_解析语句_i - 3), " 次")
+    nblk2_端口设(nblk2_解析语句_n, "times", nblk2_解析表达式(nblk2_解析语句_次, nblk2_解析语句_域))
+    nblk2_入口设(nblk2_解析语句_n, "body", nblk2_解析块(nblk2_解析语句_态, nblk2_解析语句_缩, nblk2_解析语句_域))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_以(nblk2_解析语句_t, "重复 "):
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("control.repeat")
+    nblk2_端口设(nblk2_解析语句_n, "times", nblk2_解析表达式(nblk2_去尾(nblk2_条件文本(nblk2_解析语句_t, "重复 "), " 次"), nblk2_解析语句_域))
+    nblk2_入口设(nblk2_解析语句_n, "body", nblk2_解析块(nblk2_解析语句_态, nblk2_解析语句_缩, nblk2_解析语句_域))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_解析语句_t == "无限重复:":
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("control.forever")
+    nblk2_入口设(nblk2_解析语句_n, "body", nblk2_解析块(nblk2_解析语句_态, nblk2_解析语句_缩, nblk2_解析语句_域))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_以(nblk2_解析语句_t, "对每项 "):
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("control.forEach")
+    创建局部变量 nblk2_解析语句_内 为 nblk2_去尾(nblk2_段(nblk2_解析语句_t, "对每项 "), ":")
+    创建局部变量 nblk2_解析语句_i 为 查找(nblk2_解析语句_内, " 在 ")
+    nblk2_字段设(nblk2_解析语句_n, "variable", 子串(nblk2_解析语句_内, 0, nblk2_解析语句_i))
+    nblk2_端口设(nblk2_解析语句_n, "items", nblk2_解析表达式(子串(nblk2_解析语句_内, nblk2_解析语句_i + 3, 文本长度(nblk2_解析语句_内) - nblk2_解析语句_i - 3), nblk2_解析语句_域))
+    nblk2_入口设(nblk2_解析语句_n, "body", nblk2_解析块(nblk2_解析语句_态, nblk2_解析语句_缩, nblk2_解析语句_域))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_解析语句_t == "尝试:":
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("control.try")
+    nblk2_入口设(nblk2_解析语句_n, "body", nblk2_解析块(nblk2_解析语句_态, nblk2_解析语句_缩, nblk2_解析语句_域))
+    创建局部变量 nblk2_解析语句_捕 为 []
+    当 nblk2_非(nblk2_当前行(nblk2_解析语句_态) == 空):
+      创建局部变量 nblk2_解析语句_行 为 nblk2_当前行(nblk2_解析语句_态)
+      如果 nblk2_解析语句_行["缩"] != nblk2_解析语句_缩:
+        跳出循环
+      创建局部变量 nblk2_解析语句_c 为 nblk2_解析语句_行["文"]
+      如果 nblk2_非(nblk2_以(nblk2_解析语句_c, "捕获 ")):
+        跳出循环
+      设置键(nblk2_解析语句_态, "序", nblk2_解析语句_态["序"] + 1)
+      创建局部变量 nblk2_解析语句_声 为 nblk2_去尾(nblk2_段(nblk2_解析语句_c, "捕获 "), ":")
+      创建局部变量 nblk2_解析语句_名 为 ""
+      创建局部变量 nblk2_解析语句_过 为 查找(nblk2_解析语句_声, " 作为 ")
+      如果 nblk2_解析语句_过 >= 0:
+        设置局部变量 nblk2_解析语句_名 为 子串(nblk2_解析语句_声, nblk2_解析语句_过 + 4, 文本长度(nblk2_解析语句_声) - nblk2_解析语句_过 - 4)
+        设置局部变量 nblk2_解析语句_声 为 子串(nblk2_解析语句_声, 0, nblk2_解析语句_过)
+      创建局部变量 nblk2_解析语句_捕项 为 nblk2_节点("control.catchAssign")
+      nblk2_字段设(nblk2_解析语句_捕项, "exception", nblk2_解析语句_声)
+      如果 nblk2_解析语句_名 != "":
+        nblk2_字段设(nblk2_解析语句_捕项, "target", nblk2_解析语句_名)
+      nblk2_入口设(nblk2_解析语句_捕项, "body", nblk2_解析块(nblk2_解析语句_态, nblk2_解析语句_缩, nblk2_解析语句_域))
+      添加(nblk2_解析语句_捕, nblk2_解析语句_捕项)
+    nblk2_入口设(nblk2_解析语句_n, "catches", nblk2_解析语句_捕)
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_解析语句_t == "打印":
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("io.print")
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_以(nblk2_解析语句_t, "打印 "):
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("io.print")
+    nblk2_端口设(nblk2_解析语句_n, "text", nblk2_解析表达式(nblk2_段(nblk2_解析语句_t, "打印 "), nblk2_解析语句_域))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_以(nblk2_解析语句_t, "创建局部变量 ") 或者 nblk2_以(nblk2_解析语句_t, "创建变量 "):
+    创建局部变量 nblk2_解析语句_内 为 nblk2_段(nblk2_解析语句_t, "创建变量 ")
+    创建局部变量 nblk2_解析语句_种 为 "var.create"
+    如果 nblk2_以(nblk2_解析语句_t, "创建局部变量 "):
+      设置局部变量 nblk2_解析语句_内 为 nblk2_段(nblk2_解析语句_t, "创建局部变量 ")
+      设置局部变量 nblk2_解析语句_种 为 "var.createLocal"
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点(nblk2_解析语句_种)
+    创建局部变量 nblk2_解析语句_为 为 查找(nblk2_解析语句_内, " 为 ")
+    创建局部变量 nblk2_解析语句_名部 为 nblk2_解析语句_内
+    如果 nblk2_解析语句_为 >= 0:
+      设置局部变量 nblk2_解析语句_名部 为 子串(nblk2_解析语句_内, 0, nblk2_解析语句_为)
+      nblk2_端口设(nblk2_解析语句_n, "value", nblk2_解析表达式(子串(nblk2_解析语句_内, nblk2_解析语句_为 + 3, 文本长度(nblk2_解析语句_内) - nblk2_解析语句_为 - 3), nblk2_解析语句_域))
+    创建局部变量 nblk2_解析语句_冒 为 查找(nblk2_解析语句_名部, ": ")
+    如果 nblk2_解析语句_冒 >= 0:
+      nblk2_字段设(nblk2_解析语句_n, "type", nblk2_类型英(子串(nblk2_解析语句_名部, nblk2_解析语句_冒 + 2, 文本长度(nblk2_解析语句_名部) - nblk2_解析语句_冒 - 2)))
+      设置局部变量 nblk2_解析语句_名部 为 子串(nblk2_解析语句_名部, 0, nblk2_解析语句_冒)
+    否则:
+      nblk2_字段设(nblk2_解析语句_n, "type", "any")
+    nblk2_字段设(nblk2_解析语句_n, "name", nblk2_右修剪(nblk2_解析语句_名部))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_以(nblk2_解析语句_t, "设置局部变量 ") 或者 nblk2_以(nblk2_解析语句_t, "设置 "):
+    创建局部变量 nblk2_解析语句_种 为 "var.set"
+    创建局部变量 nblk2_解析语句_内 为 nblk2_段(nblk2_解析语句_t, "设置 ")
+    如果 nblk2_以(nblk2_解析语句_t, "设置局部变量 "):
+      设置局部变量 nblk2_解析语句_种 为 "var.setLocal"
+      设置局部变量 nblk2_解析语句_内 为 nblk2_段(nblk2_解析语句_t, "设置局部变量 ")
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点(nblk2_解析语句_种)
+    创建局部变量 nblk2_解析语句_为 为 查找(nblk2_解析语句_内, " 为 ")
+    如果 nblk2_解析语句_为 < 0:
+      抛出 "nblk2: 设置 需要 `为`"
+    nblk2_字段设(nblk2_解析语句_n, "variable", 子串(nblk2_解析语句_内, 0, nblk2_解析语句_为))
+    nblk2_端口设(nblk2_解析语句_n, "value", nblk2_解析表达式(子串(nblk2_解析语句_内, nblk2_解析语句_为 + 3, 文本长度(nblk2_解析语句_内) - nblk2_解析语句_为 - 3), nblk2_解析语句_域))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_解析语句_t == "返回":
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("func.return")
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_以(nblk2_解析语句_t, "返回 "):
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("func.return")
+    nblk2_端口设(nblk2_解析语句_n, "value", nblk2_解析表达式(nblk2_段(nblk2_解析语句_t, "返回 "), nblk2_解析语句_域))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_解析语句_t == "跳出循环":
+    返回 nblk2_节点("control.break")
+
+  如果 nblk2_解析语句_t == "跳过":
+    返回 nblk2_节点("control.pass")
+
+  如果 nblk2_以(nblk2_解析语句_t, "抛出 "):
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("control.throw")
+    nblk2_端口设(nblk2_解析语句_n, "value", nblk2_解析表达式(nblk2_段(nblk2_解析语句_t, "抛出 "), nblk2_解析语句_域))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_解析语句_t == "退出程序":
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("sys.exit")
+    nblk2_字段设(nblk2_解析语句_n, "code", 0)
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_以(nblk2_解析语句_t, "退出程序 "):
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("sys.exit")
+    创建局部变量 nblk2_解析语句_码 为 转数字(nblk2_段(nblk2_解析语句_t, "退出程序 "))
+    nblk2_端口设(nblk2_解析语句_n, "code", nblk2_数节点(nblk2_解析语句_码))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_以(nblk2_解析语句_t, "等待 "):
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("control.wait")
+    nblk2_端口设(nblk2_解析语句_n, "seconds", nblk2_解析表达式(nblk2_去尾(nblk2_段(nblk2_解析语句_t, "等待 "), " 秒"), nblk2_解析语句_域))
+    返回 nblk2_解析语句_n
+
+  如果 nblk2_以(nblk2_解析语句_t, "执行命令 "):
+    创建局部变量 nblk2_解析语句_n 为 nblk2_节点("os.exec_command")
+    nblk2_字段设(nblk2_解析语句_n, "command", nblk2_解析语句_t)
+    返回 nblk2_解析语句_n
+
+  返回 nblk2_解析表达式(nblk2_解析语句_t, nblk2_解析语句_域)
+
+# ---- 表达式入口 ----
+
+定义取值 nblk2_解析表达式(nblk2_解析表达式_文, nblk2_解析表达式_域) -> 字典:
+  创建局部变量 nblk2_解析表达式_态 为 {}
+  设置键(nblk2_解析表达式_态, "词", nblk2_扫(nblk2_解析表达式_文))
+  设置键(nblk2_解析表达式_态, "序", 0)
+  如果 长度(nblk2_解析表达式_态["词"]) == 0:
+    抛出 连接("nblk2: 空表达式: ", nblk2_解析表达式_文)
+  创建局部变量 nblk2_解析表达式_n 为 nblk2_解析或(nblk2_解析表达式_态, nblk2_解析表达式_域)
+  如果 nblk2_解析表达式_态["序"] < 长度(nblk2_解析表达式_态["词"]):
+    抛出 连接("nblk2: 表达式有多余内容: ", nblk2_解析表达式_文)
+  返回 nblk2_解析表达式_n
+
+# ---- 内置函数表 ----
+
+定义操作 nblk2_内置(nblk2_内置_名, nblk2_内置_种, nblk2_内置_端):
+  创建局部变量 nblk2_内置_项 为 []
+  添加(nblk2_内置_项, nblk2_内置_种)
+  添加(nblk2_内置_项, nblk2_内置_端)
+  设置键(nblk2_g_内置, nblk2_内置_名, nblk2_内置_项)
+
+定义操作 nblk2_初始化内置():
+  nblk2_内置("连接", "text.join", [])
+  nblk2_内置("包含", "text.contains", ["text", "needle"])
+  nblk2_内置("拆分", "text.splitAt", ["text", "separator", "index"])
+  nblk2_内置("文本长度", "text.length", ["text"])
+  nblk2_内置("取字符", "text.charAt", ["text", "index"])
+  nblk2_内置("子串", "text.slice", ["text", "start", "length"])
+  nblk2_内置("查找", "text.indexOf", ["text", "needle"])
+  nblk2_内置("拆分为列表", "text.split", ["text", "separator"])
+  nblk2_内置("字符码", "text.codePoint", ["text"])
+  nblk2_内置("码转字符", "text.fromCodePoint", ["code"])
+  nblk2_内置("长度", "list.length", ["items"])
+  nblk2_内置("取元素", "list.get", ["items", "index"])
+  nblk2_内置("取值", "dict.get", ["dict", "key"])
+  nblk2_内置("有键", "dict.has", ["dict", "key"])
+  nblk2_内置("键列表", "dict.keys", ["dict"])
+  nblk2_内置("转数字", "convert.toNumber", ["text"])
+  nblk2_内置("转文本", "convert.toString", ["value"])
+  nblk2_内置("转布尔", "convert.toBoolean", ["value"])
+  nblk2_内置("类型", "convert.typeOf", ["value"])
+  nblk2_内置("解析JSON", "convert.parseJson", ["text"])
+  nblk2_内置("参数", "sys.args", [])
+  nblk2_内置("当前时间", "time.get_os_time", [])
+  nblk2_内置("读取文件", "file.read", ["path"])
+  nblk2_内置("写入文件", "file.write", ["path", "content"])
+  nblk2_内置("存在", "file.exists", ["path"])
+  nblk2_内置("列出文件", "file.list", [])
+  nblk2_内置("删除文件", "file.delete", ["path"])
+  nblk2_内置("添加", "list.add", ["items", "value"])
+  nblk2_内置("设置元素", "list.set", ["items", "index", "value"])
+  nblk2_内置("移除", "list.remove", ["items", "index"])
+  nblk2_内置("设置键", "dict.set", ["dict", "key", "value"])
+  nblk2_内置("并且", "logic.and", ["a", "b"])
+  nblk2_内置("或者", "logic.or", ["a", "b"])
+  nblk2_内置("非", "logic.not", ["value"])
+
+# ---- 项目 ----
+
+定义取值 nblk2_参名们(nblk2_参名们_文) -> 列表:
+  创建局部变量 nblk2_参名们_出 为 []
+  如果 nblk2_参名们_文 == "":
+    返回 nblk2_参名们_出
+  创建局部变量 nblk2_参名们_段们 为 拆分为列表(nblk2_参名们_文, ",")
+  重复 使用 nblk2_参名们_i 共 长度(nblk2_参名们_段们) 次:
+    创建局部变量 nblk2_参名们_项 为 取元素(nblk2_参名们_段们, nblk2_参名们_i)
+    创建局部变量 nblk2_参名们_冒 为 查找(nblk2_参名们_项, ":")
+    如果 nblk2_参名们_冒 >= 0:
+      添加(nblk2_参名们_出, nblk2_去空(子串(nblk2_参名们_项, 0, nblk2_参名们_冒)))
+    否则:
+      添加(nblk2_参名们_出, nblk2_去空(nblk2_参名们_项))
+  返回 nblk2_参名们_出
+
+定义取值 nblk2_参表(nblk2_参表_文) -> 文本:
+  创建局部变量 nblk2_参表_出 为 ""
+  如果 nblk2_参表_文 == "":
+    返回 nblk2_参表_出
+  创建局部变量 nblk2_参表_段们 为 拆分为列表(nblk2_参表_文, ",")
+  重复 使用 nblk2_参表_i 共 长度(nblk2_参表_段们) 次:
+    创建局部变量 nblk2_参表_项 为 nblk2_去空(取元素(nblk2_参表_段们, nblk2_参表_i))
+    创建局部变量 nblk2_参表_冒 为 查找(nblk2_参表_项, ":")
+    创建局部变量 nblk2_参表_名 为 nblk2_参表_项
+    创建局部变量 nblk2_参表_型 为 "any"
+    如果 nblk2_参表_冒 >= 0:
+      设置局部变量 nblk2_参表_名 为 nblk2_去空(子串(nblk2_参表_项, 0, nblk2_参表_冒))
+      设置局部变量 nblk2_参表_型 为 nblk2_类型英(nblk2_去空(子串(nblk2_参表_项, nblk2_参表_冒 + 1, 文本长度(nblk2_参表_项) - nblk2_参表_冒 - 1)))
+    如果 nblk2_参表_i > 0:
+      设置局部变量 nblk2_参表_出 为 连接(nblk2_参表_出, ", ")
+    设置局部变量 nblk2_参表_出 为 连接(nblk2_参表_出, 连接(nblk2_参表_名, 连接(": ", nblk2_参表_型)))
+  返回 nblk2_参表_出
+
+定义取值 nblk2_去引号(nblk2_去引号_文) -> 文本:
+  如果 文本长度(nblk2_去引号_文) >= 2 并且 子串(nblk2_去引号_文, 0, 1) == "\"":
+    返回 子串(nblk2_去引号_文, 1, 文本长度(nblk2_去引号_文) - 2)
+  返回 nblk2_去引号_文
+
+定义取值 nblk2_拆头(nblk2_拆头_文) -> 字典:
+  创建局部变量 nblk2_拆头_种 为 "action"
+  创建局部变量 nblk2_拆头_余 为 子串(nblk2_拆头_文, 文本长度("定义操作 "), 文本长度(nblk2_拆头_文) - 文本长度("定义操作 "))
+  如果 nblk2_以(nblk2_拆头_文, "定义取值 "):
+    设置局部变量 nblk2_拆头_种 为 "value"
+    设置局部变量 nblk2_拆头_余 为 子串(nblk2_拆头_文, 文本长度("定义取值 "), 文本长度(nblk2_拆头_文) - 文本长度("定义取值 "))
+  创建局部变量 nblk2_拆头_左 为 查找(nblk2_拆头_余, "(")
+  创建局部变量 nblk2_拆头_名 为 子串(nblk2_拆头_余, 0, nblk2_拆头_左)
+  创建局部变量 nblk2_拆头_尾 为 nblk2_去尾(子串(nblk2_拆头_余, nblk2_拆头_左 + 1, 文本长度(nblk2_拆头_余) - nblk2_拆头_左 - 1), ":")
+  创建局部变量 nblk2_拆头_右 为 nblk2_末查找(nblk2_拆头_尾, ")")
+  创建局部变量 nblk2_拆头_参 为 子串(nblk2_拆头_尾, 0, nblk2_拆头_右)
+  创建局部变量 nblk2_拆头_余尾 为 子串(nblk2_拆头_尾, nblk2_拆头_右 + 1, 文本长度(nblk2_拆头_尾) - nblk2_拆头_右 - 1)
+  创建局部变量 nblk2_拆头_返 为 "any"
+  如果 nblk2_以(nblk2_拆头_余尾, " -> "):
+    设置局部变量 nblk2_拆头_返 为 nblk2_右修剪(子串(nblk2_拆头_余尾, 4, 文本长度(nblk2_拆头_余尾) - 4))
+  创建局部变量 nblk2_拆头_出 为 {}
+  设置键(nblk2_拆头_出, "kind", nblk2_拆头_种)
+  设置键(nblk2_拆头_出, "name", nblk2_拆头_名)
+  设置键(nblk2_拆头_出, "参文", nblk2_拆头_参)
+  设置键(nblk2_拆头_出, "ret", nblk2_拆头_返)
+  返回 nblk2_拆头_出
+
+定义操作 nblk2_登记(nblk2_登记_头):
+  创建局部变量 nblk2_登记_项 为 {}
+  设置键(nblk2_登记_项, "id", 连接("b_f", 转文本(nblk2_g_号)))
+  设置键(nblk2_登记_项, "params", nblk2_参名们(取值(nblk2_登记_头, "参文")))
+  设置键(nblk2_登记_项, "ret", 取值(nblk2_登记_头, "ret"))
+  设置键(nblk2_g_函数, 取值(nblk2_登记_头, "name"), nblk2_登记_项)
+  设置 nblk2_g_号 为 nblk2_g_号 + 1
+
+定义取值 nblk2_解析定义(nblk2_解析定义_态, nblk2_解析定义_文) -> 字典:
+  创建局部变量 nblk2_解析定义_头 为 nblk2_拆头(nblk2_解析定义_文)
+  设置键(nblk2_解析定义_态, "序", nblk2_解析定义_态["序"] + 1)
+  创建局部变量 nblk2_解析定义_种 为 "func.define_action"
+  如果 取值(nblk2_解析定义_头, "kind") == "value":
+    设置局部变量 nblk2_解析定义_种 为 "func.define_value"
+  创建局部变量 nblk2_解析定义_n 为 nblk2_节点(nblk2_解析定义_种)
+  设置键(nblk2_解析定义_n, "id", 取值(取值(nblk2_g_函数, 取值(nblk2_解析定义_头, "name")), "id"))
+  nblk2_字段设(nblk2_解析定义_n, "name", 取值(nblk2_解析定义_头, "name"))
+  nblk2_字段设(nblk2_解析定义_n, "params", nblk2_参表(取值(nblk2_解析定义_头, "参文")))
+  如果 取值(nblk2_解析定义_头, "kind") == "value":
+    nblk2_字段设(nblk2_解析定义_n, "returnType", nblk2_类型英(取值(nblk2_解析定义_头, "ret")))
+  nblk2_入口设(nblk2_解析定义_n, "body", nblk2_解析块(nblk2_解析定义_态, 0, nblk2_参名们(取值(nblk2_解析定义_头, "参文"))))
+  返回 nblk2_解析定义_n
+
+定义取值 nblk2_解析项目(nblk2_解析项目_源) -> 字典:
+  设置 nblk2_g_阶段 为 连接("解析 ", nblk2_g_目录)
+  创建局部变量 nblk2_解析项目_态 为 {}
+  设置键(nblk2_解析项目_态, "行", nblk2_拆行(nblk2_解析项目_源))
+  设置键(nblk2_解析项目_态, "序", 0)
+  创建局部变量 nblk2_解析项目_脚本 为 []
+  重复 使用 nblk2_解析项目_i 共 长度(nblk2_解析项目_态["行"]) 次:
+    创建局部变量 nblk2_解析项目_t 为 取元素(nblk2_解析项目_态["行"], nblk2_解析项目_i)["文"]
+    如果 nblk2_以(nblk2_解析项目_t, "定义取值 ") 或者 nblk2_以(nblk2_解析项目_t, "定义操作 "):
+      nblk2_登记(nblk2_拆头(nblk2_解析项目_t))
+  当 nblk2_解析项目_态["序"] < 长度(nblk2_解析项目_态["行"]):
+    创建局部变量 nblk2_解析项目_行 为 取元素(nblk2_解析项目_态["行"], nblk2_解析项目_态["序"])
+    创建局部变量 nblk2_解析项目_t 为 nblk2_解析项目_行["文"]
+    如果 nblk2_解析项目_行["缩"] != 0:
+      抛出 "nblk2: 顶层缩进错误"
+    如果 nblk2_以(nblk2_解析项目_t, "项目 ") 或者 nblk2_以(nblk2_解析项目_t, "语言 "):
+      设置键(nblk2_解析项目_态, "序", nblk2_解析项目_态["序"] + 1)
+    否则如果 nblk2_以(nblk2_解析项目_t, "导入 "):
+      创建局部变量 nblk2_解析项目_路 为 连接(连接(nblk2_g_目录, "/"), nblk2_去引号(nblk2_段(nblk2_解析项目_t, "导入 ")))
+      创建局部变量 nblk2_解析项目_子 为 nblk2_解析项目(读取文件(nblk2_解析项目_路))
+      重复 使用 nblk2_解析项目_j 共 长度(nblk2_解析项目_子["scripts"]) 次:
+        创建局部变量 nblk2_解析项目_脚 为 取元素(nblk2_解析项目_子["scripts"], nblk2_解析项目_j)
+        如果 类型(nblk2_解析项目_脚) == "字典" 并且 取值(nblk2_解析项目_脚, "type") != "control.start":
+          添加(nblk2_解析项目_脚本, nblk2_解析项目_脚)
+      设置键(nblk2_解析项目_态, "序", nblk2_解析项目_态["序"] + 1)
+    否则如果 nblk2_以(nblk2_解析项目_t, "定义取值 ") 或者 nblk2_以(nblk2_解析项目_t, "定义操作 "):
+      添加(nblk2_解析项目_脚本, nblk2_解析定义(nblk2_解析项目_态, nblk2_解析项目_t))
+    否则如果 nblk2_解析项目_t == "开始:":
+      设置键(nblk2_解析项目_态, "序", nblk2_解析项目_态["序"] + 1)
+      创建局部变量 nblk2_解析项目_n 为 nblk2_节点("control.start")
+      nblk2_入口设(nblk2_解析项目_n, "body", nblk2_解析块(nblk2_解析项目_态, 0, []))
+      添加(nblk2_解析项目_脚本, nblk2_解析项目_n)
+      跳出循环
+    否则:
+      抛出 连接("nblk2: 未知的顶层块: ", nblk2_解析项目_t)
+  创建局部变量 nblk2_解析项目_项目 为 {}
+  设置键(nblk2_解析项目_项目, "scripts", nblk2_解析项目_脚本)
+  返回 nblk2_解析项目_项目
+
+# ---- 入口 ----
+
+开始:
+  创建变量 nblk2_g_内置 为 {}
+  创建变量 nblk2_g_函数 为 {}
+  创建变量 nblk2_g_号 为 0
+  创建变量 nblk2_g_目录 为 "."
+  创建变量 nblk2_g_阶段 为 ""
+  创建变量 nblk1_g_函数表 为 {}
+  创建变量 nblk1_g_参数表 为 {}
+  创建变量 nblk1_g_步数 为 0
+  创建变量 nblk1_g_步数上限 为 50000000
+  创建变量 nblk1_g_已退出 为 假
+  创建变量 nblk1_g_临时 为 空
+  创建变量 nblk1_g_程序参数 为 []
+  nblk2_初始化内置()
+  创建变量 nblk2_入口_参 为 参数()
+  如果 长度(nblk2_入口_参) < 1:
+    打印 "用法: nblk2 <文件.nblk> [程序参数...]"
+    退出程序 2
+  创建变量 nblk2_入口_路 为 取元素(nblk2_入口_参, 0)
+  设置 nblk2_g_目录 为 nblk2_目录(nblk2_入口_路)
+  创建变量 nblk2_入口_源 为 读取文件(nblk2_入口_路)
+  创建变量 nblk2_入口_余 为 []
+  重复 使用 nblk2_入口_i 共 长度(nblk2_入口_参) - 1 次:
+    添加(nblk2_入口_余, 取元素(nblk2_入口_参, nblk2_入口_i + 1))
+  尝试:
+    创建变量 nblk2_入口_项 为 nblk2_解析项目(nblk2_入口_源)
+    如果 长度(nblk2_入口_余) > 0 并且 取元素(nblk2_入口_余, 0) == "--dump":
+      打印 nblk2_编码(nblk2_入口_项)
+      退出程序 0
+    设置 nblk2_g_阶段 为 "执行"
+    执行项目带参数(nblk2_入口_项, nblk2_入口_余)
+  捕获 任意 作为 nblk2_入口_错:
+    打印 连接("nblk2 错误[", 连接(nblk2_g_阶段, 连接("]: ", nblk2_入口_错)))
+    退出程序 1
