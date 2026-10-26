@@ -29,6 +29,9 @@ function saveCollapsed(collapsed: Set<string>): void {
 
 const collapsedGroups = loadCollapsed();
 
+/** Keep the scissors where the user left them: every render rebuilds the list. */
+let savedScrollTop = 0;
+
 window.addEventListener("scroll", hideTip, true);
 
 let tipTimer: number | null = null;
@@ -120,6 +123,9 @@ export function renderToolbox(options: ToolboxOptions): HTMLElement {
   });
 
   const list = el("div", { class: "toolbox__list" });
+  list.addEventListener("scroll", () => {
+    savedScrollTop = list.scrollTop;
+  });
   const empty = el("p", { class: "toolbox__empty", text: t("toolbox.noResults", { query: "" }) });
   empty.hidden = true;
 
@@ -225,6 +231,7 @@ export function renderToolbox(options: ToolboxOptions): HTMLElement {
 
   search.addEventListener("input", applyFilter);
   applyFilter();
+  list.scrollTop = savedScrollTop;
 
   return el("aside", { class: "toolbox", dataset: { deleteZone: "true" } }, [
     el("header", { class: "panel__head" }, [
