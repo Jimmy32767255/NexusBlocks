@@ -82,6 +82,20 @@ if (process.argv.includes("--self")) {
   } else {
     console.log("✔ self-hosting (nblk1 interprets itself on the demo)");
   }
+  // nblk1 runs nblk2 (the source front-end) on a small program: the front-end
+  // itself is interpreted, so this checks that the two bootstrap layers compose.
+  const nblk2Ir = join(root, "bootstrap/nblk2.ir.json");
+  dump(nblk2, nblk2Ir);
+  const underFrontEnd = run(cli, [nblk1, nblk2Ir, join(root, "bootstrap/tests/data.nblk")]);
+  const dataDirect = native(join(root, "bootstrap/tests/data.nblk"));
+  if (dataDirect.out !== underFrontEnd.out || dataDirect.status !== underFrontEnd.status) {
+    failed += 1;
+    console.error("✖ source-under-IR: nblk1(nblk2, data.nblk) differs");
+    console.error(`  native: ${JSON.stringify(dataDirect.out.slice(0, 200))}`);
+    console.error(`  nested: ${JSON.stringify(underFrontEnd.out.slice(0, 200))}`);
+  } else {
+    console.log("✔ source-under-IR (nblk1 interprets nblk2 on data.nblk)");
+  }
   const sourceNested = run(cli, [nblk2, "--", nblk1, demoIr]);
   if (direct.out !== sourceNested.out || direct.status !== sourceNested.status) {
     failed += 1;

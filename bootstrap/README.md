@@ -85,7 +85,7 @@ node packages/cli/src/bin.ts bootstrap/nblk2.nblk -- \
 ```
 
 `node tools/bootstrap-check.mjs --self` 会同时比对：原生 vs nblk1、原生 vs nblk2、
-nblk1 解释自己、以及 nblk2 编译 nblk1。
+nblk1 解释自己、nblk1 解释 nblk2（source-under-IR）、以及 nblk2 编译 nblk1。
 
 实现要点：
 
@@ -100,7 +100,9 @@ nblk1 解释自己、以及 nblk2 编译 nblk1。
 
 - `导入` 相对主文件目录解析，暂不支持子目录内的相对路径。
 - 文本里的 `跳过` 与原生一致，是空语句（`control.pass`），不是 `continue`。
-- `nblk2` 能把 **自己** 的词法/语法完整跑完（约 1 分钟完成解析），但随后执行内层程序时报
-  `runtime.error.badType`；源码级固定点（nblk2 编译 nblk2）尚未打通，卡在多层解释时的运行时状态隔离。
+- `nblk2` 的源码级自解释：nblk2（原生）编译 nblk2.nblk 约 1 分钟完成解析；让 **nblk1** 去解释
+  nblk2 再编译 nblk2.nblk 仍超过 5 分钟（纯性能问题，非语义问题）。`nblk1` 解释 nblk2 编译
+  `bootstrap/tests/data.nblk` 已与原生一致（`--self` 中的 source-under-IR 项）。
+- `tools/ir-dump.mjs` 默认用真实文件系统解析 `导入`，导出自包含的项目 IR；`--no-imports` 只导出单个文件。
 - 参数传递：`nblk1` 提供 `执行项目带参数(项目, 参数列表)`，把参数显式传给被解释程序；
   `nblk2` 用它把 `参数()` 的剩余部分交给目标程序。
