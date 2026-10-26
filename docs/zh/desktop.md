@@ -11,7 +11,7 @@
 ┌──────────────▼──────────────┐
 │ Rust 主进程（src-tauri）    │
 │  绝对路径 / ~ / 主目录相对  │
-│  fs.read / write / ...      │
+│  fs.* / os.exec             │
 └─────────────────────────────┘
 ```
 
@@ -26,7 +26,7 @@
 ```bash
 pnpm install
 pnpm desktop          # 开发模式：Vite + Tauri 窗口
-pnpm desktop:build    # 构建安装包（默认 deb）
+pnpm desktop:build    # 构建当前平台安装包（Linux deb / Windows NSIS）
 ```
 
 `pnpm desktop` 会先启动编辑器的 Vite 开发服务器，再打开原生窗口；编辑器代码改动仍然热更新。
@@ -42,7 +42,7 @@ Failed to initialize gtk backend!: BoolError { message: "Failed to initialize GT
 常见于 ssh 登录、从非图形会话启动的 tmux、或者 `scripts/dev-env.sh` 把 `XDG_RUNTIME_DIR` 指向仓库目录之后。`pnpm desktop` 现在经由 `scripts/desktop-display.mjs` 启动，会按顺序尝试：
 
 1. 沿用有效的 `WAYLAND_DISPLAY` / `DISPLAY`；
-2. 在 `$XDG_RUNTIME_DIR`、`/run/user/$UID` 里找一个活着的 `wayland-<n>` 或 `X<n>` socket，并顺手补上 `DBUS_SESSION_BUS_ADDRESS`；
+2. 在 `$XDG_RUNTIME_DIR`、`/run/user/$UID`（以及 `XDG_RUNTIME_DIR` 未设时的 `/tmp/runtime-$UID`）里找一个活着的 `wayland-<n>` 或 `X<n>` socket，并顺手补上 `DBUS_SESSION_BUS_ADDRESS`；
 3. 都没有时退回 `xvfb-run` 虚拟显示（窗口不可见，仅用于跑通/截图）。
 
 屏幕上的窗口只会出现在这些 socket 所属的那台机器、那个会话上；从别的电脑 ssh 过来时需要 `ssh -X` 做 X11 转发。
@@ -67,7 +67,7 @@ Failed to initialize gtk backend!: BoolError { message: "Failed to initialize GT
 
 | 写法 | 解析结果 |
 | --- | --- |
-| `/home/me/notes.txt`、`C:\notes.txt` | 绝对路径，原样使用 |
+| Linux：`/home/me/notes.txt`；Windows：`C:\notes.txt` | 当前平台的绝对路径，原样使用；另一平台的写法会被当作相对主目录的路径 |
 | `~/notes.txt` | 相对用户主目录 |
 | `notes.txt`、`projects/demo.txt` | 相对用户主目录 |
 | 空路径 | `file.list` 列主目录；其余积木报 `runtime.error.filePath` |
@@ -89,17 +89,16 @@ Failed to initialize gtk backend!: BoolError { message: "Failed to initialize GT
 | `console.print` | none | 由编辑器本地处理，不进 Rust |
 | `fs.read` / `fs.write` | medium | 读写文本文件 |
 | `fs.exists` / `fs.list` / `fs.delete` | low / low / medium | 查询、列目录、删除 |
+| `os.exec` | high | 执行系统命令并返回输出 |
 
-桌面宿主在 `apps/editor/src/desktop.ts` 中实现：检测到 `__TAURI_INTERNALS__` 时替换掉浏览器宿主，其余代码不变。Rust 侧只有一个统一命令：
+桌面宿主在 `apps/editor/src/desktop.ts` 中实现：检测到 `__TAURI_INTERNALS__` 时替换掉浏览器宿主，其余代码不变。Rust 侧除统一的能力入口 `capability_invoke(request)`（返回 `{ ok, value }` 或 `{ ok: false, error: { messageKey } }`）外，还有项目保存/打开命令 `project_save`、`project_open`，以及外部解释器控制命令 `cli_status`、`cli_run`、`cli_stop`。
 
-- `capability_invoke(request)` — 返回 `{ ok, value }` 或 `{ ok: false, error: { messageKey } }`
+> ⚠️ 安全边界：桌面版当前对 `fs.*` 与 `os.exec` **默认全部授权**，程序可以读写当前用户有权访问的任意文件、执行任意命令。项目不计划加入按项目的能力授权面板或沙箱（见[设计决策](decisions.md)）；只运行你信任的项目。
 
-> ⚠️ 安全边界：桌面版当前对 `fs.*` **默认全部授权**，程序可以读写当前用户有权访问的任意文件。后续计划加入按项目的能力授权面板与审计日志；在装上之前，只运行你信任的项目。
-
-后续要把能力扩展到进程、网络时，仍然是「新增能力 + 在 Rust 侧加一条路由」，编辑器与积木无需感知具体实现。
+后续要把能力扩展到网络时，仍然是「新增能力 + 在 Rust 侧加一条路由」，编辑器与积木无需感知具体实现。
 
 ## 打包
 
-`pnpm desktop:build` 使用 Tauri 默认 bundler，`src-tauri/tauri.conf.json` 里 `bundle.targets` 目前只配置了 `deb`；需要 AppImage/rpm 时加进数组即可。前端产物来自 `apps/editor/dist`，由 `beforeBuildCommand` 自动重新构建。
+`pnpm desktop:build` 使用 Tauri 默认 bundler：Linux 配置为 `deb`，Windows 配置为 NSIS（`setup.exe`）；需要 AppImage/rpm 时把目标加进 `bundle.targets` 即可。前端产物来自 `apps/editor/dist`，由 `beforeBuildCommand` 自动重新构建。
 
 图标由 `tauri icon` 从 `src-tauri/icons/source.png` 生成，已提交到仓库。
