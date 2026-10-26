@@ -253,7 +253,17 @@ function renderInspectorPort(node: BlockNode, port: PortDef, options: InspectorO
   }
 
   if (port.type === "any") {
-    row.append(el("span", { class: "field__hint", text: t("block.port.dropValue") }));
+    const literal = node.fields?.[port.name];
+    if (literal === undefined || literal === null) {
+      row.append(el("span", { class: "field__hint", text: t("block.port.dropValue") }));
+    } else {
+      row.append(
+        el("code", {
+          class: "field__value",
+          text: typeof literal === "boolean" ? t(literal ? "common.true" : "common.false") : String(literal),
+        }),
+      );
+    }
     return row;
   }
   const raw = node.fields?.[port.name] ?? port.default ?? "";

@@ -345,6 +345,7 @@ export const en: Catalog = {
   "block.control.if.port.elseIfBody": "else if body",
   "block.control.if.field.elseIfs": "extra branches",
   "block.grow.add": "Add item",
+  "block.port.null": "empty value (null)",
   "block.port.dropValue": "drop a text, number or true/false block here",
   "block.grow.remove": "Remove item",
   "block.grow.addParam": "Add parameter",
