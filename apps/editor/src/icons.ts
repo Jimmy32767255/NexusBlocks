@@ -28,6 +28,7 @@ const PATHS = {
   chevronRight: '<path d="m9 6 6 6-6 6"/>',
   arrowUp: '<path d="M12 20V4M5 11l7-7 7 7"/>',
   arrowDown: '<path d="M12 4v16M5 13l7 7 7-7"/>',
+  gauge: '<path d="M4 14a8 8 0 1 1 16 0"/><path d="M12 14l4.5-4.5"/><path d="M5 19h14"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;

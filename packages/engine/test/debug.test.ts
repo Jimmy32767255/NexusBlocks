@@ -38,6 +38,46 @@ function sessionFor(
   });
 }
 
+describe("debug call stack", () => {
+  it("reports active function frames from innermost to outermost", async () => {
+    const print = createBlock("io.print", { id: "p1", fields: { text: "deep" } });
+    const outer = createBlock("func.define_action", {
+      id: "f1",
+      fields: { name: "outer", params: "" },
+      inputs: { body: [createBlock("func.call:f2")] },
+    });
+    const inner = createBlock("func.define_action", {
+      id: "f2",
+      fields: { name: "inner", params: "" },
+      inputs: { body: [print] },
+    });
+    const start = createBlock("control.start", {
+      id: "s1",
+      inputs: { body: [createBlock("func.call:f1")] },
+    });
+    const project = createProject({ name: "stack", locale: "en" });
+    project.scripts = [start, outer, inner];
+    const controller = new AbortController();
+    const stacks: string[][] = [];
+    const session = new DebugSession({
+      signal: controller.signal,
+      breakpoints: [print.id],
+      traceDelay: 0,
+      onPause: (_id, _values, stack) => {
+        stacks.push(stack.map((frame) => frame.name));
+        controller.abort();
+      },
+    });
+    await runProject(project, {
+      signal: controller.signal,
+      debug: session,
+      registry: createProjectRegistry(project),
+      host: createLocalHost(() => {}),
+    });
+    assert.deepEqual(stacks, [["outer", "inner"]]);
+  });
+});
+
 describe("debug session", () => {
   it("pauses on a breakpoint and resumes after the user continues", async () => {
     const { project, first, second } = twoPrints();

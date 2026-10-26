@@ -12,6 +12,8 @@ export interface ToolbarOptions {
   zoom: number;
   onRun: () => void;
   onRunTrace: () => void;
+  traceDelay: number;
+  onTraceDelayChange: (milliseconds: number) => void;
   onPause: () => void;
   onResume: () => void;
   onStep: () => void;
@@ -85,6 +87,21 @@ export function renderToolbar(options: ToolbarOptions): HTMLElement {
     [icon("trace", 15), el("span", { text: t("toolbar.runTrace") })],
   );
 
+  const speedButton = el(
+    "button",
+    {
+      class: "icon-button",
+      attrs: {
+        type: "button",
+        title: t("toolbar.traceDelay"),
+        "aria-label": t("toolbar.traceDelay"),
+        "data-trace-speed": "true",
+      },
+      on: { click: () => toggleSpeedPopover(speedButton) },
+    },
+    [icon("gauge", 15)],
+  );
+
   const stopButton = el(
     "button",
     {
@@ -145,6 +162,7 @@ export function renderToolbar(options: ToolbarOptions): HTMLElement {
     el("div", { class: "topbar__actions" }, [
       runButton,
       traceButton,
+      speedButton,
       pauseButton,
       resumeButton,
       stepButton,
@@ -180,4 +198,75 @@ function brandMark(): string {
     <rect x="2" y="18" width="12" height="12" rx="3" fill="url(#nexus-logo)" opacity=".55"/>
     <rect x="18" y="18" width="12" height="12" rx="3" fill="url(#nexus-logo)"/>
   </svg>`;
+}
+
+
+let speedPopover: HTMLElement | null = null;
+
+/** Slider popover anchored to the speed button; closes on outside click. */
+function toggleSpeedPopover(anchor: HTMLElement): void {
+  closeSpeedPopover();
+  const popover = el("div", { class: "popover", attrs: { role: "dialog" } });
+  const value = el("span", { class: "popover__value" });
+  const range = el("input", {
+    class: "popover__slider",
+    attrs: { type: "range", min: "0", max: "3000", step: "25", value: String(currentDelay()) },
+  });
+  const delay = Number(range.value);
+  value.textContent = delay === 0 ? t("toolbar.traceDelayOff") : `${delay} ms`;
+  popover.append(
+    el("div", { class: "popover__head" }, [
+      el("strong", { text: t("toolbar.traceDelay") }),
+      value,
+    ]),
+    range,
+    el("p", { class: "popover__hint", text: t("toolbar.traceDelayHint") }),
+  );
+  range.addEventListener("input", () => {
+    const next = Number(range.value);
+    value.textContent = next === 0 ? t("toolbar.traceDelayOff") : `${next} ms`;
+    speedDelay = next;
+    speedListener?.(next);
+  });
+  const rect = anchor.getBoundingClientRect();
+  popover.style.top = `${Math.round(rect.bottom + 6)}px`;
+  popover.style.left = `${Math.round(Math.max(8, rect.left - 60))}px`;
+  document.body.append(popover);
+  speedPopover = popover;
+  const onPointer = (event: PointerEvent) => {
+    if (popover.contains(event.target as Node) || anchor.contains(event.target as Node)) return;
+    closeSpeedPopover();
+  };
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key === "Escape") closeSpeedPopover();
+  };
+  window.addEventListener("pointerdown", onPointer, true);
+  window.addEventListener("keydown", onKey, true);
+  speedCleanup = () => {
+    window.removeEventListener("pointerdown", onPointer, true);
+    window.removeEventListener("keydown", onKey, true);
+  };
+}
+
+function closeSpeedPopover(): void {
+  speedPopover?.remove();
+  speedPopover = null;
+  speedCleanup?.();
+  speedCleanup = null;
+}
+
+let speedCleanup: (() => void) | null = null;
+
+let speedDelay = 450;
+let speedListener: ((milliseconds: number) => void) | null = null;
+
+function currentDelay(): number {
+  return speedDelay;
+}
+
+/** Keep the popover slider in sync with the delay chosen elsewhere. */
+export function setTraceDelayState(milliseconds: number, onChange: (value: number) => void): void {
+  speedDelay = milliseconds;
+  speedListener = onChange;
+  closeSpeedPopover();
 }

@@ -2,18 +2,13 @@ import { toDisplayText, type Value } from "@nexus/ir";
 import { el } from "./dom.ts";
 import { t } from "./i18n.ts";
 
-export interface VariablesOptions {
-  /** Live values keyed by variable name; empty until the program declares one. */
-  values: Record<string, Value> | null;
-}
-
 /**
- * Read-only panel listing the variables that exist at run time. Variables are
- * created and deleted by blocks, so the panel mirrors the interpreter instead
+ * Read-only list of the variables that exist at run time. Variables are
+ * created and deleted by blocks, so the list mirrors the interpreter instead
  * of editing the document.
  */
-export function renderVariables(options: VariablesOptions): HTMLElement {
-  const entries = Object.entries(options.values ?? {});
+export function renderVariableItems(values: Record<string, Value> | null): HTMLElement {
+  const entries = Object.entries(values ?? {});
   const list = el("div", { class: "variables__list" });
 
   if (entries.length === 0) {
@@ -30,12 +25,7 @@ export function renderVariables(options: VariablesOptions): HTMLElement {
     );
   }
 
-  return el("section", { class: "variables" }, [
-    el("header", { class: "panel__head" }, [
-      el("h2", { class: "panel__title", text: t("panel.variables") }),
-    ]),
-    list,
-  ]);
+  return list;
 }
 
 function formatValue(value: Value | undefined): string {

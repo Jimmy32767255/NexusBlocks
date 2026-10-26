@@ -10,6 +10,9 @@ export const en: Catalog = {
   "app.projectName": "Project name",
 
   "toolbar.run": "Run",
+  "toolbar.traceDelay": "Trace speed",
+  "toolbar.traceDelayHint": "Delay between statements while tracing; 0 runs at full speed.",
+  "toolbar.traceDelayOff": "no delay",
   "toolbar.runTrace": "Trace",
   "toolbar.pause": "Pause",
   "toolbar.resume": "Continue",
@@ -110,6 +113,11 @@ export const en: Catalog = {
   "canvas.emptyBody": "Drag a block from the toolbox onto the canvas. Programs run from “when program starts”.",
   "canvas.blocks": "{count} blocks",
 
+  "debug.tab.variables": "Variables",
+  "debug.tab.stack": "Call stack",
+  "debug.stack.empty": "No function calls right now.",
+  "debug.stack.top": "Top-level scripts",
+  "debug.stack.depth": "frame {depth}",
   "variables.empty": "No variables yet. A run shows them here once the program creates one.",
 
   "console.empty": "Run the program to see its output here.",
