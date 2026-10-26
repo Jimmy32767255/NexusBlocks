@@ -8,8 +8,8 @@ Nexus Blocks 是一个**可扩展的图形化编程环境**：用积木搭程序
 
 - **完整的语言能力**：变量、控制流、表达式、值语义；每块积木都对应语言 IR 中的一个节点，图形与文本是同一套语义的两种视图。
 - **可扩展**：积木定义、能力（capability）、渲染器、语言包彼此独立，新增积木不需要改编辑器核心。
-- **能走向系统交互**：运行时只通过 `HostBridge` 调用宿主能力（文件、进程、网络……）。桌面端可以按能力清单授权；第一版只实现了 `console.print`，但方向与接口已经就位。
-- **国际化**：界面、积木标签、运行时消息、文档都走同一套 key，默认简体中文与英文。
+- **能走向系统交互**：运行时只通过 `HostBridge` 调用宿主能力。目前已实现控制台输出、本机文件读写与执行系统命令；桌面宿主直接授予完整能力清单，不做运行时授权，网络与剪贴板等能力尚未实现。
+- **国际化**：界面、积木标签、运行时消息与内置帮助都走同一套 key，默认简体中文与英文。
 - **WebView 优先**：编辑器是纯静态 Web 应用（原生 TypeScript + Vite），可以嵌进任何 WebView（Tauri、Electron、移动端）。
 
 ## 当前状态（v0.1）
@@ -17,16 +17,16 @@ Nexus Blocks 是一个**可扩展的图形化编程环境**：用积木搭程序
 已经可用：
 
 - 完整图形编辑器：工具箱（分类可折叠）、拖拽/吸附、嵌套积木、画布平移缩放、属性面板（脚本可上下移）、工具箱悬停提示与积木详情、变量面板（只读运行状态）、控制台、问题面板、撤销重做、本地自动保存。
-- **调试**：暂停/继续、单步执行、语句断点、跟踪运行与实时变量值；调试状态只存编辑器，不写入 `.nblk`。
-- 76 种基础积木：控制/输出/注释/逻辑/数学/文本/变量之外，还有等待、跳出循环、错误处理（抛出/尝试/捕获）、列表与字典、函数定义与参数、本机文件读写；文本按 Unicode 码点支持长度、取字符、子串、查找、拆分与码点互转；函数可用局部变量并支持递归，还有对每项循环、并且/或者、JSON 解析与命令行参数；每个函数定义还会动态生成一个调用块。
+- **调试**：暂停/继续、单步执行、非注释语句断点、跟踪运行与实时变量值；调试状态只存编辑器，不写入 `.nblk`。
+- 78 种基础积木：控制/输出/注释/逻辑/数学/文本/变量之外，还有等待、跳出循环、错误处理（抛出/尝试/捕获）、列表与字典、函数定义与参数、本机文件读写；文本按 Unicode 码点支持长度、取字符、子串、查找、拆分与码点互转；函数可用局部变量并支持递归，还有对每项循环、并且/或者、JSON 解析与命令行参数；每个函数定义还会动态生成一个调用块。
 - **跨文件导入**：`导入[文件]`、`从[文件]导入[函数]`、`从[文件]导入[函数]作为[名称]` 三种顶栏积木，从其他 `.nblk` 文件载入函数并生成调用块；被导入文件的函数会合并进当前程序。
 - 变量在运行时声明：用「创建变量」/「删除变量」积木建立和移除，没有预定义变量列表，因此 `.nblk` 里也无需声明区。
 - 解释器：可中止、事件流（日志/输出/状态/错误）、全局变量表；不设步数或递归上限。
-- 中英文界面与消息，运行输出也按项目语言显示。
+- 中英文界面与消息；运行消息按当前界面语言显示，CLI 用 `--lang` 选择错误信息语言。
 - **桌面外壳（Tauri 2）**：加载同一份编辑器 bundle，`fs.*` 直接访问本机文件系统（绝对路径、`~/…` 或主目录相对路径）；浏览器版仍保留 localStorage 文件区。
 - **`.nblk` 文本格式**：程序保存为类 Python 的可读文本（不是 JSON），关键字使用 UTF-8 中文，保留 IR 语义。语法见 [`docs/zh/nblk.md`](docs/zh/nblk.md)。
-- **独立解释器**：`nblk program.nblk` 可在终端运行程序；桌面编辑器普通运行时调用它，调试仍用内置引擎。见 [`docs/zh/cli.md`](docs/zh/cli.md)。
-- `pnpm test` 覆盖 IR、i18n、engine 与编辑器核心逻辑（195 个用例）。
+- **独立解释器**：`nblk program.nblk` 可在终端运行程序；桌面编辑器找到 `nblk` 时，普通运行会调用它，调试仍用内置引擎（找不到则回退）。见 [`docs/zh/cli.md`](docs/zh/cli.md)。
+- `pnpm test` 覆盖 IR、i18n、engine 与编辑器核心逻辑（222 个用例）。
 
 ## 自举（self-hosting）
 
@@ -38,7 +38,7 @@ Nexus Blocks 是一个**可扩展的图形化编程环境**：用积木搭程序
 
 细节与限制见 [`bootstrap/README.md`](bootstrap/README.md)；路线图见 [`docs/zh/roadmap.md`](docs/zh/roadmap.md) 的 v0.7。
 
-尚未实现（已为它们预留接口）：网络/进程/剪贴板等更多系统能力、列表/字典的遍历与删除等进阶操作、代码导出、多平台安装包流水线。
+尚未实现：网络与剪贴板能力、字典的遍历与删除（列表的遍历与删除已支持）、代码导出、macOS 安装包流水线。
 
 ## 目录结构
 
@@ -46,14 +46,16 @@ Nexus Blocks 是一个**可扩展的图形化编程环境**：用积木搭程序
 packages/ir      语言 IR：数据模型、`.nblk` 解析/打印、校验、遍历、示例
 packages/engine  积木定义与注册表、解释器、能力请求与运行时事件
 packages/i18n    语言包与翻译函数
+packages/cli     独立命令行解释器
 apps/editor      Web 编辑器（Vite + 原生 TypeScript）
 apps/desktop     Tauri 2 桌面外壳（Rust 宿主、Tauri 配置）
-docs/zh          架构、IR、积木、i18n、桌面壳、路线图
+bootstrap        用 `.nblk` 写的自举解释器与一致性测试
+docs/zh          架构、IR、积木、i18n、CLI、桌面壳、路线图
 ```
 
 ## 快速开始
 
-需要 Node.js 22+ 与 pnpm 10+。
+需要 Node.js 22+ 与 pnpm（仓库锁定 `pnpm@12.15.0`，用 Corepack 可自动匹配）。
 
 ```bash
 pnpm install
@@ -62,7 +64,8 @@ pnpm build      # 产出 apps/editor/dist 静态站点
 pnpm test       # 全部单元测试
 pnpm typecheck  # 严格类型检查
 pnpm desktop        # 桌面版开发模式（需要 Rust 与 webkit2gtk-4.1）
-pnpm cli:build      # 构建命令行解释器（packages/cli/dist/nblk）
+pnpm cli:build      # 构建 CLI 的 Node 打包产物（packages/cli/dist/nblk.cjs，需 Node.js 22+）
+pnpm cli:package    # 构建独立可执行文件 packages/cli/dist/nblk（需 Bun）
 pnpm desktop:build  # 构建当前平台桌面安装包
 pnpm package:all    # 打包 Linux .deb 与 Windows setup.exe（见打包文档）
 ```
@@ -80,8 +83,10 @@ pnpm package:all    # 打包 Linux .deb 与 Windows setup.exe（见打包文档�
 - [设计决策记录](docs/zh/decisions.md)
 - [架构总览](docs/zh/architecture.md)
 - [语言与 IR](docs/zh/ir.md)
+- [`.nblk` 文本格式](docs/zh/nblk.md)
 - [积木系统](docs/zh/blocks.md)
 - [编辑器使用指南](docs/zh/editor.md)
+- [命令行解释器](docs/zh/cli.md)
 - [国际化](docs/zh/i18n.md)
 - [桌面外壳](docs/zh/desktop.md)
 - [路线图](docs/zh/roadmap.md)

@@ -8,8 +8,8 @@ Nexus Blocks is an **extensible visual programming environment**: you build prog
 
 - **Real language semantics**: variables, control flow, expressions, and value semantics. Every block maps to exactly one IR node; the visual and textual views are two presentations of the same semantics.
 - **Extensible**: block definitions, capabilities, renderers, and language packs are independent. Adding a block never requires touching the editor core.
-- **Ready for system integration**: at runtime, effects travel through a `HostBridge` as capability calls (files, processes, network, …). A desktop shell can grant them per capability. v0.1 only ships `console.print`, but the seam is already there.
-- **Internationalised**: UI, block labels, runtime messages, and docs share one message catalogue (English and Simplified Chinese by default).
+- **Ready for system integration**: at runtime, effects travel through a `HostBridge` as capability calls. Console output, local file access, and running system commands are implemented today; the desktop host grants the full capability list without runtime authorization. Network and clipboard capabilities are not implemented yet.
+- **Internationalised**: UI, block labels, runtime messages, and in-app help share one message catalogue (English and Simplified Chinese by default).
 - **WebView first**: the editor is a plain static web app (vanilla TypeScript + Vite) that can be embedded in any WebView (Tauri, Electron, mobile).
 
 ## Status (v0.1)
@@ -17,16 +17,16 @@ Nexus Blocks is an **extensible visual programming environment**: you build prog
 Working today:
 
 - A complete visual editor: toolbox, drag & drop with snapping, nested blocks, canvas pan/zoom, inspector, toolbox hover cards with block details, a read-only variables panel, console, problems panel, undo/redo, and local autosave.
-- **Debugging**: pause/resume, single-step execution, per-statement breakpoints, and trace mode with live variable values. Debug state lives in the editor and is never written to `.nblk` files.
-- 76 built-in blocks across control/IO/comments/logic/math/text/variables, plus waiting, breaking out of loops, error handling (throw/try/catch), lists and dictionaries, function definitions/parameters, and local file I/O. Text works on Unicode code points: length, character access, substrings, search, splitting and code point conversion. Functions get local variables and recursion, plus for-each loops, and/or, JSON parsing and command line arguments. Every function definition also yields a dynamic call block.
+- **Debugging**: pause/resume, single-step execution, breakpoints on non-comment statements, and trace mode with live variable values. Debug state lives in the editor and is never written to `.nblk` files.
+- 78 built-in blocks across control/IO/comments/logic/math/text/variables, plus waiting, breaking out of loops, error handling (throw/try/catch), lists and dictionaries, function definitions/parameters, and local file I/O. Text works on Unicode code points: length, character access, substrings, search, splitting and code point conversion. Functions get local variables and recursion, plus for-each loops, and/or, JSON parsing and command line arguments. Every function definition also yields a dynamic call block.
 - Variables are declared at run time with the create/delete blocks; there is no predefined variable list, so `.nblk` files need no declarations either.
-- An interpreter with a step limit, cancellation, event stream (logs, output, status, errors), and a global variable table.
-- English and Chinese UI, runtime messages, and program output in the project locale.
+- An interpreter with cancellation, an event stream (logs, output, status, errors), and global plus per-call local variables. No step or recursion limits.
+- English and Chinese UI and runtime messages; messages follow the current UI locale (the CLI picks the error language with `--lang`).
 - **Desktop shell (Tauri 2)**: loads the same editor bundle; `fs.*` reaches the real file system (absolute paths, `~/…`, or home-relative), while the browser build keeps its localStorage file area.
-- **`.nblk` text format**: projects are stored as a readable, Python-like text file instead of JSON, while the IR stays the single source of truth; legacy `.nexusblocks.json` files still open. See [`docs/zh/nblk.md`](docs/zh/nblk.md) (Chinese).
-- `pnpm test` covers IR, i18n, engine, and editor logic (190 cases).
+- **`.nblk` text format**: projects are stored as a readable, Python-like text file instead of JSON, while the IR stays the single source of truth. See [`docs/zh/nblk.md`](docs/zh/nblk.md) (Chinese).
+- `pnpm test` covers IR, i18n, engine, and editor logic (222 cases).
 
-Not built yet (interfaces reserved): network/process/clipboard capabilities, advanced list/dict operations such as iteration and removal, code export, and multi-platform packaging pipelines.
+Not built yet: network and clipboard capabilities, dictionary iteration and removal (list iteration and removal are supported), code export, and a macOS packaging pipeline.
 
 ## Layout
 
@@ -34,14 +34,16 @@ Not built yet (interfaces reserved): network/process/clipboard capabilities, adv
 packages/ir      Language IR: data model, `.nblk` parse/print, validation, traversal, samples
 packages/engine  Block definitions & registry, interpreter, capability requests, runtime events
 packages/i18n    Message catalogues and translator
+packages/cli     Standalone command-line interpreter
 apps/editor      Web editor (Vite + vanilla TypeScript)
 apps/desktop     Tauri 2 desktop shell (Rust host, Tauri config)
-docs/zh          Architecture, IR, blocks, i18n, roadmap (Chinese)
+bootstrap        Self-hosting interpreter written in `.nblk`, with consistency tests
+docs/zh          Architecture, IR, blocks, i18n, CLI, desktop, packaging, roadmap (Chinese)
 ```
 
 ## Quick start
 
-Requires Node.js 22+ and pnpm 10+.
+Requires Node.js 22+ and pnpm (the repo pins `pnpm@12.15.0` via Corepack).
 
 ```bash
 pnpm install
@@ -50,10 +52,13 @@ pnpm build      # static site in apps/editor/dist
 pnpm test       # unit tests
 pnpm typecheck  # strict type checking
 pnpm desktop        # desktop dev window (needs Rust + webkit2gtk-4.1)
-pnpm desktop:build  # build a desktop installer (deb)
+pnpm cli:build      # bundle the CLI for Node.js (packages/cli/dist/nblk.cjs)
+pnpm cli:package    # build the standalone executable packages/cli/dist/nblk (needs Bun)
+pnpm desktop:build  # build an installer for the current platform
+pnpm package:all    # build the Linux .deb and Windows setup.exe (see packaging docs)
 ```
 
-The desktop build needs Rust 1.77+; on Linux also the `webkit2gtk-4.1`, `gtk+-3.0` and `libsoup-3.0` development packages. Work on Windows/macOS only needs the Rust toolchain.
+The desktop build needs Rust 1.77+; on Linux also the `webkit2gtk-4.1`, `gtk+-3.0` and `libsoup-3.0` development packages. On Windows/macOS, development builds use the platform WebView and toolchain; only Linux packaging (and the Linux→Windows cross-build) has the extra dependencies described in the packaging guide.
 
 Drag “when program starts” from the toolbox onto the canvas, drop “print” into it, and press Run: the console shows `Hello, world!`.
 
@@ -62,9 +67,13 @@ Drag “when program starts” from the toolbox onto the canvas, drop “print�
 - [Documentation index](docs/README.md)
 - [Architecture](docs/zh/architecture.md)
 - [Language & IR](docs/zh/ir.md)
+- [`.nblk` text format (Chinese)](docs/zh/nblk.md)
 - [Blocks](docs/zh/blocks.md)
 - [Editor guide (Chinese)](docs/zh/editor.md)
+- [CLI](docs/zh/cli.md)
 - [i18n](docs/zh/i18n.md)
+- [Desktop shell](docs/zh/desktop.md)
+- [Packaging](docs/zh/packaging.md)
 - [Roadmap](docs/zh/roadmap.md)
 
 ## Commit convention

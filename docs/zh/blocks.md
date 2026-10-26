@@ -36,10 +36,12 @@ interface BlockDefinition extends BlockSchema {
 | `control.forEach` | 控制 | 对列表的每一项运行一次循环体，当前项写入变量 | `items` 列表、`body` 栈，属性 `variable` |
 | `control.wait` | 控制 | 等待若干秒（可被「停止」中断） | `seconds` 数字 |
 | `control.label` | 控制 | 标记一个跳转目标 | 属性 `name` |
-| `control.goto` | 控制 | 跳转到同一脚本/函数中的标记 | 属性 `name` |
+| `control.goto` | 控制 | 跳到标记（通常在同一脚本/函数内） | 属性 `name` |
 | `control.pass` | 控制 | 空语句，什么也不做 | — |
+| `control.break` | 控制 | 跳出当前循环（终结语句） | — |
 | `comment.note` | 注释 | 注释语句，运行时不产生任何效果 | 属性 `text` |
 | `sys.exit` | 系统 | 立即结束整个程序 | `code` 数字状态码 |
+| `sys.setArgs` | 系统 | 替换程序看到的参数列表（主要给自举运行时/宿主用） | `args` 列表 |
 | `sys.args` | 系统 | 命令行运行时的程序参数列表 | 无 |
 | `control.throw` | 控制 | 抛出异常 | `value` 任意值 |
 | `control.try` | 控制 | 尝试/捕获容器 | `body`、`catches` 栈 |
@@ -49,14 +51,19 @@ interface BlockDefinition extends BlockSchema {
 | `io.print` | 输出 | 打印到控制台 | `text` 任意值 |
 | `convert.toNumber` | 转换 | 把整段文本转成数值；含非数字内容报错 | `text` 文本 |
 | `convert.toString` | 转换 | 把值转成字符串 | `value` 任意值 |
+| `convert.toBoolean` | 转换 | 把布尔值、数字（0 为假）或文本 `true`/`false` 转成布尔值；其他文本报错 | `value` 任意值 |
+| `convert.typeOf` | 转换 | 返回值的类型名（文本） | `value` 任意值 |
 | `convert.parseJson` | 转换 | 把 JSON 文本解析成值；语法错误报 `runtime.error.badJson` | `text` 文本 |
+| `logic.not` | 逻辑 | 逻辑非（按真值规则取反） | `value` 布尔值 |
 | `logic.boolean` | 逻辑 | 布尔字面量 | 属性 `value` |
 | `logic.and` / `logic.or` | 逻辑 | 并且 / 或者，短路求值 | `a`、`b` 布尔值 |
 | `logic.compare` | 逻辑 | 比较运算（`== != < <= > >=`） | 属性 `op`，`a`、`b` 值 |
 | `math.number` | 数学 | 数字字面量 | 属性 `value` |
-| `math.arithmetic` | 数学 | 四则运算（`+ - * / %`） | 属性 `op`，`a`、`b` 值 |
+| `math.arithmetic` | 数学 | 四则运算（`+ - * / %`），默认 2 个操作数 | 属性 `op`、`count`（默认 2，最少 2），端口 `a`、`b`、`n3`… |
+| `math.abs` | 数学 | 绝对值 | `value` 数字 |
+| `math.round` | 数学 | 取整：向上 / 向下 / 四舍五入 | 属性 `mode`，`value` 数字 |
 | `text.literal` | 文本 | 文本字面量 | 属性 `value` |
-| `text.join` | 文本 | 连接文本（默认 2 段，可扩到 8 段） | `a`、`b`、`c`… 值 |
+| `text.join` | 文本 | 连接文本（默认 2 段，可继续增加，没有上限） | `a`、`b`、`c`… 值 |
 | `text.splitAt` | 文本 | 以分隔符拆分后取下标 n 的段（0 起）；空分隔符报错 | `text`、`separator`、`index` 值 |
 | `text.contains` | 文本 | 判断包含关系 | `text`、`needle` 值 |
 | `text.length` | 文本 | 文本的字符数（按 Unicode 码点计） | `text` 值 |
@@ -67,26 +74,36 @@ interface BlockDefinition extends BlockSchema {
 | `text.codePoint` | 文本 | 第一个字符的 Unicode 码点；空文本报错 | `text` 值 |
 | `text.fromCodePoint` | 文本 | 把 Unicode 码点转成字符；非法码点报错 | `code` 值 |
 | `time.get_os_time` | 系统 | 当前本地时间（`YYYY-MM-DD HH:mm:ss`） | 无 |
-| `os.exec_command` | 系统 | 用系统 shell 执行命令，打印输出；退出码非 0 报错。需要宿主提供 `os.exec` 能力（桌面版支持，浏览器不支持） | `command` 值 |
-| `var.create` | 变量 | 运行时创建变量，类型 `any`/`text`/`number`/`boolean`/`list`/`dict`，初始值按类型校验 | 属性 `name`、`type`，`value` 值 |
-| `var.delete` | 变量 | 删除运行时创建的变量 | 属性 `name` |
-| `var.set` | 变量 | 给变量赋值（变量必须已创建，否则报 `runtime.error.missingVariable`） | 属性 `variable`，`value` 值 |
-| `var.get` | 变量 | 读取变量（变量必须已创建） | 属性 `variable` |
+| `os.exec_command` | 系统 | 用系统 shell 执行命令，打印输出；退出码非 0 报错。需要宿主提供 `os.exec` 能力（桌面版与 CLI 支持，浏览器不支持） | `command` 值 |
+| `var.create` | 变量 | 运行时创建全局变量，类型 `any`/`text`/`number`/`boolean`/`list`/`dict`，初始值按类型校验 | 属性 `name`、`type`，`value` 值 |
+| `var.createLocal` | 变量 | 在当前函数调用内创建局部变量（函数外报错） | 属性 `name`、`type`，`value` 值 |
+| `var.delete` | 变量 | 删除全局变量（不能删除局部变量） | 属性 `name` |
+| `var.set` | 变量 | 给已存在的变量赋值（局部优先，其次全局；不存在报 `runtime.error.missingVariable`） | 属性 `variable`，`value` 值 |
+| `var.setLocal` | 变量 | 给当前函数的局部变量赋值 | 属性 `variable`，`value` 值 |
+| `var.get` | 变量 | 读取变量（局部变量优先，其次全局） | 属性 `variable` |
 | `list.literal` | 列表与字典 | JSON 列表字面量 | 属性 `items`，如 `[1, 2, 3]` |
-| `list.length` / `list.get` | 列表与字典 | 长度 / 按 0 起始下标取值 | `items` 列表，`index` 数字 |
-| `list.add` / `list.set` / `list.remove` | 列表与字典 | 末尾追加 / 替换某项 / 删除某项 | `items`、`index`、`value` |
+| `list.length` | 列表与字典 | 列表长度 | `items` 列表 |
+| `list.get` | 列表与字典 | 按 0 起始下标取值 | `items` 列表，`index` 数字 |
+| `list.add` | 列表与字典 | 末尾追加一项 | `items` 列表，`value` 任意值 |
+| `list.set` | 列表与字典 | 替换某项 | `items` 列表，`index` 数字，`value` 任意值 |
+| `list.remove` | 列表与字典 | 删除某项 | `items` 列表，`index` 数字 |
 | `dict.literal` | 列表与字典 | JSON 字典字面量 | 属性 `items`，如 `{"name": "Ada"}` |
 | `dict.get` / `dict.has` | 列表与字典 | 按键取值 / 判断键存在 | `dict`、`key` |
-| `dict.keys` / `dict.set` | 列表与字典 | 所有键（列表）/ 按键写入 | `dict`、`key`、`value` |
-| `func.define` | 函数 | 定义函数（hat，函数体为 `body` 栈） | 属性 `name`、`params`（`名称: 类型`）、`returnType`，`body` 栈 |
+| `dict.keys` | 列表与字典 | 所有键（列表） | `dict` 字典 |
+| `dict.set` | 列表与字典 | 按键写入 | `dict` 字典，`key` 文本，`value` 任意值 |
+| `func.define_value` | 函数 | 定义取值函数（hat，函数体为 `body` 栈） | 属性 `name`、`params`（`名称: 类型`）、`returnType`，`body` 栈 |
+| `func.define_action` | 函数 | 定义操作函数（hat，不返回值） | 属性 `name`、`params`，`body` 栈 |
 | `func.param` | 函数 | 读取当前函数的一个参数 | 属性 `name` |
 | `func.return` | 函数 | 立即返回，可带结果 | `value` 值 |
 | `func.call:<函数块 id>` | 函数 | 动态生成的调用块（无返回值时为语句，否则为表达式） | 每个参数一个值端口 |
-| `file.read` | 文件 | 读取文本文件（绝对路径、`~/…` 或主目录相对路径） | `path` |
+| `file.read` | 文件 | 读取文本文件（绝对路径、`~/…` 与相对路径按宿主解析：桌面版相对主目录、CLI 相对脚本目录；浏览器为扁平文件区） | `path` |
 | `file.write` | 文件 | 写入（覆盖）文本文件 | `path`、`content` |
 | `file.exists` | 文件 | 文件是否存在 | `path` |
 | `file.delete` | 文件 | 删除文件 | `path` |
-| `file.list` | 文件 | 列出文件夹中的文件名（列表，留空为主目录） | — |
+| `file.list` | 文件 | 列出默认目录的文件名（无参数：CLI 为脚本目录、桌面版为主目录、浏览器为整个工作区） | — |
+| `import.all` | 模块 | 导入整个文件（hat，启动前由加载器解析） | 属性 `file` |
+| `import.named` | 模块 | 按原名导入一个函数 | 属性 `file`、`name` |
+| `import.alias` | 模块 | 导入一个函数并改名 | 属性 `file`、`name`、`alias` |
 
 类别颜色在 `packages/engine/src/blocks/control.ts` 的 `CATEGORY_COLORS` 中定义（其他积木文件从这里导入）；工具箱顺序由 `packages/engine/src/registry.ts` 的 `CATEGORY_ORDER` 决定。
 
@@ -99,21 +116,32 @@ interface ExecutionContext {
   readonly project: Project;
   readonly host: HostBridge;
   readonly signal: AbortSignal;
-  evaluate(node: BlockNode): Promise<Value>;          // 执行表达式子树
+  readonly args: readonly string[];                   // 程序参数（编辑器里来自运行参数框）
+  setArgs(args: readonly string[]): void;
+
+  evaluate(node: BlockNode): Promise<Value>;           // 执行表达式子树
   input(node: BlockNode, port: string): Promise<Value>; // 端口值（含内联字面量）
-  literal(node: BlockNode, port: string): Value;      // 端口内联字面量
-  stack(node: BlockNode, port: string): BlockNode[];  // 栈端口里的语句
-  run(blocks: BlockNode[]): Promise<void>;            // 顺序执行一组语句
-  getVariable(id: string): Value;
-  setVariable(id: string, value: Value): void;
-  getParam(name: string): Value;                      // 函数参数（仅函数体内）
+  literal(node: BlockNode, port: string): Value;       // 端口内联字面量
+  stack(node: BlockNode, port: string): BlockNode[];   // 栈端口里的语句
+  run(blocks: BlockNode[]): Promise<void>;             // 顺序执行一组语句
+
+  getVariable(name: string): Value;                    // 局部优先，其次全局
+  hasVariable(name: string): boolean;
+  setVariable(name: string, value: Value): void;       // 已存在（局部优先）
+  createVariable(name: string, value: Value): void;    // 全局
+  createLocalVariable(name: string, value: Value): void; // 仅函数调用内
+  setLocalVariable(name: string, value: Value): void;
+  deleteVariable(name: string): void;
+  getParam(name: string): Value;                       // 函数参数（仅函数体内）
   callFunction(id: string, args: Value[]): Promise<Value>;
   coerce(value: Value, type: ValueType, blockId: string): Value;
-  variableName(id: string): string;
-  print(value: Value, blockId?: string): void;        // 走 HostBridge，产出 log 事件
-  tick(): Promise<void>;                              // 记一步，超限/停止时抛错
-  sleep(ms: number): Promise<void>;                   // 可被停止打断的等待
+
+  print(value: Value, blockId?: string): void;         // 走 HostBridge，产出 log 事件
+  tick(): Promise<void>;                               // 协作检查点：让 UI 绘制并响应「停止」
+  sleep(ms: number): Promise<void>;                    // 可被停止打断的等待
   fail(messageKey: string, params?: Record<string, string | number>): never;
+  exit(code: number): never;
+  describeFailure(failure: RuntimeFailure): string;    // 当前语言的错误文本
 }
 ```
 
@@ -127,7 +155,7 @@ interface ExecutionContext {
 
 - 值就是纯 JSON：`Value[]` 与 `{ [key: string]: Value }`，可以跨进程传输、直接序列化。
 - 字面量积木把文本字段按 JSON 解析；格式不符会抛出可翻译错误 `runtime.error.badJson`。
-- `list.add`、`list.set`、`list.remove`、`dict.set` 就地修改容器（引用语义）；需要保留旧值应先复制。下标越界会抛 `runtime.error.badIndex`；`list.remove` 删除后，后面的元素前移。
+- `list.add`、`list.set`、`list.remove`、`dict.set` 就地修改容器（引用语义）；需要保留旧值应先复制。只有 `list.get` / `list.set` / `list.remove` 按下标访问，越界会抛 `runtime.error.badIndex`；`list.remove` 删除后，后面的元素前移。
 - 变量可以用「创建变量」声明为 `list` / `dict` 类型，`var.get` 返回的就是同一个容器。
 
 ## 积木形状
@@ -162,13 +190,14 @@ registry.grouped();         // 按类别分组，供工具箱
 
 部分积木支持在画布上直接增减内容，状态存在积木自己的字段里：
 
-- `text.join`：字段 `count`（2–8）。端口按 `a`、`b`、`c`… 依次生成。
-- `control.if`：字段 `elseIfs` 是扩展值（0–4）。0 为普通 if；N≥1 时生成 N−1 个 `elseIfN`（布尔条件）与 `elseIfNBody`（栈）端口，外加 `else` 端口。
-- `func.define`：`params` 是文本字段，画布上的 `+`/`−` 会按 `名称:类型` 语法追加或删除最后一个参数。
+- `text.join`：字段 `count`（默认 2，最少 2，没有上限）。端口按 `a`、`b`、`c`… 依次生成。
+- `math.arithmetic`：字段 `count`（默认 2，最少 2，没有上限）。端口按 `a`、`b`、`n3`、`n4`… 依次生成。
+- `control.if`：字段 `elseIfs` 是扩展值（默认 0，最少 0，没有上限）。0 和 1 都只生成 `condition`/`then`/`else`；N≥2 时生成 N−1 个 `elseIfN`（布尔条件）与 `elseIfNBody`（栈）端口，外加 `else` 端口。
+- `func.define_value` / `func.define_action`：`params` 是文本字段，画布上的 `+`/`−` 会按 `名称:类型` 语法追加或删除最后一个参数（编辑器辅助按钮最多追加到 8 个，手工编辑文本不受此限）。
 
 这类端口由 `BlockSchema.dynamicPorts(node)` 给出；校验、渲染、拖拽和解释器都通过 `portsOf(schema, node)` 读取，因此插件的自定义积木也可以用同样方式实现可增长端口。
 
-`validateProject` 接受任意 `BlockSchema` 来源；IR 侧会额外扫描 `func.define`，校验参数列表与 `func.param` 的作用域。插件可以传入自己的注册表，不影响核心。
+`validateProject` 接受任意 `BlockSchema` 来源；IR 侧会额外扫描 `func.define_value` / `func.define_action`，校验参数列表与 `func.param` 的作用域。插件可以传入自己的注册表，不影响核心。
 
 ## 新增一块积木
 
@@ -187,7 +216,7 @@ registry.grouped();         // 按类别分组，供工具箱
 - `control.repeat`：先把 `times` 求值为非负整数，再重复执行 `body`。
 - `control.forever`：每轮先 `tick` 再执行 `body`；`BreakSignal` 退出循环；没有步数上限，死循环会一直跑，直到用户按「停止」。
 - `control.while`：每轮开始前重新求值 `condition`，为假就结束；条件里的变量或函数调用会随轮次变化。
-- `control.repeatWith`：先固定 `times`，然后第 0..N-1 轮把轮次写入 `variable`（0 起）；循环结束后变量保留最后一轮的值；`break` 时立即停止并保留当前值。
+- `control.repeatWith`：先固定 `times`，然后第 0..N-1 轮把轮次写入 `variable`（0 起；变量不存在时自动创建）；循环结束后变量保留最后一轮的值；`break` 时立即停止并保留当前值。
 
 ## 类型转换
 
@@ -205,14 +234,14 @@ registry.grouped();         // 按类别分组，供工具箱
 
 ## 跳出循环
 
-`control.break` 抛出内部 `BreakSignal`，只由循环积木捕获（`control.repeat`、`control.forever`、`control.while`、`control.repeatWith`）。如果在循环外执行，整次运行以 `runtime.error.breakOutsideLoop` 报错。`func.return` 用同一套控制流信号，两者都会安全穿过 `control.if` 等普通语句。
+`control.break` 抛出内部 `BreakSignal`，只由循环积木捕获（`control.repeat`、`control.forever`、`control.while`、`control.repeatWith`、`control.forEach`）。如果在循环外执行，整次运行以 `runtime.error.breakOutsideLoop` 报错。`func.return` 用同一套控制流信号，两者都会安全穿过 `control.if` 等普通语句。
 
 ## 标记与跳转
 
 `control.label` 是空操作，`control.goto` 抛出 `GotoSignal(name)`。信号由当前脚本或函数的 `runFrame` 捕获：在帧内按出现顺序（深度优先）查找第一个同名标记，然后从该标记所在的语句继续执行，再依次执行各层外层栈中位于容器之后的语句。
 
 - 标记可以放在任意嵌套位置；跳进循环体或条件分支后，程序会从标记处继续，而不会重新判断外层条件或重跑循环头部。
-- 标签只在当前脚本或函数内可见；查找不跨越函数调用边界。
+- 标签按脚本/函数帧解析；`goto` 在函数里抛出后会冒泡到调用方的 `runFrame`，调用方若有同名标记就会被跳转（没有跨帧校验）。只在同帧使用、或保证调用链上没有同名标记，才是安全写法。
 - 找不到同名标记时以 `runtime.error.unknownLabel`（参数 `{name}`）结束运行。
 - 同名标记重复时第一个生效；`catch` 分支里的标记暂不参与索引。
 
@@ -221,7 +250,7 @@ registry.grouped();         // 按类别分组，供工具箱
 `control.throw` 抛出 `ThrowSignal(value)`；`control.try` 执行 `body`，捕获 `ThrowSignal` 和 `RuntimeFailure`，按 `catches` 顺序用分支的 `exception` 字段匹配：
 
 - `any` 匹配全部；`error` 只匹配运行时错误；其余按被抛出值的类型（`text`/`number`/`boolean`/`list`/`dict`）匹配。
-- `control.catchAssign` 在匹配后调用 `ctx.setVariable(target, text)`，把异常转成当前语言的消息字符串；`RuntimeFailure` 的文本由运行入口注入的 `describeFailure` 本地化。
+- `control.catchAssign` 在匹配后把异常转成当前语言的消息字符串，写入 `target`（变量不存在时创建）；`RuntimeFailure` 的文本由运行入口注入的 `describeFailure` 本地化。
 - 没有匹配分支时原样重抛；`StopSignal`、`BreakSignal` 永不捕获，保证「停止」和跳出循环语义不变。
 - 校验要求捕获积木只能出现在 `control.try` 的 `catches` 栈中，且该栈只能放捕获积木（`catch.misplaced` / `catch.invalid`）。
 
