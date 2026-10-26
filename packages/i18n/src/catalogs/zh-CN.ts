@@ -7,6 +7,9 @@ export const zhCN: Catalog = {
   "app.projectName": "项目名称",
 
   "toolbar.run": "运行",
+  "toolbar.traceDelay": "跟踪速度",
+  "toolbar.traceDelayHint": "跟踪运行时每条语句之间等待的时间，0 表示不等待。",
+  "toolbar.traceDelayOff": "不等待",
   "toolbar.runTrace": "跟踪",
   "toolbar.pause": "暂停",
   "toolbar.resume": "继续",
@@ -107,6 +110,11 @@ export const zhCN: Catalog = {
   "canvas.emptyBody": "从工具箱拖一块积木到画布。程序从“当程序启动时”开始运行。",
   "canvas.blocks": "{count} 个积木",
 
+  "debug.tab.variables": "变量",
+  "debug.tab.stack": "调用栈",
+  "debug.stack.empty": "当前没有函数调用。",
+  "debug.stack.top": "顶层脚本",
+  "debug.stack.depth": "第 {depth} 层",
   "variables.empty": "还没有变量。程序创建变量后会显示在这里。",
 
   "console.empty": "运行程序后，输出会显示在这里。",

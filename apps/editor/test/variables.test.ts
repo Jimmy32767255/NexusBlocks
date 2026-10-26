@@ -13,11 +13,11 @@ Object.assign(globalThis, {
 });
 
 dom.window.localStorage.setItem("nexus-blocks:locale", "en");
-const { renderVariables } = await import("../src/variables.ts");
+const { renderVariableItems } = await import("../src/variables.ts");
 
 describe("variables panel", () => {
   it("lists live variables with their current values", () => {
-    const root = renderVariables({ values: { score: 3, name: "Ada", done: true } });
+    const root = renderVariableItems({ score: 3, name: "Ada", done: true });
     const names = [...root.querySelectorAll(".variables__name")].map((node) => node.textContent);
     const values = [...root.querySelectorAll(".variables__value")].map((node) => node.textContent);
     assert.deepEqual(names, ["score", "name", "done"]);
@@ -25,13 +25,13 @@ describe("variables panel", () => {
   });
 
   it("shows an empty hint before the program declares anything", () => {
-    const root = renderVariables({ values: null });
+    const root = renderVariableItems(null);
     assert.equal(root.querySelectorAll(".variables__item").length, 0);
     assert.ok(root.querySelector(".variables__empty"));
   });
 
   it("offers no editing controls", () => {
-    const root = renderVariables({ values: { score: 1 } });
+    const root = renderVariableItems({ score: 1 });
     assert.equal(root.querySelector("input"), null);
     assert.equal(root.querySelector("button"), null);
   });

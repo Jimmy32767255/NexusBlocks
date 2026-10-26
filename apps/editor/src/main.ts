@@ -6,6 +6,7 @@ import {
   resolveImports,
   runProject,
   type BlockRegistry,
+  type DebugFrame,
   type ImportError,
   type RuntimeEvent,
   type RuntimeFailure,
@@ -24,6 +25,7 @@ import {
   portsOf,
   printNblk,
   type Diagnostic,
+  type NexusDocument,
   type Value,
   type ValueType,
 } from "@nexus/ir";
@@ -55,10 +57,10 @@ import {
 } from "./persist.ts";
 import { Store, type RunStatus } from "./store.ts";
 import { toast } from "./toast.ts";
-import { renderToolbar } from "./toolbar.ts";
+import { renderToolbar, setTraceDelayState } from "./toolbar.ts";
 import { renderToolbox, restoreToolboxScroll } from "./toolbox.ts";
 import { renderHatList } from "./hat-list.ts";
-import { renderVariables } from "./variables.ts";
+import { renderDebugPanel, type DebugTab } from "./debug-panel.ts";
 import { createDesktopCli, createDesktopFiles, createDesktopHost, isDesktopShell } from "./desktop.ts";
 
 import "./styles.css";
@@ -90,11 +92,34 @@ let debugTrace = false;
 let debugPaused = false;
 let debugCurrentId: string | null = null;
 let debugValues: Record<string, Value> | null = null;
+let debugStack: DebugFrame[] = [];
+const DEBUG_TAB_KEY = "nexus-blocks:debug-tab";
+
+function loadDebugTab(): DebugTab {
+  return localStorage.getItem(DEBUG_TAB_KEY) === "stack" ? "stack" : "variables";
+}
+
+let sideTab: DebugTab = loadDebugTab();
 let surface: HTMLElement | null = null;
 let frame: number | null = null;
 /** Pan offset of the automatic layout. Never stored in the document. */
 let viewport = { x: 0, y: 0 };
 let autosaveTimer: number | null = null;
+const TRACE_DELAY_KEY = "nexus-blocks:trace-delay";
+
+function loadTraceDelay(): number {
+  const stored = localStorage.getItem(TRACE_DELAY_KEY);
+  if (stored === null) return 450;
+  const value = Number(stored);
+  return Number.isFinite(value) && value >= 0 ? Math.min(value, 3000) : 450;
+}
+
+let traceDelay = loadTraceDelay();
+setTraceDelayState(traceDelay, (milliseconds) => {
+  traceDelay = milliseconds;
+  localStorage.setItem(TRACE_DELAY_KEY, String(milliseconds));
+  debugSession?.setTraceDelay(traceDelay);
+});
 let focusScriptId: string | null = null;
 
 const LEFT_TAB_KEY = "nexus-blocks:left-tab";
@@ -132,72 +157,278 @@ void refreshImports(false);
 
 function scheduleRender(): void {
   if (frame !== null) return;
-  frame = requestAnimationFrame(() => {
+  // A timeout (not rAF) keeps updates flowing when the tab is throttled or the
+  // webview is not painting, which is common while tracing in the background.
+  frame = window.setTimeout(() => {
     frame = null;
     renderNow();
+  }, 16);
+}
+
+interface Shell {
+  app: HTMLElement;
+  toolbar: HTMLElement | null;
+  tabs: { toolbox: HTMLButtonElement; hats: HTMLButtonElement };
+  leftBody: HTMLElement;
+  canvasHost: HTMLElement;
+  status: HTMLElement;
+  problems: HTMLButtonElement;
+  blockCount: HTMLElement;
+  zoomText: HTMLElement;
+  inspector: HTMLElement | null;
+  variables: HTMLElement | null;
+  console: HTMLElement | null;
+}
+
+let shell: Shell | null = null;
+const regionDeps: Record<string, unknown[] | undefined> = {};
+
+/** True when one of a region's inputs changed since its last render. */
+function dirty(name: string, next: unknown[]): boolean {
+  const previous = regionDeps[name];
+  if (
+    previous &&
+    previous.length === next.length &&
+    previous.every((value, index) => Object.is(value, next[index]))
+  ) {
+    return false;
+  }
+  regionDeps[name] = next;
+  return true;
+}
+
+/** Diagnostics and block count are document-wide; validate once per document. */
+let analysedDocument: NexusDocument | null = null;
+let analysedRegistry: BlockRegistry | null = null;
+let analysedDiagnostics: Diagnostic[] = [];
+let analysedBlocks = 0;
+
+function analyse(document: NexusDocument): { diagnostics: Diagnostic[]; blocks: number } {
+  if (analysedDocument === document && analysedRegistry === registry) {
+    return { diagnostics: analysedDiagnostics, blocks: analysedBlocks };
+  }
+  analysedDocument = document;
+  analysedRegistry = registry;
+  analysedDiagnostics = validateQuietly();
+  analysedBlocks = countBlocks(document.project);
+  return { diagnostics: analysedDiagnostics, blocks: analysedBlocks };
+}
+
+function buildShell(): Shell {
+  const tab = (id: "toolbox" | "hats", key: string): HTMLButtonElement =>
+    el("button", {
+      class: "left-panel__tab",
+      text: t(key),
+      attrs: { type: "button", role: "tab", "data-left-tab": id },
+      on: { click: () => setLeftTab(id) },
+    });
+  const tabs = { toolbox: tab("toolbox", "sidebar.toolbox"), hats: tab("hats", "sidebar.hats") };
+  const leftBody = el("div", { class: "left-panel__body" });
+  const left = el("aside", { class: "toolbox left-panel", dataset: { deleteZone: "true" } }, [
+    el("div", { class: "left-panel__tabs", attrs: { role: "tablist" } }, [tabs.toolbox, tabs.hats]),
+    leftBody,
+  ]);
+
+  const canvasHost = el("div", { class: "canvas-host" });
+  const status = el("span", { class: "status status--idle" });
+  const problems = el("button", {
+    class: "statusbar__problems",
+    attrs: { type: "button", title: t("panel.problems") },
+    on: { click: () => void showProblems() },
   });
+  const blockCount = el("span");
+  const zoomText = el("span");
+  const statusbar = el("div", { class: "statusbar" }, [
+    status,
+    problems,
+    el("span", { class: "statusbar__spacer" }),
+    blockCount,
+    zoomText,
+  ]);
+  const stage = el("section", { class: "stage" }, [canvasHost, statusbar]);
+
+  const side = el("aside", { class: "side" });
+  const workspace = el("main", { class: "workspace" }, [left, stage, side]);
+  const app = el("div", { class: "app" }, [workspace]);
+
+  return {
+    app,
+    toolbar: null,
+    tabs,
+    leftBody,
+    canvasHost,
+    status,
+    problems,
+    blockCount,
+    zoomText,
+    inspector: null,
+    variables: null,
+    console: null,
+  };
 }
 
 function renderNow(): void {
   if (frame !== null) {
-    cancelAnimationFrame(frame);
+    window.clearTimeout(frame);
     frame = null;
   }
   const state = store.state;
   const document = state.document;
   const running = state.status === "running";
+  if (!shell) {
+    shell = buildShell();
+    host.replaceChildren(shell.app);
+  }
+  const current = shell;
+  const analysis = analyse(document);
 
-  const left = renderLeftPanel();
+  for (const id of ["toolbox", "hats"] as const) {
+    const button = current.tabs[id];
+    const active = leftTab === id;
+    button.classList.toggle("left-panel__tab--active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  }
+  if (dirty("tabs", [currentLocale()])) {
+    current.tabs.toolbox.textContent = t("sidebar.toolbox");
+    current.tabs.hats.textContent = t("sidebar.hats");
+  }
 
-  const canvas = renderCanvas(document, {
+  if (
+    dirty("toolbar", [
+      document.project.name,
+      currentLocale(),
+      state.status,
+      state.zoom,
+      store.canUndo(),
+      store.canRedo(),
+    ])
+  ) {
+    const toolbar = renderToolbar({
+      projectName: document.project.name,
+      locale: currentLocale(),
+      status: state.status,
+      canUndo: store.canUndo(),
+      canRedo: store.canRedo(),
+      zoom: state.zoom,
+      onRun: () => void run(false),
+      onRunTrace: () => void run(true),
+      traceDelay,
+      onTraceDelayChange: (milliseconds) => {
+        traceDelay = milliseconds;
+        localStorage.setItem(TRACE_DELAY_KEY, String(milliseconds));
+        debugSession?.setTraceDelay(traceDelay);
+      },
+      onPause: () => debugSession?.requestPause(),
+      onResume: () => debugSession?.resume(),
+      onStep: () => debugSession?.step(),
+      onStop: () => stop(),
+      onNew: () => void newProject(),
+      onOpen: () => void openProject(),
+      onSave: () => void save(),
+      onUndo: () => store.undo(),
+      onRedo: () => store.redo(),
+      onZoomIn: () => store.setZoom(store.state.zoom * 1.2),
+      onZoomOut: () => store.setZoom(store.state.zoom / 1.2),
+      onZoomReset: () => resetView(),
+      onLocaleChange: (locale) => changeLocale(locale),
+      onHelp: () => void showHelp(),
+      onDocs: () => void showDocs(),
+      onRefreshImports: () => void refreshImports(true),
+      onRename: (name) => renameProject(name),
+    });
+    if (current.toolbar) current.toolbar.replaceWith(toolbar);
+    else current.app.prepend(toolbar);
+    current.toolbar = toolbar;
+  }
+
+  if (
+    dirty("left", [
+      leftTab,
+      registry,
+      currentLocale(),
+      ...(leftTab === "hats" ? [document, state.selectedId] : []),
+    ])
+  ) {
+    const body =
+      leftTab === "toolbox"
+        ? renderToolbox({
+            registry,
+            onInsert: (type) => placeBlockAtCenter(type),
+            onDragStart: (event, type) => startToolboxDrag(event, type, dragDeps()),
+          })
+        : el("div", { class: "toolbox__body" }, [
+            renderHatList({
+              document,
+              registry,
+              selectedId: state.selectedId,
+              onSelect: (id) => {
+                focusScriptId = id;
+                store.select(id);
+                scheduleRender();
+              },
+            }),
+          ]);
+    current.leftBody.replaceChildren(body);
+    if (leftTab === "toolbox") restoreToolboxScroll();
+  }
+
+  const canvasChanged = dirty("canvas", [
+    document,
     registry,
-    selectedId: state.selectedId,
-    zoom: state.zoom,
-    viewport,
-    interactive: !running && state.status !== "paused",
-    breakpoints: store.breakpoints,
-    debugCurrentId,
-  });
-  surface = canvas.surface;
+    state.zoom,
+    running || state.status === "paused",
+  ]);
+  if (canvasChanged) {
+    const canvas = renderCanvas(document, {
+      registry,
+      selectedId: state.selectedId,
+      zoom: state.zoom,
+      viewport,
+      interactive: !running && state.status !== "paused",
+      breakpoints: store.breakpoints,
+      debugCurrentId,
+    });
+    current.canvasHost.replaceChildren(canvas.root);
+    surface = canvas.surface;
+    applyBlockWidths(current.canvasHost);
+  }
 
-  const canvasHost = el("div", { class: "canvas-host" }, [canvas.root]);
-
-  const diagnostics = validateQuietly();
-  const errorCount =
-    diagnostics.filter((diagnostic) => diagnostic.severity === "error").length + importErrors.length;
-  const problems = el(
-    "button",
-    {
-      class: `statusbar__problems${errorCount > 0 ? " statusbar__problems--error" : ""}`,
-      attrs: { type: "button", title: t("panel.problems") },
-      on: { click: () => void showProblems() },
-    },
-    [
+  if (dirty("statusbar", [analysis.diagnostics, importErrors, analysis.blocks, state.status, state.zoom])) {
+    current.status.className = `status status--${state.status}`;
+    current.status.textContent = t(STATUS_KEYS[state.status]);
+    const errorCount =
+      analysis.diagnostics.filter((diagnostic) => diagnostic.severity === "error").length +
+      importErrors.length;
+    current.problems.className = `statusbar__problems${errorCount > 0 ? " statusbar__problems--error" : ""}`;
+    current.problems.replaceChildren(
       icon(errorCount > 0 ? "warning" : "terminal", 13),
       el("span", {
-        text: diagnostics.length > 0 ? t("problems.count", { count: diagnostics.length }) : t("problems.none"),
+        text:
+          analysis.diagnostics.length > 0
+            ? t("problems.count", { count: analysis.diagnostics.length })
+            : t("problems.none"),
       }),
-    ],
-  );
-
-  const stage = el("section", { class: "stage" }, [
-    canvasHost,
-    el("div", { class: "statusbar" }, [
-      el("span", { class: `status status--${state.status}`, text: t(STATUS_KEYS[state.status]) }),
-      problems,
-      el("span", { class: "statusbar__spacer" }),
-      el("span", { text: t("canvas.blocks", { count: countBlocks(document.project) }) }),
-      el("span", { text: `${Math.round(state.zoom * 100)}%` }),
-    ]),
-  ]);
+    );
+    current.blockCount.textContent = t("canvas.blocks", { count: analysis.blocks });
+    current.zoomText.textContent = `${Math.round(state.zoom * 100)}%`;
+  }
 
   const selected = state.selectedId ? findBlock(document.project, state.selectedId) : null;
   const scriptIndex = selected
     ? document.project.scripts.findIndex((script) => script.id === selected.id)
     : -1;
 
-  const side = el("aside", { class: "side" }, [
-    renderInspector({
+  if (
+    dirty("inspector", [
+      selected,
+      document,
+      registry,
+      currentLocale(),
+      scriptIndex,
+      selected ? store.breakpoints.has(selected.id) : false,
+    ])
+  ) {
+    const inspector = renderInspector({
       registry,
       selected,
       onFieldChange: setBlockValue,
@@ -217,53 +448,85 @@ function renderNow(): void {
           debugSession?.setBreakpoints(store.breakpoints);
         }
       },
-    }),
-    renderVariables({ values: debugValues }),
-    renderConsole({
+    });
+    if (current.inspector) current.inspector.replaceWith(inspector);
+    else current.app.querySelector(".side")?.append(inspector);
+    current.inspector = inspector;
+  }
+
+  if (dirty("debug-side", [debugValues, debugStack, sideTab])) {
+    const variables = renderDebugPanel({
+      tab: sideTab,
+      values: debugValues,
+      stack: debugStack,
+      onTabChange: (tab) => {
+        sideTab = tab;
+        localStorage.setItem(DEBUG_TAB_KEY, tab);
+        renderNow();
+      },
+    });
+    if (current.variables) current.variables.replaceWith(variables);
+    else current.app.querySelector(".side")?.append(variables);
+    current.variables = variables;
+  }
+
+  if (dirty("console", [state.logs])) {
+    const consolePanel = renderConsole({
       logs: state.logs,
       onClear: () => store.clearLogs(),
       onSelectBlock: (blockId) => store.select(blockId),
-    }),
-  ]);
+    });
+    if (current.console) current.console.replaceWith(consolePanel);
+    else current.app.querySelector(".side")?.append(consolePanel);
+    current.console = consolePanel;
+  }
 
-  const toolbar = renderToolbar({
-    projectName: document.project.name,
-    locale: currentLocale(),
-    status: state.status,
-    canUndo: store.canUndo(),
-    canRedo: store.canRedo(),
-    zoom: state.zoom,
-    onRun: () => void run(false),
-    onRunTrace: () => void run(true),
-    onPause: () => debugSession?.requestPause(),
-    onResume: () => debugSession?.resume(),
-    onStep: () => debugSession?.step(),
-    onStop: () => stop(),
-    onNew: () => void newProject(),
-    onOpen: () => void openProject(),
-    onSave: () => void save(),
-    onUndo: () => store.undo(),
-    onRedo: () => store.redo(),
-    onZoomIn: () => store.setZoom(store.state.zoom * 1.2),
-    onZoomOut: () => store.setZoom(store.state.zoom / 1.2),
-    onZoomReset: () => resetView(),
-    onLocaleChange: (locale) => changeLocale(locale),
-    onHelp: () => void showHelp(),
-    onDocs: () => void showDocs(),
-    onRefreshImports: () => void refreshImports(true),
-    onRename: (name) => renameProject(name),
-  });
-
-  host.replaceChildren(
-    el("div", { class: "app" }, [toolbar, el("main", { class: "workspace" }, [left, stage, side])]),
-  );
-  applyBlockWidths(stage);
-  if (leftTab === "toolbox") restoreToolboxScroll();
+  syncTransientState();
   if (focusScriptId) {
     jumpToScript(focusScriptId);
     focusScriptId = null;
   }
   applyViewport();
+}
+
+/**
+ * Selection, breakpoints and the debug pointer only change classes, so a
+ * keystroke in the inspector never rebuilds thousands of blocks.
+ */
+function syncTransientState(): void {
+  const surfaceElement = surface;
+  if (!surfaceElement) return;
+  const selectedId = store.state.selectedId;
+  for (const marked of surfaceElement.querySelectorAll<HTMLElement>(".block--selected")) {
+    if (marked.dataset.blockId !== selectedId) marked.classList.remove("block--selected");
+  }
+  if (selectedId) {
+    surfaceElement
+      .querySelector<HTMLElement>(`[data-block-id="${CSS.escape(selectedId)}"]`)
+      ?.classList.add("block--selected");
+  }
+
+  for (const marked of surfaceElement.querySelectorAll<HTMLElement>(".block--debug-current")) {
+    if (marked.dataset.blockId !== debugCurrentId) marked.classList.remove("block--debug-current");
+  }
+  if (debugCurrentId) {
+    surfaceElement
+      .querySelector<HTMLElement>(`[data-block-id="${CSS.escape(debugCurrentId)}"]`)
+      ?.classList.add("block--debug-current");
+  }
+
+  const markedBreakpoints = new Set<string>();
+  for (const marked of surfaceElement.querySelectorAll<HTMLElement>(".block--breakpoint")) {
+    const id = marked.dataset.blockId ?? "";
+    if (store.breakpoints.has(id)) markedBreakpoints.add(id);
+    else marked.classList.remove("block--breakpoint");
+  }
+  for (const id of store.breakpoints) {
+    if (markedBreakpoints.has(id)) continue;
+    surfaceElement
+      .querySelector<HTMLElement>(`[data-block-id="${CSS.escape(id)}"]`)
+      ?.classList.add("block--breakpoint");
+  }
 }
 
 /* -------------------------------------------------------------------- data */
@@ -482,19 +745,22 @@ async function run(trace = false): Promise<void> {
   debugValues = null;
   const session = new DebugSession({
     signal: controller.signal,
-    traceDelay: trace ? 450 : 0,
+    traceDelay: trace ? traceDelay : 0,
     breakpoints: store.breakpoints,
-    onStatement: (blockId) => {
+    onStatement: (blockId, stack) => {
       debugCurrentId = blockId;
+      debugStack = stack;
       if (trace) {
         scheduleRender();
         requestAnimationFrame(() => focusBlock(blockId));
       }
     },
-    onPause: (blockId, values) => {
+    onPause: (blockId, values, stack) => {
       debugPaused = true;
       debugCurrentId = blockId;
       debugValues = values as Record<string, Value>;
+      debugStack = stack;
+
       store.setStatus("paused");
       scheduleRender();
       requestAnimationFrame(() => focusBlock(blockId));
@@ -503,8 +769,11 @@ async function run(trace = false): Promise<void> {
       debugPaused = false;
       store.setStatus("running");
     },
-    onVariables: (values) => {
+    onVariables: (values, stack) => {
       debugValues = values as Record<string, Value>;
+      debugStack = stack;
+
+
       if (trace || debugPaused) scheduleRender();
     },
   });
@@ -528,6 +797,7 @@ async function run(trace = false): Promise<void> {
     debugPaused = false;
     debugCurrentId = null;
     debugValues = null;
+    debugStack = [];
     scheduleAutosave();
     scheduleRender();
   }
