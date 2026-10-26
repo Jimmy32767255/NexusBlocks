@@ -31,6 +31,12 @@ const collapsedGroups = loadCollapsed();
 
 /** Keep the scissors where the user left them: every render rebuilds the list. */
 let savedScrollTop = 0;
+let activeList: HTMLElement | null = null;
+
+/** Re-apply the remembered offset once the rebuilt list is in the document. */
+export function restoreToolboxScroll(): void {
+  if (activeList) activeList.scrollTop = savedScrollTop;
+}
 
 window.addEventListener("scroll", hideTip, true);
 
@@ -123,6 +129,7 @@ export function renderToolbox(options: ToolboxOptions): HTMLElement {
   });
 
   const list = el("div", { class: "toolbox__list" });
+  activeList = list;
   list.addEventListener("scroll", () => {
     savedScrollTop = list.scrollTop;
   });
@@ -231,9 +238,8 @@ export function renderToolbox(options: ToolboxOptions): HTMLElement {
 
   search.addEventListener("input", applyFilter);
   applyFilter();
-  list.scrollTop = savedScrollTop;
 
-  return el("aside", { class: "toolbox", dataset: { deleteZone: "true" } }, [
+  return el("div", { class: "toolbox__body" }, [
     el("header", { class: "panel__head" }, [
       el("h2", { class: "panel__title", text: t("toolbox.title") }),
       el("span", { class: "toolbox__delete-hint", text: t("toolbox.deleteHint") }),

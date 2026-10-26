@@ -56,7 +56,8 @@ import {
 import { Store, type RunStatus } from "./store.ts";
 import { toast } from "./toast.ts";
 import { renderToolbar } from "./toolbar.ts";
-import { renderToolbox } from "./toolbox.ts";
+import { renderToolbox, restoreToolboxScroll } from "./toolbox.ts";
+import { renderHatList } from "./hat-list.ts";
 import { renderVariables } from "./variables.ts";
 import { createDesktopCli, createDesktopFiles, createDesktopHost, isDesktopShell } from "./desktop.ts";
 
@@ -94,6 +95,21 @@ let frame: number | null = null;
 /** Pan offset of the automatic layout. Never stored in the document. */
 let viewport = { x: 0, y: 0 };
 let autosaveTimer: number | null = null;
+let focusScriptId: string | null = null;
+
+const LEFT_TAB_KEY = "nexus-blocks:left-tab";
+
+function loadLeftTab(): "toolbox" | "hats" {
+  return localStorage.getItem(LEFT_TAB_KEY) === "hats" ? "hats" : "toolbox";
+}
+
+let leftTab = loadLeftTab();
+
+function setLeftTab(tab: "toolbox" | "hats"): void {
+  leftTab = tab;
+  localStorage.setItem(LEFT_TAB_KEY, tab);
+  scheduleRender();
+}
 
 const STATUS_KEYS: Record<RunStatus, string> = {
   idle: "status.idle",
@@ -131,11 +147,7 @@ function renderNow(): void {
   const document = state.document;
   const running = state.status === "running";
 
-  const toolbox = renderToolbox({
-    registry,
-    onInsert: (type) => placeBlockAtCenter(type),
-    onDragStart: (event, type) => startToolboxDrag(event, type, dragDeps()),
-  });
+  const left = renderLeftPanel();
 
   const canvas = renderCanvas(document, {
     registry,
@@ -243,13 +255,70 @@ function renderNow(): void {
   });
 
   host.replaceChildren(
-    el("div", { class: "app" }, [toolbar, el("main", { class: "workspace" }, [toolbox, stage, side])]),
+    el("div", { class: "app" }, [toolbar, el("main", { class: "workspace" }, [left, stage, side])]),
   );
   applyBlockWidths(stage);
+  if (leftTab === "toolbox") restoreToolboxScroll();
+  if (focusScriptId) {
+    jumpToScript(focusScriptId);
+    focusScriptId = null;
+  }
   applyViewport();
 }
 
 /* -------------------------------------------------------------------- data */
+
+function renderLeftPanel(): HTMLElement {
+  const tabButton = (id: "toolbox" | "hats", key: string): HTMLButtonElement => {
+    const active = leftTab === id;
+    return el("button", {
+      class: `left-panel__tab${active ? " left-panel__tab--active" : ""}`,
+      text: t(key),
+      attrs: {
+        type: "button",
+        role: "tab",
+        "aria-selected": active ? "true" : "false",
+        "data-left-tab": id,
+      },
+      on: { click: () => setLeftTab(id) },
+    });
+  };
+
+  const body =
+    leftTab === "toolbox"
+      ? renderToolbox({
+          registry,
+          onInsert: (type) => placeBlockAtCenter(type),
+          onDragStart: (event, type) => startToolboxDrag(event, type, dragDeps()),
+        })
+      : el("div", { class: "toolbox__body" }, [
+          renderHatList({
+            document: store.state.document,
+            registry,
+            selectedId: store.state.selectedId,
+            onSelect: (id) => {
+              focusScriptId = id;
+              store.select(id);
+              scheduleRender();
+            },
+          }),
+        ]);
+
+  return el("aside", { class: "toolbox left-panel", dataset: { deleteZone: "true" } }, [
+    el("div", { class: "left-panel__tabs", attrs: { role: "tablist" } }, [
+      tabButton("toolbox", "sidebar.toolbox"),
+      tabButton("hats", "sidebar.hats"),
+    ]),
+    body,
+  ]);
+}
+
+/** Scroll the canvas so one top-level script sits near the top of the view. */
+function jumpToScript(scriptId: string): void {
+  const wrapper = surface?.querySelector<HTMLElement>(`[data-script="${CSS.escape(scriptId)}"]`);
+  if (!wrapper) return;
+  viewport = clampViewport({ x: 0, y: 40 - wrapper.offsetTop * store.state.zoom });
+}
 
 function scheduleImportRefresh(): void {
   if (importTimer !== null) window.clearTimeout(importTimer);
