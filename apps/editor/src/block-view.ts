@@ -14,8 +14,8 @@ function measureText(text: string): number {
   return measureContext.measureText(text).width;
 }
 
-function clampWidth(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, Math.ceil(value)));
+function clampWidth(value: number, min: number): number {
+  return Math.max(min, Math.ceil(value));
 }
 
 /** Resize an inline field/select to roughly the width of its current content. */
@@ -23,15 +23,15 @@ export function autoSizeControl(control: HTMLInputElement | HTMLSelectElement): 
   if (control.tagName === "SELECT") {
     const select = control as HTMLSelectElement;
     const label = select.selectedOptions[0]?.textContent ?? "";
-    select.style.width = `${clampWidth(measureText(label) + 42, 64, 220)}px`;
+    select.style.width = `${clampWidth(measureText(label) + 42, 64)}px`;
     return;
   }
   const input = control as HTMLInputElement;
   if (input.type === "number") {
-    input.style.width = `${clampWidth(measureText(input.value) + 24, 44, 170)}px`;
+    input.style.width = `${clampWidth(measureText(input.value) + 24, 44)}px`;
     return;
   }
-  input.style.width = `${clampWidth(measureText(input.value) + 22, 54, 320)}px`;
+  input.style.width = `${clampWidth(measureText(input.value) + 22, 54)}px`;
 }
 
 function directChild(parent: HTMLElement, selector: string): HTMLElement | null {
@@ -345,7 +345,7 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
         attrs: {
           type: "text",
           value: name,
-          size: Math.max(4, Math.min(20, name.length + 1)),
+          size: Math.max(4, name.length + 1),
           title,
           "aria-label": title,
           spellcheck: "false",
@@ -364,7 +364,7 @@ function renderField(node: BlockNode, field: FieldDef, context: BlockRenderConte
         attrs: {
           type: "text",
           value: text,
-          size: Math.max(2, Math.min(24, text.length + 1)),
+          size: Math.max(2, text.length + 1),
           title,
           "aria-label": title,
           disabled: !context.interactive,
@@ -392,7 +392,14 @@ function renderValuePort(node: BlockNode, port: PortDef, context: BlockRenderCon
     const raw = node.fields?.[port.name];
     const value = raw === undefined ? port.default ?? "" : raw;
     if (type === "any") {
-      chip.append(el("span", { class: "port__hint", text: t("block.port.dropValue") }));
+      chip.append(
+        raw === undefined || raw === null
+          ? el("span", { class: "port__literal port__literal--null", text: t("block.port.null") })
+          : el("span", {
+              class: "port__literal",
+              text: typeof raw === "boolean" ? t(raw ? "common.true" : "common.false") : String(raw),
+            }),
+      );
     } else if (type === "boolean") {
       const select = el("select", {
         class: "port__input port__select",
@@ -417,7 +424,7 @@ function renderValuePort(node: BlockNode, port: PortDef, context: BlockRenderCon
           type: type === "number" ? "number" : "text",
           step: "any",
           value: text,
-          size: Math.max(2, Math.min(20, text.length + 1)),
+          size: Math.max(2, text.length + 1),
           disabled: !context.interactive,
         },
       });

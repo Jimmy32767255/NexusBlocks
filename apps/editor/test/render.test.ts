@@ -363,7 +363,7 @@ describe("editor rendering", () => {
 });
 
 describe("inline control sizing", () => {
-  it("fits control widths to their content within the limits", async () => {
+  it("fits control widths to their content without an upper limit", async () => {
     const { autoSizeControl } = await import("../src/block-view.ts");
 
     const text = document.createElement("input");
@@ -374,7 +374,7 @@ describe("inline control sizing", () => {
 
     text.value = "x".repeat(100);
     autoSizeControl(text);
-    assert.equal(text.style.width, "320px");
+    assert.ok(Number.parseInt(text.style.width, 10) > 320, text.style.width);
 
     const number = document.createElement("input");
     number.type = "number";
