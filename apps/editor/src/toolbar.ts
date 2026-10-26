@@ -12,6 +12,8 @@ export interface ToolbarOptions {
   zoom: number;
   onRun: () => void;
   onRunTrace: () => void;
+  argsCount: number;
+  onEditArgs: () => void;
   traceDelay: number;
   onTraceDelayChange: (milliseconds: number) => void;
   onPause: () => void;
@@ -85,6 +87,21 @@ export function renderToolbar(options: ToolbarOptions): HTMLElement {
       on: { click: options.onRunTrace },
     },
     [icon("trace", 15), el("span", { text: t("toolbar.runTrace") })],
+  );
+
+  const argsButton = el(
+    "button",
+    {
+      class: "icon-button icon-button--args",
+      attrs: {
+        type: "button",
+        title: t("toolbar.argsTitle", { count: String(options.argsCount) }),
+        "aria-label": t("toolbar.args"),
+        "data-args-count": String(options.argsCount),
+      },
+      on: { click: options.onEditArgs },
+    },
+    [icon("terminal", 15)],
   );
 
   const speedButton = el(
@@ -161,6 +178,7 @@ export function renderToolbar(options: ToolbarOptions): HTMLElement {
     name,
     el("div", { class: "topbar__actions" }, [
       runButton,
+      argsButton,
       traceButton,
       speedButton,
       pauseButton,

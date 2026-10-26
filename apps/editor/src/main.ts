@@ -32,7 +32,7 @@ import {
 import { applyBlockWidths } from "./block-view.ts";
 import { renderCanvas } from "./canvas.ts";
 import { renderConsole } from "./console.ts";
-import { confirmDialog, helpBody, openDialog } from "./dialogs.ts";
+import { argsDialog, confirmDialog, helpBody, openDialog } from "./dialogs.ts";
 import { el } from "./dom.ts";
 import { startBlockDrag, startToolboxDrag, type DragDeps } from "./drag.ts";
 import { autoSizeControl } from "./block-view.ts";
@@ -58,6 +58,7 @@ import {
 import { Store, type RunStatus } from "./store.ts";
 import { toast } from "./toast.ts";
 import { renderToolbar, setTraceDelayState } from "./toolbar.ts";
+import { parseArguments } from "./args.ts";
 import { renderToolbox, restoreToolboxScroll } from "./toolbox.ts";
 import { renderHatList } from "./hat-list.ts";
 import { renderDebugPanel, type DebugTab } from "./debug-panel.ts";
@@ -106,6 +107,7 @@ let frame: number | null = null;
 let viewport = { x: 0, y: 0 };
 let autosaveTimer: number | null = null;
 const TRACE_DELAY_KEY = "nexus-blocks:trace-delay";
+const ARGS_KEY = "nexus-blocks:args";
 
 function loadTraceDelay(): number {
   const stored = localStorage.getItem(TRACE_DELAY_KEY);
@@ -115,6 +117,8 @@ function loadTraceDelay(): number {
 }
 
 let traceDelay = loadTraceDelay();
+let argsText = localStorage.getItem(ARGS_KEY) ?? "";
+let programArgs = parseArguments(argsText);
 setTraceDelayState(traceDelay, (milliseconds) => {
   traceDelay = milliseconds;
   localStorage.setItem(TRACE_DELAY_KEY, String(milliseconds));
@@ -299,6 +303,7 @@ function renderNow(): void {
       currentLocale(),
       state.status,
       state.zoom,
+      programArgs.length,
       store.canUndo(),
       store.canRedo(),
     ])
@@ -312,6 +317,8 @@ function renderNow(): void {
       zoom: state.zoom,
       onRun: () => void run(false),
       onRunTrace: () => void run(true),
+      argsCount: programArgs.length,
+      onEditArgs: () => void editArgs(),
       traceDelay,
       onTraceDelayChange: (milliseconds) => {
         traceDelay = milliseconds;
@@ -694,6 +701,16 @@ function placeBlockAtCenter(type: string): void {
 
 /* ------------------------------------------------------------------ actions */
 
+async function editArgs(): Promise<void> {
+  const next = await argsDialog({ initial: argsText });
+  if (next === null) return;
+  argsText = next;
+  programArgs = parseArguments(next);
+  if (next.length === 0) localStorage.removeItem(ARGS_KEY);
+  else localStorage.setItem(ARGS_KEY, next);
+  renderNow();
+}
+
 async function runWithCli(): Promise<void> {
   const runner = cliRunner;
   if (!runner || cliRunning) return;
@@ -703,7 +720,7 @@ async function runWithCli(): Promise<void> {
   scheduleRender();
   try {
     const schemas = new Map(registry.all().map((definition) => [definition.type, definition]));
-    await runner.run(printNblk(store.state.document, schemas), currentLocale(), (value) => {
+    await runner.run(printNblk(store.state.document, schemas), currentLocale(), programArgs, (value) => {
       const event = value as {
         kind?: string;
         text?: string;
@@ -783,6 +800,7 @@ async function run(trace = false): Promise<void> {
   try {
     await runProject(store.state.document.project, {
       signal: controller.signal,
+      args: programArgs,
       debug: session,
       onEvent: handleEvent,
       describeFailure: translateFailure,
