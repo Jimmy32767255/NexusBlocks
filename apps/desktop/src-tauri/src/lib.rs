@@ -352,6 +352,7 @@ fn cli_run(
     state: State<'_, CliProcess>,
     source: String,
     locale: String,
+    args: Vec<String>,
 ) -> Result<String, String> {
     let path = find_cli().ok_or_else(|| "cli.notFound".to_string())?;
     if let Ok(mut guard) = state.0.lock() {
@@ -359,8 +360,10 @@ fn cli_run(
             let _ = previous.kill();
         }
     }
-    let mut child = Command::new(&path)
-        .args(["--json", "-", "--lang", &locale])
+    let mut command = Command::new(&path);
+    command.args(["--json", "-", "--lang", &locale, "--"]);
+    command.args(&args);
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
