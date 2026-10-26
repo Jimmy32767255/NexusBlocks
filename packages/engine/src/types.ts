@@ -127,9 +127,19 @@ export interface DebugHooks {
   afterStatement?(node: BlockNode, view: DebugRuntimeView): void | Promise<void>;
 }
 
+/** One active function call, innermost last. */
+export interface DebugFrame {
+  /** Declared function name. */
+  name: string;
+  /** Block id of the `定义…函数` hat. */
+  blockId: string;
+}
+
 /** Read-only window the debugger gets into a running interpreter. */
 export interface DebugRuntimeView {
   variableValues(): Record<string, Value>;
+  /** Active function calls at this moment; empty at the top level. */
+  callStack(): DebugFrame[];
 }
 
 export interface RunOptions {

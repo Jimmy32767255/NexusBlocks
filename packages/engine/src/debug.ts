@@ -1,5 +1,5 @@
 import type { BlockNode } from "@nexus/ir";
-import type { DebugHooks, DebugRuntimeView } from "./types.ts";
+import type { DebugFrame, DebugHooks, DebugRuntimeView } from "./types.ts";
 import { StopSignal } from "./errors.ts";
 
 export interface DebugSessionOptions {
@@ -8,10 +8,10 @@ export interface DebugSessionOptions {
   /** Milliseconds to wait before each statement; 0 disables tracing. */
   traceDelay?: number;
   signal: AbortSignal;
-  onStatement?: (blockId: string) => void;
-  onPause?: (blockId: string, values: Record<string, unknown>) => void;
+  onStatement?: (blockId: string, stack: DebugFrame[]) => void;
+  onPause?: (blockId: string, values: Record<string, unknown>, stack: DebugFrame[]) => void;
   onResume?: () => void;
-  onVariables?: (values: Record<string, unknown>) => void;
+  onVariables?: (values: Record<string, unknown>, stack: DebugFrame[]) => void;
 }
 
 /**
@@ -97,7 +97,7 @@ export class DebugSession implements DebugHooks {
 
   async beforeStatement(node: BlockNode, view: DebugRuntimeView): Promise<void> {
     if (this.stopped || this.signal.aborted) throw new StopSignal();
-    this.options.onStatement?.(node.id);
+    this.options.onStatement?.(node.id, view.callStack());
     if (this.traceDelay > 0) await this.sleep(this.traceDelay);
 
     let shouldPause = this.breakpoints.has(node.id) || this.pauseRequested;
@@ -116,7 +116,7 @@ export class DebugSession implements DebugHooks {
     if (shouldPause) {
       this.pauseRequested = false;
       this.paused = true;
-      this.options.onPause?.(node.id, view.variableValues());
+      this.options.onPause?.(node.id, view.variableValues(), view.callStack());
       await this.waitForResume();
       if (this.stopped) throw new StopSignal();
       if (this.stepPending) {
@@ -130,7 +130,7 @@ export class DebugSession implements DebugHooks {
   }
 
   afterStatement(_node: BlockNode, view: DebugRuntimeView): void {
-    this.options.onVariables?.(view.variableValues());
+    this.options.onVariables?.(view.variableValues(), view.callStack());
   }
 
   private waitForResume(): Promise<void> {
