@@ -15,7 +15,14 @@ import {
 import { ReturnSignal } from "./blocks/functions.ts";
 import { ExitSignal, GotoSignal, RuntimeFailure, StopSignal } from "./errors.ts";
 import type { BlockRegistry } from "./registry.ts";
-import type { BlockDefinition, DebugHooks, ExecutionContext, HostBridge, RuntimeEvent } from "./types.ts";
+import type {
+  BlockDefinition,
+  DebugFrame,
+  DebugHooks,
+  ExecutionContext,
+  HostBridge,
+  RuntimeEvent,
+} from "./types.ts";
 
 export interface InterpreterOptions {
   host: HostBridge;
@@ -52,6 +59,7 @@ export class Interpreter implements ExecutionContext {
   private readonly variables = new Map<string, Value>();
   private readonly functions = new Map<string, FunctionDecl>();
   private readonly frames: Map<string, Value>[] = [];
+  private readonly activeCalls: DebugFrame[] = [];
 
   /** One local table per running function call, so recursion keeps its own state. */
   private readonly locals: Map<string, Value>[] = [];
@@ -213,6 +221,7 @@ export class Interpreter implements ExecutionContext {
     });
     this.frames.push(frame);
     this.locals.push(new Map());
+    this.activeCalls.push({ name: decl.name, blockId: decl.node.id });
     try {
       await this.runFrame((decl.node.inputs?.body as BlockNode[] | undefined) ?? []);
     } catch (error) {
@@ -224,8 +233,13 @@ export class Interpreter implements ExecutionContext {
     } finally {
       this.frames.pop();
       this.locals.pop();
+      this.activeCalls.pop();
     }
     return defaultValue(decl.returnType);
+  }
+
+  callStack(): DebugFrame[] {
+    return [...this.activeCalls];
   }
 
   getVariable(name: string): Value {
