@@ -29,6 +29,11 @@ export const zhCN: Catalog = {
   "language.zh-CN": "简体中文",
 
   "panel.toolbox": "积木",
+  "sidebar.toolbox": "积木箱",
+  "sidebar.hats": "顶级帽子",
+  "hats.empty": "还没有顶级帽子语句。从工具箱里拖一个帽子积木到画布上吧。",
+  "hats.jump": "在画布上滚动到这条脚本",
+  "hats.meta": "第 {index} 条 · {count} 块",
   "panel.variables": "变量",
   "panel.console": "控制台",
   "panel.problems": "问题",
