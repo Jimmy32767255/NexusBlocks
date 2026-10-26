@@ -433,8 +433,16 @@ interface GotoTarget {
   ancestors: { stack: BlockNode[]; index: number }[];
 }
 
-/** Index labels in a frame. First definition wins; catch branches are skipped. */
+/**
+ * Index labels in a frame. First definition wins; catch branches are skipped.
+ * Bodies come from the project IR and never change during a run, so the index
+ * is cached per body array: it used to be rebuilt on every function call.
+ */
+const labelIndexCache = new WeakMap<BlockNode[], Map<string, GotoTarget>>();
+
 function collectLabels(body: BlockNode[]): Map<string, GotoTarget> {
+  const cached = labelIndexCache.get(body);
+  if (cached) return cached;
   const labels = new Map<string, GotoTarget>();
   const visit = (stack: BlockNode[], ancestors: { stack: BlockNode[]; index: number }[]): void => {
     stack.forEach((node, index) => {
@@ -449,5 +457,6 @@ function collectLabels(body: BlockNode[]): Map<string, GotoTarget> {
     });
   };
   visit(body, []);
+  labelIndexCache.set(body, labels);
   return labels;
 }

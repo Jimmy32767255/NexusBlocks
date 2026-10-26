@@ -65,10 +65,11 @@ node packages/cli/src/bin.ts bootstrap/nblk1.nblk bootstrap/nblk1.ir.json bootst
 
 - 不执行 `导入`（IR 里的 import 块被忽略）；导入由原生前端在导出 IR 前解析。
 - 不支持 `执行命令`（`os.exec_command`），按错误处理。
-- 性能：单层解释约 2.7M 步/秒；固定点（nblk1 解释自己、再解释 demo）经 CLI 约数秒。
+- 性能：单层解释约 2.8M 步/秒；固定点（nblk1 解释自己、再解释 demo）经 CLI 约数秒。
   引擎每 1024 步才让出一次事件循环（`setImmediate`/`MessageChannel`，不是被钳制到 1ms 的
-  `setTimeout`），并缓存块定义与端口元数据；nblk1 则把 `端口`/字段读取内联、按热度重排分派。
-- 三层嵌套 `nblk1(nblk1(nblk1(demo)))` 也能跑出正确结果，约 2.53 亿步、3 分 23 秒，
+  `setTimeout`），并按节点缓存块定义、按静态块类型缓存端口元数据，函数体的标签索引也只建一次
+  （`返回` 用非 `Error` 的信号，避免每次返回都抓栈）；nblk1 则把 `端口`/字段读取内联、按热度重排分派。
+- 三层嵌套 `nblk1(nblk1(nblk1(demo)))` 也能跑出正确结果，约 2.53 亿步、2 分 4 秒，
   只作压力测试，不进 CI。
 
 ## nblk2 —— 源码前端（自举的第二块拼图）
