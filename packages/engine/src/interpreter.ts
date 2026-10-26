@@ -47,7 +47,7 @@ export class Interpreter implements ExecutionContext {
   private readonly emit: (event: RuntimeEvent) => void;
   private readonly debug: DebugHooks | undefined;
   private readonly yieldEvery: number;
-  readonly args: readonly string[];
+  private currentArgs: readonly string[];
 
   private readonly variables = new Map<string, Value>();
   private readonly functions = new Map<string, FunctionDecl>();
@@ -68,11 +68,19 @@ export class Interpreter implements ExecutionContext {
     this.debug = options.debug;
     this.signal = options.signal;
     this.yieldEvery = Math.max(1, options.yieldEvery ?? DEFAULT_YIELD_EVERY);
-    this.args = options.args ?? [];
+    this.currentArgs = options.args ?? [];
 
     for (const decl of collectFunctions(project.scripts)) {
       this.functions.set(decl.id, decl);
     }
+  }
+
+  get args(): readonly string[] {
+    return this.currentArgs;
+  }
+
+  setArgs(args: readonly string[]): void {
+    this.currentArgs = args.map((value) => String(value));
   }
 
   get stepCount(): number {

@@ -504,6 +504,9 @@ export const zhCN: Catalog = {
   "block.import.field.alias": "作为",
 
 
+  "block.sys.setArgs.label": "设置程序参数",
+  "block.sys.setArgs.description": "替换当前程序看到的命令行参数列表。",
+  "block.sys.setArgs.port.args": "参数",
   "block.sys.args.label": "程序参数",
   "block.sys.args.description": "命令行运行脚本时，文件名后面的参数列表（编辑器里为空列表）。",
   "block.sys.exit.label": "以状态退出",

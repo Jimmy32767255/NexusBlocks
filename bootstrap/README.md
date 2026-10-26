@@ -68,3 +68,39 @@ node packages/cli/src/bin.ts bootstrap/nblk1.nblk bootstrap/nblk1.ir.json bootst
 - 性能：单层解释约 1M 步/秒；固定点（nblk1 解释自己、再解释 demo）经 CLI 约数秒。
 - 三层嵌套 `nblk1(nblk1(nblk1(demo)))` 也能跑出正确结果，但需要 1.33 亿步、约 2 分 20 秒，
   只作压力测试，不进 CI。
+
+## nblk2 —— 源码前端（自举的第二块拼图）
+
+`bootstrap/nblk1.nblk` 只吃 IR JSON。`bootstrap/nblk2.nblk` 把 `.nblk` 源码
+（词法、表达式、语句、函数定义、`导入`）编译成同一套项目 IR，再调用 nblk1 的
+`装载` / `执行项目` 运行——于是 `.nblk` 源码可以由 `.nblk` 写的前端解释。
+
+```bash
+# 直接用源码前端运行一个程序
+node packages/cli/src/bin.ts bootstrap/nblk2.nblk -- bootstrap/examples/demo.nblk
+
+# 源码级自举：nblk2 编译 nblk1.nblk，再由它执行 demo 的 IR
+node packages/cli/src/bin.ts bootstrap/nblk2.nblk -- \
+  bootstrap/nblk1.nblk bootstrap/examples/demo.ir.json
+```
+
+`node tools/bootstrap-check.mjs --self` 会同时比对：原生 vs nblk1、原生 vs nblk2、
+nblk1 解释自己、以及 nblk2 编译 nblk1。
+
+实现要点：
+
+- 行预处理保留缩进（`缩`/`文`），`#` 注释剥离、字符串内的 `\"` 与 `#` 不误判。
+- 词法手写：数字/字符串/标识符/符号四类，符号串 `()[]{},.:+-*/%<>=!`。
+- 递归下降：或→与→比较→加→乘→一元→后缀→原子；`并且`/`或者` 中缀。
+- 常量（数字、文本、真假、空）直接写进端口 `fields`，与原生 IR 的“内联字面量”一致。
+- 节点 id 由 `nblk2_新号()` 生成（`b_1`、`b_2`…），函数调用直接写成 `func.call:<id>`。
+- `导入` 会递归读取同目录文件、合并其定义与脚本（跳过被导入文件的 `开始:`）。
+
+已知限制：
+
+- `导入` 相对主文件目录解析，暂不支持子目录内的相对路径。
+- 文本里的 `跳过` 与原生一致，是空语句（`control.pass`），不是 `continue`。
+- `nblk2` 能把 **自己** 的词法/语法完整跑完（约 1 分钟完成解析），但随后执行内层程序时报
+  `runtime.error.badType`；源码级固定点（nblk2 编译 nblk2）尚未打通，卡在多层解释时的运行时状态隔离。
+- 参数传递：`nblk1` 提供 `执行项目带参数(项目, 参数列表)`，把参数显式传给被解释程序；
+  `nblk2` 用它把 `参数()` 的剩余部分交给目标程序。

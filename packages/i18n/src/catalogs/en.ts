@@ -507,6 +507,9 @@ export const en: Catalog = {
   "block.import.field.alias": "as",
 
 
+  "block.sys.setArgs.label": "Set arguments",
+  "block.sys.setArgs.description": "Replace the command-line arguments the running program sees.",
+  "block.sys.setArgs.port.args": "args",
   "block.sys.args.label": "program arguments",
   "block.sys.args.description": "Arguments after the script file when run from the command line (empty in the editor).",
   "block.sys.exit.label": "exit with status",

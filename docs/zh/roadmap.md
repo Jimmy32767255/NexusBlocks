@@ -54,8 +54,9 @@
 - ✅ 函数局部变量（`创建局部变量` / `设置局部变量`），递归各层独立
 - ✅ `并且` / `或者`（短路）、`对每项`、`移除`、`解析JSON`、`参数()`（命令行参数）
 - ✅ nblk1：`bootstrap/nblk1.nblk` 是 IR 解释器，`bootstrap/tests/*.nblk` 与原生引擎逐行一致（`pnpm bootstrap:check`）
-- ⬜ nblk1 直接解析 `.nblk` 文本（目前输入是 `tools/ir-dump.mjs` 导出的项目 IR）
+- ✅ nblk2：`bootstrap/nblk2.nblk` 自带词法/表达式/语句/函数/`导入` 前端，把 `.nblk` 源码编译成项目 IR 后交给 nblk1 运行；`bootstrap/tests/*.nblk` 经它运行与原生一致，并能编译 nblk1 再跑 demo（`bootstrap-check --self` 覆盖）
 - ✅ L2：nblk1 解释 nblk1 自身并继续解释 demo，输出与直接解释逐行一致（`pnpm bootstrap:self`）；为此把解释器标识符按 `nblk1_` 前缀分函数命名，避免自举时与程序变量同名覆盖；三层嵌套（1.33 亿步、约 2 分 20 秒）亦输出正确
+- ⬜ 源码级固定点：nblk2 能解析自身（约 1 分钟），但执行内层程序时报 `runtime.error.badType`，需要把多层解释的运行时状态（函数表 / 参数表 / 程序参数）彻底隔离
 - ⬜ 视性能决定是否把默认实现切换为自举版本
 
 ## v1.0 — 稳定

@@ -739,6 +739,14 @@ class Parser {
       this.assign(node, "code", parseExpression(text.slice(5), line.number));
       return node;
     }
+    if (text === "设置参数" || text.startsWith("设置参数 ") || text.startsWith("设置参数(")) {
+      this.index += 1;
+      let rest = text.slice("设置参数".length).trim();
+      if (rest.startsWith("(") && rest.endsWith(")")) rest = rest.slice(1, -1).trim();
+      const node = createBlock("sys.setArgs");
+      this.assign(node, "args", parseExpression(rest, line.number));
+      return node;
+    }
     if (text.startsWith("run ")) {
       this.index += 1;
       const node = createBlock("os.exec_command");
@@ -1354,6 +1362,8 @@ function renderBlock(node: BlockNode, context: PrintContext): string[] {
     }
     case "sys.exit":
       return [`退出程序 ${portValue(node, "code", "number", context)}`];
+    case "sys.setArgs":
+      return [`设置参数 ${portValue(node, "args", "list", context)}`];
     case FUNCTION_RETURN_TYPE: {
       const value = node.fields?.value;
       const input = node.inputs?.value;

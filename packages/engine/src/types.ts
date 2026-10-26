@@ -29,6 +29,8 @@ export interface ExecutionContext {
   readonly signal: AbortSignal;
   /** Extra command line arguments after the script file; empty in the editor. */
   readonly args: readonly string[];
+  /** Replace the arguments the program sees (used by hosts and self-hosted runtimes). */
+  setArgs(args: readonly string[]): void;
 
   /** Evaluate a nested expression block. */
   evaluate(node: BlockNode): Promise<Value>;

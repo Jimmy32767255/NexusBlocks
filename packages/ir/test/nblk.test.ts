@@ -461,6 +461,20 @@ describe("Chinese keywords", () => {
     assert.equal(printNblk(parseOk(printed)), printed);
   });
 
+  test("prints set-arguments statements", () => {
+    const document = parseOk(`项目 "Args"
+
+开始:
+  设置参数 参数()
+`);
+    const body = document.project.scripts[0]!.inputs?.body as BlockNode[];
+    assert.equal(body[0]!.type, "sys.setArgs");
+    assert.equal((body[0]!.inputs?.args as BlockNode).type, "sys.args");
+    const printed = printNblk(document);
+    assert.match(printed, /^  设置参数 参数\(\)$/m);
+    assert.equal(printNblk(parseOk(printed)), printed);
+  });
+
   test("prints function definitions in Chinese", () => {
     const document = parseOk(`项目 "Fn"
 

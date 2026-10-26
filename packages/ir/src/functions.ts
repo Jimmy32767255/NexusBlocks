@@ -167,13 +167,15 @@ export function bindNameCalls(project: Project): { name: string; blockId: string
       return;
     }
     node.type = functionCallType(decl.id);
-    const fields = node.fields;
-    if (!fields) return;
     decl.params.forEach((param, index) => {
       const key = `arg${index}`;
-      if (key in fields) {
-        fields[param.name] = fields[key]!;
-        delete fields[key];
+      if (node.fields && key in node.fields) {
+        node.fields[param.name] = node.fields[key]!;
+        delete node.fields[key];
+      }
+      if (node.inputs && key in node.inputs) {
+        node.inputs[param.name] = node.inputs[key]!;
+        delete node.inputs[key];
       }
     });
   });
