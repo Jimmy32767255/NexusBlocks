@@ -36,7 +36,31 @@ export interface InterpreterOptions {
   debug?: DebugHooks;
 }
 
-export const DEFAULT_YIELD_EVERY = 256;
+export const DEFAULT_YIELD_EVERY = 1024;
+
+/**
+ * Yield to the host event loop cheaply. `setTimeout(0)` is clamped to ~1ms in
+ * Node and browsers, which dominates long runs; `setImmediate`/`MessageChannel`
+ * hand control back in microseconds while still letting timers and renders run.
+ */
+const yieldToEventLoop: () => Promise<void> = (() => {
+  const immediate = (globalThis as { setImmediate?: (cb: () => void) => unknown }).setImmediate;
+  if (typeof immediate === "function") {
+    return () => new Promise<void>((resolve) => immediate(resolve));
+  }
+  if (typeof MessageChannel === "function") {
+    return () =>
+      new Promise<void>((resolve) => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = () => {
+          channel.port1.close();
+          resolve();
+        };
+        channel.port2.postMessage(null);
+      });
+  }
+  return () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+})();
 
 /**
  * Tree-walking interpreter. It owns no globals: variables live per run, and
@@ -66,6 +90,10 @@ export class Interpreter implements ExecutionContext {
 
   private steps = 0;
   private currentBlockId: string | undefined;
+  /** Per-node definition cache: the registry lookup is pure per block type. */
+  private readonly definitions = new WeakMap<BlockNode, BlockDefinition>();
+  /** Port metadata cache for blocks with static ports, keyed by type then port. */
+  private readonly portCache = new Map<string, Map<string, { type: ValueType; fallback: Value }>>();
 
   constructor(project: Project, registry: BlockRegistry, options: InterpreterOptions) {
     this.project = project;
@@ -151,7 +179,7 @@ export class Interpreter implements ExecutionContext {
       if (definition.kind === "statement") {
         await this.debug?.beforeStatement?.(node, this);
       }
-      await this.tick();
+      if (this.step()) await yieldToEventLoop();
       if (definition.kind === "expression") {
         this.fail("runtime.error.expressionAsStatement", { type: node.type });
       }
@@ -164,7 +192,7 @@ export class Interpreter implements ExecutionContext {
 
   async evaluate(node: BlockNode): Promise<Value> {
     this.currentBlockId = node.id;
-    await this.tick();
+    if (this.step()) await yieldToEventLoop();
     const definition = this.definitionFor(node);
     if (definition.kind !== "expression" || !definition.evaluate) {
       this.fail("runtime.error.statementAsValue", { type: node.type });
@@ -179,24 +207,53 @@ export class Interpreter implements ExecutionContext {
       this.currentBlockId = node.id;
       return value;
     }
-    const definition = this.definitionFor(node);
-    const portDef = portsOf(definition, node).find(
-      (candidate) => candidate.name === port && candidate.kind === "value",
-    );
-    const type = portDef?.type ?? "any";
+    const type = this.valuePortType(node, port);
     const raw = node.fields?.[port];
     if (raw !== undefined) return this.coerce(raw, type, node.id);
-    return this.coerce(portDef?.default ?? defaultValue(type), type, node.id);
+    return this.coerce(this.valuePortDefault(node, port), type, node.id);
   }
 
   literal(node: BlockNode, port: string): Value {
     const raw = node.fields?.[port];
     if (raw !== undefined) return raw;
+    return this.valuePortDefault(node, port);
+  }
+
+  /**
+   * Value-port metadata, cached per static block type. Dynamic blocks
+   * (`func.call:<id>`) build their port list per node, so they stay uncached.
+   */
+  private valuePort(node: BlockNode, port: string): { type: ValueType; fallback: Value } {
     const definition = this.definitionFor(node);
-    const portDef = portsOf(definition, node).find(
+    if (definition.dynamicPorts) {
+      const found = definition.dynamicPorts(node).find(
+        (candidate) => candidate.name === port && candidate.kind === "value",
+      );
+      const type = found?.type ?? "any";
+      return { type, fallback: found?.default ?? defaultValue(type) };
+    }
+    let byPort = this.portCache.get(definition.type);
+    if (!byPort) {
+      byPort = new Map();
+      this.portCache.set(definition.type, byPort);
+    }
+    const hit = byPort.get(port);
+    if (hit) return hit;
+    const found = portsOf(definition, node).find(
       (candidate) => candidate.name === port && candidate.kind === "value",
     );
-    return portDef?.default ?? defaultValue(portDef?.type ?? "any");
+    const type = found?.type ?? "any";
+    const entry = { type, fallback: found?.default ?? defaultValue(type) };
+    byPort.set(port, entry);
+    return entry;
+  }
+
+  private valuePortType(node: BlockNode, port: string): ValueType {
+    return this.valuePort(node, port).type;
+  }
+
+  private valuePortDefault(node: BlockNode, port: string): Value {
+    return this.valuePort(node, port).fallback;
   }
 
   stack(node: BlockNode, port: string): BlockNode[] {
@@ -215,13 +272,15 @@ export class Interpreter implements ExecutionContext {
   async callFunction(id: string, args: Value[]): Promise<Value> {
     const decl = this.functions.get(id);
     if (!decl) this.fail("runtime.error.unknownFunction", { name: id });
+    const params = decl.params;
     const frame = new Map<string, Value>();
-    decl.params.forEach((param, index) => {
+    for (let index = 0; index < params.length; index += 1) {
+      const param = params[index]!;
       frame.set(param.name, this.coerce(args[index] ?? defaultValue(param.type), param.type, decl.node.id));
-    });
+    }
     this.frames.push(frame);
     this.locals.push(new Map());
-    this.activeCalls.push({ name: decl.name, blockId: decl.node.id });
+    if (this.debug) this.activeCalls.push({ name: decl.name, blockId: decl.node.id });
     try {
       await this.runFrame((decl.node.inputs?.body as BlockNode[] | undefined) ?? []);
     } catch (error) {
@@ -233,7 +292,7 @@ export class Interpreter implements ExecutionContext {
     } finally {
       this.frames.pop();
       this.locals.pop();
-      this.activeCalls.pop();
+      if (this.debug) this.activeCalls.pop();
     }
     return defaultValue(decl.returnType);
   }
@@ -335,12 +394,15 @@ export class Interpreter implements ExecutionContext {
     });
   }
 
-  async tick(): Promise<void> {
+  /** Count one step; returns true when a cooperative pause is due. */
+  private step(): boolean {
     this.steps += 1;
     if (this.signal.aborted) throw new StopSignal();
-    if (this.steps % this.yieldEvery === 0) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    return this.steps % this.yieldEvery === 0;
+  }
+
+  async tick(): Promise<void> {
+    if (this.step()) await yieldToEventLoop();
   }
 
   exit(code: number): never {
@@ -352,10 +414,13 @@ export class Interpreter implements ExecutionContext {
   }
 
   private definitionFor(node: BlockNode): BlockDefinition {
+    const cached = this.definitions.get(node);
+    if (cached) return cached;
     const definition = this.registry.get(node.type);
     if (!definition) {
       this.fail("runtime.error.unknownBlock", { type: node.type });
     }
+    this.definitions.set(node, definition);
     return definition;
   }
 }
