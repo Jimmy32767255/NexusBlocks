@@ -34,7 +34,9 @@ Nexus Blocks 是一个**可扩展的图形化编程环境**：用积木搭程序
 
 - [`bootstrap/nblk1.nblk`](bootstrap/nblk1.nblk) 是一个完全用 `.nblk` 写成的 IR 解释器：词法/语法由原生前端负责，求值、作用域、控制流、函数调用全部由 `.nblk` 代码实现。
 - `pnpm bootstrap:check` 会把 `bootstrap/tests/*.nblk` 分别交给原生引擎和 nblk1 执行，逐行比对输出。
-- `pnpm bootstrap:self` 让 nblk1 执行 nblk1 自己的 IR，用来验证自解释。
+- [`bootstrap/nblk2.nblk`](bootstrap/nblk2.nblk) 是同一语言的源码前端：它自己完成词法、表达式、语句、函数与 `导入` 的解析，把 `.nblk` 源码编译成项目 IR，再交给 nblk1 运行。
+- `pnpm bootstrap:self` 一次性验证七个组合：nblk1 执行 nblk1 自己的 IR、nblk1 解释 nblk2、nblk2 编译 nblk1 后再跑 demo（源码级固定点）。
+- 默认实现仍是 TypeScript 引擎（`nblk` CLI 与编辑器）；自举实现与它行为对齐，但慢两个数量级以上，定位是语义见证与参考实现。
 
 细节与限制见 [`bootstrap/README.md`](bootstrap/README.md)；路线图见 [`docs/zh/roadmap.md`](docs/zh/roadmap.md) 的 v0.7。
 

@@ -61,6 +61,12 @@ node packages/cli/src/bin.ts bootstrap/nblk1.nblk bootstrap/nblk1.ir.json bootst
 - 值与类型：直接使用语言自带的列表/字典，`类型()` 区分六种值类型。
 - 函数：按 `func.call:<id>` 查函数表，实参按 `参数表` 取端口。
 
+## 定位
+
+自举实现是**语义见证与参考实现**：它证明这门语言的运行时与解析语义可以被它自己表达，
+并由 `bootstrap-check --self` 的七项组合持续和原生引擎对齐。默认实现仍是 TypeScript 引擎
+（CLI 与编辑器都走它），因为自举版本慢两个数量级，切换没有用户收益。
+
 ## 已知限制
 
 - 不执行 `导入`（IR 里的 import 块被忽略）；导入由原生前端在导出 IR 前解析。
