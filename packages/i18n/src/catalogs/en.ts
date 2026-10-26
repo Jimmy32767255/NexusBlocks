@@ -32,6 +32,11 @@ export const en: Catalog = {
   "language.zh-CN": "简体中文",
 
   "panel.toolbox": "Blocks",
+  "sidebar.toolbox": "Blocks",
+  "sidebar.hats": "Top hats",
+  "hats.empty": "No top-level hats yet. Drag a hat block from the toolbox onto the canvas.",
+  "hats.jump": "Scroll the canvas to this script",
+  "hats.meta": "script {index} · {count} blocks",
   "panel.variables": "Variables",
   "panel.console": "Console",
   "panel.problems": "Problems",
