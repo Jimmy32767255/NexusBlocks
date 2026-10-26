@@ -1,4 +1,5 @@
 import { el } from "./dom.ts";
+import { parseArguments } from "./args.ts";
 import { icon } from "./icons.ts";
 import { t } from "./i18n.ts";
 
@@ -186,6 +187,94 @@ export function promptDialog(options: PromptOptions): Promise<string | null> {
     );
 
     unmount = mount(card, () => close(null));
+    input.focus();
+    input.select();
+  });
+}
+
+export interface ArgsDialogOptions {
+  initial: string;
+}
+
+/** Edit the command-line arguments handed to the next run. */
+export function argsDialog(options: ArgsDialogOptions): Promise<string | null> {
+  return new Promise((resolve) => {
+    let unmount = (): void => {};
+    const close = (value: string | null): void => {
+      unmount();
+      resolve(value);
+    };
+
+    const input = el("input", {
+      class: "input input--wide",
+      attrs: {
+        type: "text",
+        value: options.initial,
+        placeholder: t("dialog.args.placeholder"),
+        autocomplete: "off",
+        spellcheck: "false",
+      },
+    });
+    const preview = el("p", { class: "field__hint" });
+    const refresh = (): void => {
+      const args = parseArguments(input.value);
+      preview.textContent =
+        args.length === 0
+          ? t("dialog.args.empty")
+          : t("dialog.args.preview", { count: String(args.length), list: args.join("  ·  ") });
+    };
+    input.addEventListener("input", refresh);
+
+    const card = el("div", {
+      class: "modal__card",
+      attrs: { role: "dialog", "aria-modal": "true", "aria-label": t("dialog.args.title") },
+    });
+
+    const form = el("form", { class: "modal__form" }, [
+      el("label", { class: "field" }, [
+        el("span", { class: "field__label", text: t("dialog.args.label") }),
+        input,
+      ]),
+      el("p", { class: "field__hint", text: t("dialog.args.body") }),
+      preview,
+    ]);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      close(input.value.trim());
+    });
+
+    card.append(
+      el("header", { class: "modal__head" }, [
+        el("h2", { class: "modal__title", text: t("dialog.args.title") }),
+        el(
+          "button",
+          {
+            class: "icon-button",
+            attrs: { type: "button", title: t("common.close") },
+            on: { click: () => close(null) },
+          },
+          [icon("close", 18)],
+        ),
+      ]),
+      el("div", { class: "modal__body" }, [form]),
+      el("div", { class: "modal__actions" }, [
+        el("button", {
+          class: "button",
+          text: t("common.cancel"),
+          attrs: { type: "button" },
+          on: { click: () => close(null) },
+        }),
+        el("button", {
+          class: "button button--primary",
+          text: t("common.confirm"),
+          attrs: { type: "button" },
+          on: { click: () => form.requestSubmit() },
+        }),
+      ]),
+    );
+
+    unmount = mount(card, () => close(null));
+    refresh();
     input.focus();
     input.select();
   });

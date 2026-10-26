@@ -116,7 +116,7 @@ export function createDesktopHost(
 
 export interface DesktopCli {
   path: string;
-  run(source: string, locale: string, onEvent: (event: Value) => void): Promise<void>;
+  run(source: string, locale: string, args: readonly string[], onEvent: (event: Value) => void): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -135,7 +135,7 @@ export async function createDesktopCli(): Promise<DesktopCli | null> {
     if (!path) return null;
     return {
       path,
-      async run(source, locale, onEvent) {
+      async run(source, locale, args, onEvent) {
         await new Promise<void>((resolve, reject) => {
           let settled = false;
           let unlistens: Array<() => void> = [];
@@ -153,7 +153,7 @@ export async function createDesktopCli(): Promise<DesktopCli | null> {
               if (settled) for (const unlisten of registered) unlisten();
             })
             .catch(reject);
-          invoke("cli_run", { source, locale }).catch((error) => {
+          invoke("cli_run", { source, locale, args }).catch((error) => {
             for (const unlisten of unlistens) unlisten();
             reject(error);
           });
